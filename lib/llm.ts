@@ -26,7 +26,7 @@ async function fetchTimeout(
   url: string,
   opts: RequestInit,
   ms: number
-): Promise<{ res: Response | null; timedOut: boolean }> {
+): Promise<{ res: Response | null; timedOut: boolean; error?: Error }> {
   const ctrl = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => {
@@ -35,8 +35,8 @@ async function fetchTimeout(
   }, ms);
   try {
     return { res: await fetch(url, { ...opts, signal: ctrl.signal }), timedOut: false };
-  } catch {
-    return { res: null, timedOut };
+  } catch (e) {
+    return { res: null, timedOut, error: e as Error };
   } finally {
     clearTimeout(timer);
   }
@@ -46,7 +46,33 @@ async function fetchTimeout(
 const GEMINI_TIMEOUT = Number(process.env.GEMINI_TIMEOUT_MS || 90000);
 const ANTHROPIC_TIMEOUT = Number(process.env.ANTHROPIC_TIMEOUT_MS || 60000);
 
-export type LlmReason = "ok" | "timeout" | "invalid_json" | "http_error" | "no_key";
+export type LlmReason = "ok" | "timeout" | "invalid_json" | "http_error" | "no_key" | "exception";
+
+/** Rich result from a single provider attempt, for diagnostics. */
+interface ProviderResult<T> {
+  data: T | null;
+  reason: LlmReason;
+  status?: number; // HTTP status when available
+  message?: string; // short, non-sensitive error message
+  errorType?: string; // error class/name
+}
+
+/** Is Gemini explicitly turned off via config? (e.g. DISABLE_GEMINI=1) */
+function geminiDisabled(): boolean {
+  const v = (process.env.DISABLE_GEMINI || "").toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
+/** Pull a short, non-sensitive error message out of an API error body. */
+function apiErrorMessage(body: string): string {
+  try {
+    const j = JSON.parse(body);
+    const m = j?.error?.message ?? j?.message ?? body;
+    return String(m).slice(0, 200);
+  } catch {
+    return String(body).slice(0, 200);
+  }
+}
 
 /** Send a prompt, return parsed JSON, or null on any failure (caller falls back). */
 export async function interpret<T>(system: string, user: string): Promise<T | null> {
@@ -54,37 +80,89 @@ export async function interpret<T>(system: string, user: string): Promise<T | nu
 }
 
 /**
- * Gemini first (free); on failure, fall back to Anthropic if configured.
- * Reports the provider used and the reason for any failure, for degrade visibility.
+ * Gemini first (free); Anthropic only as fallback. Every decision point emits an
+ * explicit diagnostic so an unattended run reveals exactly why a provider was
+ * used: unavailable, skipped, attempted+failed, rate-limited, unauthorized,
+ * crashed, or succeeded. Never logs key values — only boolean presence.
  */
 export async function interpretWithProvider<T>(
   system: string,
   user: string
 ): Promise<{ data: T | null; provider: "gemini" | "anthropic" | "none"; reason: LlmReason }> {
-  if (process.env.GEMINI_API_KEY) {
-    const g = await geminiInterpret<T>(system, user);
-    if (g.data) return { data: g.data, provider: "gemini", reason: "ok" };
-    if (process.env.ANTHROPIC_API_KEY) {
-      const a = await anthropicInterpret<T>(system, user);
-      if (a.data) return { data: a.data, provider: "anthropic", reason: "ok" };
-      return { data: null, provider: "none", reason: a.reason }; // last reason wins
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY);
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
+
+  console.log(`[gen] providers available gemini=${hasGemini} anthropic=${hasAnthropic}`);
+  console.log(`[gen] provider selection starting`);
+
+  // ── Gemini (primary) ──
+  if (geminiDisabled()) {
+    console.log(`[gen] provider=gemini skipped reason=config_disabled`);
+  } else if (!hasGemini) {
+    console.log(`[gen] provider=gemini skipped reason=missing_api_key`);
+  } else {
+    console.log(`[gen] attempting provider=gemini`);
+    let g: ProviderResult<T>;
+    try {
+      g = await geminiInterpret<T>(system, user);
+    } catch (e) {
+      const err = e as Error;
+      g = { data: null, reason: "exception", message: err?.message?.slice(0, 200), errorType: err?.name };
     }
-    return { data: null, provider: "none", reason: g.reason };
+    if (g.data) {
+      console.log(`[gen] provider=gemini success`);
+      console.log(`[gen] llm provider=gemini reason=ok`);
+      return { data: g.data, provider: "gemini", reason: "ok" };
+    }
+    console.log(
+      `[gen] provider=gemini failed reason=${g.reason}` +
+        (g.status !== undefined ? ` status=${g.status}` : "") +
+        (g.errorType ? ` type=${g.errorType}` : "") +
+        (g.message ? ` message=${JSON.stringify(g.message)}` : "")
+    );
+    console.log(
+      hasAnthropic ? `[gen] falling back to anthropic` : `[gen] no fallback available (anthropic key missing)`
+    );
+    if (!hasAnthropic) {
+      console.log(`[gen] llm provider=none reason=${g.reason}`);
+      return { data: null, provider: "none", reason: g.reason };
+    }
   }
-  if (process.env.ANTHROPIC_API_KEY) {
-    const a = await anthropicInterpret<T>(system, user);
-    return { data: a.data, provider: a.data ? "anthropic" : "none", reason: a.data ? "ok" : a.reason };
+
+  // ── Anthropic (fallback, or primary when Gemini absent/disabled) ──
+  if (hasAnthropic) {
+    console.log(`[gen] attempting provider=anthropic`);
+    let a: ProviderResult<T>;
+    try {
+      a = await anthropicInterpret<T>(system, user);
+    } catch (e) {
+      const err = e as Error;
+      a = { data: null, reason: "exception", message: err?.message?.slice(0, 200), errorType: err?.name };
+    }
+    if (a.data) {
+      console.log(`[gen] provider=anthropic success`);
+      console.log(`[gen] llm provider=anthropic reason=ok`);
+      return { data: a.data, provider: "anthropic", reason: "ok" };
+    }
+    console.log(
+      `[gen] provider=anthropic failed reason=${a.reason}` +
+        (a.status !== undefined ? ` status=${a.status}` : "") +
+        (a.errorType ? ` type=${a.errorType}` : "") +
+        (a.message ? ` message=${JSON.stringify(a.message)}` : "")
+    );
+    console.log(`[gen] llm provider=none reason=${a.reason}`);
+    return { data: null, provider: "none", reason: a.reason };
   }
+
+  // ── Nothing available ──
+  console.log(`[gen] llm provider=none reason=no_key`);
   return { data: null, provider: "none", reason: "no_key" };
 }
 
 // ── Google Gemini (free tier) ──
-async function geminiInterpret<T>(
-  system: string,
-  user: string
-): Promise<{ data: T | null; reason: LlmReason }> {
+async function geminiInterpret<T>(system: string, user: string): Promise<ProviderResult<T>> {
   const key = process.env.GEMINI_API_KEY!;
-  const { res, timedOut } = await fetchTimeout(
+  const { res, timedOut, error } = await fetchTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
     {
       method: "POST",
@@ -98,26 +176,38 @@ async function geminiInterpret<T>(
     },
     GEMINI_TIMEOUT
   );
-  if (!res) return { data: null, reason: timedOut ? "timeout" : "http_error" };
-  if (!res.ok) return { data: null, reason: "http_error" };
+  if (!res) {
+    return timedOut
+      ? { data: null, reason: "timeout", message: `aborted after ${GEMINI_TIMEOUT}ms`, errorType: "AbortError" }
+      : { data: null, reason: "http_error", message: error?.message?.slice(0, 200) ?? "network error", errorType: error?.name ?? "FetchError" };
+  }
+  if (!res.ok) {
+    let message = "";
+    try {
+      message = apiErrorMessage(await res.text());
+    } catch {
+      /* ignore */
+    }
+    return { data: null, reason: "http_error", status: res.status, message };
+  }
   try {
     const json: any = await res.json();
     const text: string =
       (json?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? "").join("\n") || "";
     const data = extractJson<T>(text);
-    return { data, reason: data ? "ok" : "invalid_json" };
-  } catch {
-    return { data: null, reason: "invalid_json" };
+    return data
+      ? { data, reason: "ok" }
+      : { data: null, reason: "invalid_json", message: "model output was not parseable JSON" };
+  } catch (e) {
+    const err = e as Error;
+    return { data: null, reason: "invalid_json", message: err?.message?.slice(0, 200), errorType: err?.name };
   }
 }
 
 // ── Anthropic (optional fallback) ──
-async function anthropicInterpret<T>(
-  system: string,
-  user: string
-): Promise<{ data: T | null; reason: LlmReason }> {
+async function anthropicInterpret<T>(system: string, user: string): Promise<ProviderResult<T>> {
   const key = process.env.ANTHROPIC_API_KEY!;
-  const { res, timedOut } = await fetchTimeout(
+  const { res, timedOut, error } = await fetchTimeout(
     "https://api.anthropic.com/v1/messages",
     {
       method: "POST",
@@ -127,16 +217,31 @@ async function anthropicInterpret<T>(
     },
     ANTHROPIC_TIMEOUT
   );
-  if (!res) return { data: null, reason: timedOut ? "timeout" : "http_error" };
-  if (!res.ok) return { data: null, reason: "http_error" };
+  if (!res) {
+    return timedOut
+      ? { data: null, reason: "timeout", message: `aborted after ${ANTHROPIC_TIMEOUT}ms`, errorType: "AbortError" }
+      : { data: null, reason: "http_error", message: error?.message?.slice(0, 200) ?? "network error", errorType: error?.name ?? "FetchError" };
+  }
+  if (!res.ok) {
+    let message = "";
+    try {
+      message = apiErrorMessage(await res.text());
+    } catch {
+      /* ignore */
+    }
+    return { data: null, reason: "http_error", status: res.status, message };
+  }
   try {
     const json: any = await res.json();
     const text: string =
       (json.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n") || "";
     const data = extractJson<T>(text);
-    return { data, reason: data ? "ok" : "invalid_json" };
-  } catch {
-    return { data: null, reason: "invalid_json" };
+    return data
+      ? { data, reason: "ok" }
+      : { data: null, reason: "invalid_json", message: "model output was not parseable JSON" };
+  } catch (e) {
+    const err = e as Error;
+    return { data: null, reason: "invalid_json", message: err?.message?.slice(0, 200), errorType: err?.name };
   }
 }
 

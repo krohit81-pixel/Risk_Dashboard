@@ -411,6 +411,9 @@ export async function generateSnapshot(
   indicators: Indicator[]
 ): Promise<EditorialSnapshot> {
   const raw = await ingest();
+  console.log(
+    `[gen] env keys: gemini=${Boolean(process.env.GEMINI_API_KEY)} anthropic=${Boolean(process.env.ANTHROPIC_API_KEY)} disableGemini=${(process.env.DISABLE_GEMINI || "false")}`
+  );
   console.log(`[gen] ingested ${raw.length} raw stories`);
 
   // No live source configured → curated seed (clearly marked).

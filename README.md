@@ -380,3 +380,22 @@ Watch the log line: `[gen] layman attached (N fields)` confirms the translation 
 - **"Explain This" removed** everywhere (links, imports, component) — redundant since Learning view
   rewrites the whole screen.
 - **Footer** now reads "Prepared by Rohit Kohli" (name only, no title).
+
+---
+
+## LLM provider diagnostics (instrumentation)
+
+`interpretWithProvider` now emits an explicit line at every decision point so one
+unattended cron run reveals exactly why a provider was used. Never logs key values —
+only boolean presence.
+
+- `[gen] env keys: gemini=<bool> anthropic=<bool> disableGemini=<val>` (start of run)
+- `[gen] providers available gemini=<bool> anthropic=<bool>`
+- `[gen] provider selection starting`
+- `[gen] attempting provider=gemini` → `provider=gemini success` | `provider=gemini failed reason=<r> status=<n> type=<class> message="..."`
+- `[gen] provider=gemini skipped reason=missing_api_key | config_disabled`
+- `[gen] falling back to anthropic` (or `no fallback available …`)
+- `[gen] attempting provider=anthropic` → `provider=anthropic success` | `provider=anthropic failed …`
+- `[gen] llm provider=<provider> reason=<reason>` (preserved summary)
+
+Config: set `DISABLE_GEMINI=1` to force the Anthropic path (emits `config_disabled`).
