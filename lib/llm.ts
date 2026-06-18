@@ -170,7 +170,7 @@ async function geminiInterpret<T>(system: string, user: string): Promise<Provide
       body: JSON.stringify({
         system_instruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: user }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.4, maxOutputTokens: 5000 },
+        generationConfig: { responseMimeType: "application/json", temperature: 0.4, maxOutputTokens: 8192 },
       }),
       cache: "no-store",
     },
@@ -192,12 +192,27 @@ async function geminiInterpret<T>(system: string, user: string): Promise<Provide
   }
   try {
     const json: any = await res.json();
-    const text: string =
-      (json?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? "").join("\n") || "";
-    const data = extractJson<T>(text);
-    return data
-      ? { data, reason: "ok" }
-      : { data: null, reason: "invalid_json", message: "model output was not parseable JSON" };
+    const cand = json?.candidates?.[0];
+    const finishReason: string = cand?.finishReason ?? "";
+    const text: string = (cand?.content?.parts ?? []).map((p: any) => p?.text ?? "").join("\n") || "";
+    const { data, fenceDetected, extractionRequired } = parseLlmJson<T>(text);
+    console.log(
+      `[gen] gemini response: length=${text.length} fences=${fenceDetected} finishReason=${finishReason || "n/a"}`
+    );
+    if (data) {
+      if (extractionRequired) console.log(`[gen] gemini json recovered via extraction`);
+      return { data, reason: "ok" };
+    }
+    // All recovery attempts failed — log the raw head (model output only, no keys) so we can see why.
+    console.log(`[gen] gemini json parse FAILED — raw first 1000 chars: ${JSON.stringify(text.slice(0, 1000))}`);
+    const truncated = finishReason === "MAX_TOKENS";
+    return {
+      data: null,
+      reason: "invalid_json",
+      message: truncated
+        ? "unparseable JSON (response truncated: finishReason=MAX_TOKENS)"
+        : "model output was not parseable JSON after fence-strip + extraction",
+    };
   } catch (e) {
     const err = e as Error;
     return { data: null, reason: "invalid_json", message: err?.message?.slice(0, 200), errorType: err?.name };
@@ -212,7 +227,7 @@ async function anthropicInterpret<T>(system: string, user: string): Promise<Prov
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 5000, system, messages: [{ role: "user", content: user }] }),
+      body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 8000, system, messages: [{ role: "user", content: user }] }),
       cache: "no-store",
     },
     ANTHROPIC_TIMEOUT
@@ -233,19 +248,28 @@ async function anthropicInterpret<T>(system: string, user: string): Promise<Prov
   }
   try {
     const json: any = await res.json();
+    const stopReason: string = json?.stop_reason ?? "";
     const text: string =
       (json.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n") || "";
-    const data = extractJson<T>(text);
-    return data
-      ? { data, reason: "ok" }
-      : { data: null, reason: "invalid_json", message: "model output was not parseable JSON" };
+    const { data, extractionRequired } = parseLlmJson<T>(text);
+    if (data) {
+      if (extractionRequired) console.log(`[gen] anthropic json recovered via extraction`);
+      return { data, reason: "ok" };
+    }
+    console.log(`[gen] anthropic json parse FAILED — raw first 1000 chars: ${JSON.stringify(text.slice(0, 1000))}`);
+    const truncated = stopReason === "max_tokens";
+    return {
+      data: null,
+      reason: "invalid_json",
+      message: truncated ? "unparseable JSON (response truncated: stop_reason=max_tokens)" : "model output was not parseable JSON",
+    };
   } catch (e) {
     const err = e as Error;
     return { data: null, reason: "invalid_json", message: err?.message?.slice(0, 200), errorType: err?.name };
   }
 }
 
-/** Pull the first JSON object/array out of a model response (strips fences/prose). */
+/** Pull the first balanced JSON object/array out of a model response (string-aware). */
 export function extractJson<T>(text: string): T | null {
   if (!text) return null;
   const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
@@ -254,9 +278,19 @@ export function extractJson<T>(text: string): T | null {
   const open = cleaned[start];
   const close = open === "{" ? "}" : "]";
   let depth = 0;
+  let inStr = false;
+  let esc = false;
   for (let i = start; i < cleaned.length; i++) {
-    if (cleaned[i] === open) depth++;
-    else if (cleaned[i] === close) {
+    const ch = cleaned[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === open) depth++;
+    else if (ch === close) {
       depth--;
       if (depth === 0) {
         try {
@@ -267,7 +301,31 @@ export function extractJson<T>(text: string): T | null {
       }
     }
   }
-  return null;
+  return null; // never balanced → likely truncated
+}
+
+/**
+ * Robust JSON recovery for LLM output. Tries, in order:
+ *   1. strip ```json / ``` fences + trim, then JSON.parse directly;
+ *   2. balanced, string-aware extraction of the first JSON value (handles prose
+ *      before/after the object).
+ * Reports what was needed so the caller can log it. Only after BOTH fail should
+ * the caller treat the response as invalid and fall back.
+ */
+export function parseLlmJson<T>(text: string): {
+  data: T | null;
+  fenceDetected: boolean;
+  extractionRequired: boolean;
+} {
+  const fenceDetected = text.includes("```");
+  const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  try {
+    return { data: JSON.parse(cleaned) as T, fenceDetected, extractionRequired: false };
+  } catch {
+    /* fall through to extraction */
+  }
+  const data = extractJson<T>(cleaned);
+  return { data, fenceDetected, extractionRequired: data !== null };
 }
 
 /** System prompt enforcing grounding + the CRO voice + hype-free tone. */

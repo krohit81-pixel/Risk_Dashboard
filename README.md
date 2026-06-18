@@ -399,3 +399,21 @@ only boolean presence.
 - `[gen] llm provider=<provider> reason=<reason>` (preserved summary)
 
 Config: set `DISABLE_GEMINI=1` to force the Anthropic path (emits `config_disabled`).
+
+---
+
+## Gemini JSON robustness
+
+Minor formatting deviations no longer trigger an unnecessary Anthropic fallback.
+`parseLlmJson()` recovers in order: (1) strip ```` ```json ```` / ```` ``` ```` fences + trim → direct
+`JSON.parse`; (2) string-aware balanced extraction of the first JSON value (handles prose
+before/after). Only if BOTH fail does the provider report `invalid_json` and fall back.
+
+Gemini parse logging (no keys, model output only):
+- `[gen] gemini response: length=<n> fences=<bool> finishReason=<r>`
+- `[gen] gemini json recovered via extraction` (when wrapper/prose stripping was needed)
+- `[gen] gemini json parse FAILED — raw first 1000 chars: "<…>"` (on unrecoverable output)
+
+Also: `maxOutputTokens` raised to 8192 (Gemini) and `max_tokens` to 8000 (Anthropic) to stop the
+large layman-translation call truncating mid-JSON; truncation is now named explicitly
+(`finishReason=MAX_TOKENS` / `stop_reason=max_tokens`).
