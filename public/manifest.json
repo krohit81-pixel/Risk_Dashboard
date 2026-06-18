@@ -1,0 +1,10 @@
+{
+  "name": "Global Risk Intelligence",
+  "short_name": "Risk Brief",
+  "description": "Morning risk briefing for a global-bank CRO.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
+  "orientation": "portrait"
+}

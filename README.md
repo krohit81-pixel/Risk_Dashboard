@@ -365,4 +365,18 @@ sparklines on Markets; Mizuho relevance band.
 - LLM budget unchanged: the translation call replaces the old Explain call (still two calls/run).
 
 Watch the log line: `[gen] layman attached (N fields)` confirms the translation succeeded.
-# Risk_Dashboard
+
+---
+
+## Version 3.7 — UX/data-quality polish (pre-V4)
+
+- **Toggle scope:** the Executive ↔ Learning toggle now appears **only on the Today tab** and
+  affects only sections 03+ (CRO Conversation, Editorial Intelligence, Japan & Asia Watch).
+  Sections 01–02 are untouched; the toggle is gone from Markets and Learn (those render in their
+  default wording).
+- **Persistence fix:** `topicId` is normalised to a stable slug, so "Day X · seen X×" now reflects
+  true theme persistence. Day X = calendar days since first appearance; seen X× = unique daily
+  snapshots. Refreshing the page and regenerating the same day no longer change the counters.
+- **"Explain This" removed** everywhere (links, imports, component) — redundant since Learning view
+  rewrites the whole screen.
+- **Footer** now reads "Prepared by Rohit Kohli" (name only, no title).
