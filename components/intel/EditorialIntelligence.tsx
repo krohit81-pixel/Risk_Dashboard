@@ -2,6 +2,8 @@
 "use client";
 
 import type { EditorialCard } from "@/lib/types";
+import { SaveButton } from "../saved/SaveButton";
+import type { SavedItem } from "@/lib/savedStore";
 import { Card, SeverityPill, Chip } from "../ui";
 import {
   HorizonPill,
@@ -17,9 +19,13 @@ import {
 export function EditorialIntelligence({
   cards,
   learning,
+  savedIds,
+  onToggleSave,
 }: {
   cards: EditorialCard[];
   learning: boolean;
+  savedIds?: Set<string>;
+  onToggleSave?: (i: SavedItem) => void;
 }) {
   return (
     <section className="rise">
@@ -81,6 +87,15 @@ export function EditorialIntelligence({
             <ItemFooter>
               <SourceLink source={c.source} />
               <ConfidenceChip confidence={c.confidence} />
+              {onToggleSave ? (
+                <span className="ml-auto">
+                  <SaveButton
+                    item={{ id: c.id, kind: "editorial", title: c.title, interpretation: c.whyItMatters, bankingImpact: c.bankRisk ?? "", whyMizuho: [], sources: c.source, savedAtISO: "" }}
+                    saved={Boolean(savedIds?.has(c.id))}
+                    onToggle={onToggleSave}
+                  />
+                </span>
+              ) : null}
             </ItemFooter>
           </Card>
         ))}

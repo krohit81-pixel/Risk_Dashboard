@@ -8,6 +8,8 @@ import type {
   Confidence,
   CoverageItem,
   CroTheme,
+  EditorialCard,
+  RadarItem,
   ExplainPoint,
   EditorialSnapshot,
   IntelligenceLayer,
@@ -27,6 +29,7 @@ import {
 } from "./snapshotStore";
 import { ADAPTERS, relevanceScore, type RawStory } from "./newsAdapter";
 import { detectConcepts } from "./concepts";
+import { lensFor } from "./relevanceConfig";
 import { interpretWithProvider, llmAvailable, CRO_SYSTEM_PROMPT, type LlmReason } from "./llm";
 import type { DegradeReason } from "./types";
 
@@ -182,6 +185,7 @@ Return ONE JSON object with this exact shape (no prose outside the JSON):
 Rules:
 - 3-5 themes (all expanded), 1-2 editorial cards${hasJapanNews ? ", one japanAsia object built ONLY from Japan/BOJ/yen/JGB/Nikkei stories" : ""}.
 - Each story cluster may anchor only ONE output item. Do NOT repeat the same development across a theme and an editorial card — editorial cards MUST cover different stories than the themes.
+- PRIORITISATION: the reader is onboarding with Mizuho **Americas**. Rank US-relevant developments FIRST — Federal Reserve / FOMC, the Treasury market and funding (issuance, repo/SOFR, liquidity), US credit (IG/HY spreads, private credit, leveraged loans/CLOs), the US banking sector (regional-bank stress, CRE, deposits, capital — SLR / Basel III endgame), US capital markets and US regulation (Fed/OCC/FDIC). Favour US banking/credit/regulatory specificity over generic US macro headlines. Keep Japan/BOJ/JGB/USDJPY developments as important secondary context (they also surface in the dedicated Japan section). Europe/EMEA is tertiary for now.
 - Rank by CRO relevance, not popularity. Keep each field concise. JSON only.`;
 
   const { data: out, provider, reason } = await interpretWithProvider<Partial<IntelligenceLayer>>(
@@ -237,11 +241,36 @@ Rules:
     expandedCount: themes.filter((t) => t.expanded).length,
     editorial,
     japanAsia,
+    radar: buildRadar(clusters, themes, editorial),
     weekly: curated.weekly, // weekly handled separately (Monday job / curated)
     liveNews: true,
     generatedISO: new Date().toISOString(),
   };
   return { intel, provider, reason: "ok" };
+}
+
+/**
+ * "Also on the Radar" — headline-only breadth. Built deterministically from the
+ * clusters that did NOT become full themes/editorial (no LLM call, no translation,
+ * so zero added generation cost or truncation risk). Deduped against what's already
+ * shown, US/relevance-ranked, capped.
+ */
+function buildRadar(clusters: Cluster[], themes: CroTheme[], editorial: EditorialCard[]): RadarItem[] {
+  const shown = [...themes.map((t) => t.title), ...editorial.map((e) => e.title)];
+  const isDup = (title: string) => shown.some((s) => titleOverlap(s, title) > 0.5);
+  const out: RadarItem[] = [];
+  const seen = new Set<string>();
+  // Skip the top clusters that fed the themes; scan the rest for headline items.
+  for (const c of clusters.slice(3)) {
+    const lead = c.stories[0];
+    if (!lead?.title) continue;
+    const key = lead.title.toLowerCase().slice(0, 50);
+    if (seen.has(key) || isDup(lead.title)) continue;
+    seen.add(key);
+    out.push({ title: lead.title, source: lead.source, url: lead.url || undefined, lens: lensFor(`${lead.title} ${lead.summary}`) });
+    if (out.length >= 6) break;
+  }
+  return out;
 }
 
 function anchorFromIndicators(id: string | undefined, indicators: Indicator[]) {

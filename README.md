@@ -417,3 +417,22 @@ Gemini parse logging (no keys, model output only):
 Also: `maxOutputTokens` raised to 8192 (Gemini) and `max_tokens` to 8000 (Anthropic) to stop the
 large layman-translation call truncating mid-JSON; truncation is now named explicitly
 (`finishReason=MAX_TOKENS` / `stop_reason=max_tokens`).
+
+---
+
+## Version 3.8 — Relevance + retention (Americas-first)
+
+- **US-first relevance rebalance.** Phase-aware four-lens weighting in `lib/relevanceConfig.ts`
+  (US / macro / Japan / Europe). `ONBOARDING_PHASE` env (default `1` = Americas) shifts the
+  weighting without a rebuild. US banking/credit/regulatory specificity is rewarded; the ranking
+  prompt prioritises Fed/Treasury/US credit/US banking/capital markets/US regulation. Japan stays
+  protected by its own dedicated section.
+- **Save for Later.** Save the *interpreted* snapshot (title · why it matters · banking impact ·
+  why-Mizuho · source) of any theme/editorial/Japan item. KV-backed (`saved:items`, capped 50),
+  surfaced in a Learn-tab "Saved for Later" section. API: `/api/saved` (GET/POST/DELETE).
+- **Also on the Radar.** Headline-only breadth built deterministically from leftover clusters —
+  no LLM call, no translation, no truncation risk. Lens-tagged, tappable to source.
+- **Regenerate editorial.** Manual re-run button on Today (busy-guarded via KV `regen:status`,
+  preserves last-good on failure). API: `/api/regenerate` (POST run, GET status).
+
+Deferred to V4: Ask About This, Add to Learn, Supabase, editable concept library, personal notes.

@@ -22,12 +22,16 @@ export interface NewsAdapter {
 }
 
 // CRO topic set for the relevance filter (earnings/single-stock/celebrity noise suppressed).
+import { lensBonus } from "./relevanceConfig";
+
 export const CRO_TOPICS = [
   "inflation", "interest rate", "central bank", "treasury", "bond yield", "yield",
   "credit spread", "high yield", "private credit", "commercial real estate", "cre",
   "liquidity", "capital", "basel", "regulation", "supervision", "stress test",
   "boj", "jgb", "yen", "carry trade", "nikkei", "japan", "china", "apac",
   "geopolitic", "sanction", "tariff", "energy price", "recession", "default", "fed",
+  "fomc", "powell", "sofr", "repo", "regional bank", "occ", "fdic", "slr",
+  "leveraged loan", "clo", "deposit", "capital markets", "treasury auction",
 ];
 
 const SUPPRESS = ["earnings beat", "stock surges", "meme", "retail traders", "quarterly profit", "price target"];
@@ -50,6 +54,8 @@ export function relevanceScore(story: RawStory): number {
   let score = sourceTier(story.source);
   for (const t of CRO_TOPICS) if (text.includes(t)) score += 1;
   for (const s of SUPPRESS) if (text.includes(s)) score -= 3;
+  // Phase-aware lens priority (US-first during Americas onboarding; Japan still scores).
+  score += lensBonus(text).bonus;
   return score;
 }
 

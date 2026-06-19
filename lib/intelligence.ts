@@ -307,6 +307,7 @@ export function buildIntelligence(
     expandedCount: themes.filter((t) => t.expanded).length,
     editorial,
     japanAsia: JAPAN_ASIA,
+    radar: [],
     weekly: WEEKLY,
     liveNews,
     generatedISO: new Date().toISOString(),

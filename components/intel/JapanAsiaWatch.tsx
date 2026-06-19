@@ -2,6 +2,8 @@
 "use client";
 
 import type { JapanAsiaWatch as JAW } from "@/lib/types";
+import { SaveButton } from "../saved/SaveButton";
+import type { SavedItem } from "@/lib/savedStore";
 import { Card } from "../ui";
 import {
   HorizonPill,
@@ -19,10 +21,15 @@ import {
 export function JapanAsiaWatchSection({
   data,
   learning,
+  savedIds,
+  onToggleSave,
 }: {
   data: JAW;
   learning: boolean;
+  savedIds?: Set<string>;
+  onToggleSave?: (i: SavedItem) => void;
 }) {
+  const savedItem: SavedItem = { id: "japan-watch", kind: "japan", title: "Japan & Asia Watch", interpretation: data.narrative, bankingImpact: "", whyMizuho: data.mizuho ?? [], sources: data.source, savedAtISO: "" };
   return (
     <section className="rise">
       <Card className="px-4 py-3.5">
@@ -49,6 +56,11 @@ export function JapanAsiaWatchSection({
           <SourceLink source={data.source} />
           <ConfidenceChip confidence={data.confidence} />
           {data.interpretation ? <InterpretationTag /> : null}
+          {onToggleSave ? (
+            <span className="ml-auto">
+              <SaveButton item={savedItem} saved={Boolean(savedIds?.has(savedItem.id))} onToggle={onToggleSave} />
+            </span>
+          ) : null}
         </ItemFooter>
       </Card>
     </section>

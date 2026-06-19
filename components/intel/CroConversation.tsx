@@ -5,6 +5,8 @@ import { useState } from "react";
 import type { CroTheme } from "@/lib/types";
 import { Card, SeverityPill, Chip } from "../ui";
 import { Linkify } from "../learn/Linkify";
+import { SaveButton } from "../saved/SaveButton";
+import type { SavedItem } from "@/lib/savedStore";
 import {
   HorizonPill,
   LabeledLine,
@@ -40,7 +42,8 @@ function PersistenceBadge({ theme }: { theme: CroTheme }) {
   return null;
 }
 
-function ThemeCard({ theme: t, learning, onOpenConcept }: { theme: CroTheme; learning: boolean; onOpenConcept?: (id: string) => void }) {
+function ThemeCard({ theme: t, learning, onOpenConcept, savedIds, onToggleSave }: { theme: CroTheme; learning: boolean; onOpenConcept?: (id: string) => void; savedIds?: Set<string>; onToggleSave?: (i: SavedItem) => void }) {
+  const savedItem: SavedItem = { id: t.topicId || t.id, kind: "theme", title: t.title, interpretation: t.whyItMatters, bankingImpact: t.bankingImpact, whyMizuho: t.mizuho ?? [], sources: t.source, savedAtISO: "" };
   const [open, setOpen] = useState(learning);
   return (
     <Card className="px-4 py-3.5">
@@ -89,6 +92,11 @@ function ThemeCard({ theme: t, learning, onOpenConcept }: { theme: CroTheme; lea
         <SourceLink source={t.source} />
         <ConfidenceChip confidence={t.confidence} />
         {t.interpretation ? <InterpretationTag /> : null}
+        {onToggleSave ? (
+          <span className="ml-auto">
+            <SaveButton item={savedItem} saved={Boolean(savedIds?.has(savedItem.id))} onToggle={onToggleSave} />
+          </span>
+        ) : null}
       </ItemFooter>
     </Card>
   );
@@ -99,11 +107,15 @@ export function CroConversation({
   expandedCount,
   learning,
   onOpenConcept,
+  savedIds,
+  onToggleSave,
 }: {
   themes: CroTheme[];
   expandedCount: number;
   learning: boolean;
   onOpenConcept?: (id: string) => void;
+  savedIds?: Set<string>;
+  onToggleSave?: (i: SavedItem) => void;
 }) {
   const cards = themes.filter((t) => t.expanded);
   return (
@@ -114,7 +126,7 @@ export function CroConversation({
       </p>
       <div className="space-y-3">
         {cards.map((t) => (
-          <ThemeCard key={t.id} theme={t} learning={learning} onOpenConcept={onOpenConcept} />
+          <ThemeCard key={t.id} theme={t} learning={learning} onOpenConcept={onOpenConcept} savedIds={savedIds} onToggleSave={onToggleSave} />
         ))}
       </div>
     </section>

@@ -21,6 +21,9 @@ import { StaleBanner } from "@/components/intel/StaleBanner";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { WhatChangedOvernight } from "@/components/WhatChangedOvernight";
 import { ConceptLibrary } from "@/components/learn/ConceptLibrary";
+import { RadarSection } from "@/components/intel/RadarSection";
+import { SavedList } from "@/components/saved/SavedList";
+import type { SavedItem } from "@/lib/savedStore";
 import { resolveIntelligence } from "@/lib/layman";
 
 export default function Page() {
@@ -59,6 +62,69 @@ export default function Page() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // ── Save for Later ──
+  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
+  const savedIds = new Set(savedItems.map((s) => s.id));
+  const loadSaved = useCallback(async () => {
+    try {
+      const r = await fetch("/api/saved", { cache: "no-store" });
+      if (r.ok) setSavedItems(((await r.json()).items ?? []) as SavedItem[]);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  useEffect(() => {
+    loadSaved();
+  }, [loadSaved]);
+
+  const toggleSave = useCallback(
+    async (item: SavedItem) => {
+      const exists = savedItems.some((s) => s.id === item.id);
+      setSavedItems((prev) => (exists ? prev.filter((s) => s.id !== item.id) : [item, ...prev]));
+      try {
+        if (exists) await fetch(`/api/saved?id=${encodeURIComponent(item.id)}`, { method: "DELETE" });
+        else
+          await fetch("/api/saved", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item),
+          });
+      } catch {
+        loadSaved();
+      }
+    },
+    [savedItems, loadSaved]
+  );
+  const removeSavedItem = useCallback(
+    async (id: string) => {
+      setSavedItems((prev) => prev.filter((s) => s.id !== id));
+      try {
+        await fetch(`/api/saved?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      } catch {
+        loadSaved();
+      }
+    },
+    [loadSaved]
+  );
+
+  // ── Manual regenerate ──
+  const [regenState, setRegenState] = useState<"idle" | "running" | "failed">("idle");
+  const regenerate = useCallback(async () => {
+    if (regenState === "running") return;
+    setRegenState("running");
+    try {
+      const r = await fetch("/api/regenerate", { method: "POST" });
+      if (r.ok) {
+        await load();
+        setRegenState("idle");
+      } else {
+        setRegenState("failed");
+      }
+    } catch {
+      setRegenState("failed");
+    }
+  }, [regenState, load]);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-app">
@@ -132,6 +198,18 @@ export default function Page() {
                     Learning view — rewrites the conversation, editorial and Japan sections in plain English.
                   </p>
                 ) : null}
+                <button
+                  type="button"
+                  onClick={regenerate}
+                  disabled={regenState === "running"}
+                  className={`mt-1 inline-flex w-fit items-center gap-1.5 rounded-lg border px-2.5 py-1 text-2xs font-semibold transition ${
+                    regenState === "running"
+                      ? "border-line bg-ink-800 text-fg-faint"
+                      : "border-line bg-ink-800 text-steel active:bg-ink-700"
+                  }`}
+                >
+                  {regenState === "running" ? "↻ Regenerating editorial…" : regenState === "failed" ? "↻ Retry (last attempt failed)" : "↻ Regenerate editorial"}
+                </button>
               </div>
             ) : null}
 
@@ -162,15 +240,22 @@ export default function Page() {
                     expandedCount={data.intelligence.expandedCount}
                     learning={learning}
                     onOpenConcept={openConcept}
+                    savedIds={savedIds}
+                    onToggleSave={toggleSave}
                   />
                 </CollapsibleSection>
 
                 <CollapsibleSection id="editorial" n="04" title="Editorial Intelligence" hint="other developments" defaultOpen={false}>
-                  <EditorialIntelligence cards={intel!.editorial} learning={learning} />
+                  <EditorialIntelligence cards={intel!.editorial} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} />
                 </CollapsibleSection>
                 <CollapsibleSection id="japanasia" n="05" title="Japan & Asia Watch" hint="daily narrative" defaultOpen={false}>
-                  <JapanAsiaWatchSection data={intel!.japanAsia} learning={learning} />
+                  <JapanAsiaWatchSection data={intel!.japanAsia} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} />
                 </CollapsibleSection>
+                {intel!.radar?.length ? (
+                  <CollapsibleSection id="radar" n="06" title="Also on the Radar" hint="headline-level breadth" defaultOpen={false}>
+                    <RadarSection items={intel!.radar} />
+                  </CollapsibleSection>
+                ) : null}
               </>
             ) : null}
 
@@ -198,14 +283,17 @@ export default function Page() {
             {/* ===== LEARN ===== */}
             {tab === "learn" ? (
               <>
-                <CollapsibleSection id="library" n="01" title="Concept Library" hint="your growing glossary" lockOpen>
+                <CollapsibleSection id="saved" n="01" title="Saved for Later" hint={`${savedItems.length} item${savedItems.length === 1 ? "" : "s"}`} defaultOpen={savedItems.length > 0}>
+                  <SavedList items={savedItems} onRemove={removeSavedItem} />
+                </CollapsibleSection>
+                <CollapsibleSection id="library" n="02" title="Concept Library" hint="your growing glossary" lockOpen>
                   <ConceptLibrary
                     conceptSeen={data.conceptSeen ?? {}}
                     openId={openConceptId}
                     onConsumeOpen={() => setOpenConceptId(null)}
                   />
                 </CollapsibleSection>
-                <CollapsibleSection id="weekly" n="02" title="Weekly Learning Summary" hint="generated weekly" defaultOpen={false}>
+                <CollapsibleSection id="weekly" n="03" title="Weekly Learning Summary" hint="generated weekly" defaultOpen={false}>
                   <WeeklyLearningSection data={data.intelligence.weekly} />
                 </CollapsibleSection>
               </>

@@ -297,6 +297,13 @@ export interface WeeklyLearning {
   questionsNextWeek: string[];
 }
 
+export interface RadarItem {
+  title: string;
+  source: string;
+  url?: string;
+  lens?: string; // us | macro | japan | europe
+}
+
 export interface IntelligenceLayer {
   /** Single ranked theme set powering both radar (09) and conversation (10). */
   themes: CroTheme[];
@@ -304,6 +311,8 @@ export interface IntelligenceLayer {
   editorial: EditorialCard[];
   japanAsia: JapanAsiaWatch;
   weekly: WeeklyLearning;
+  /** Headline-only breadth — developments without full editorial treatment. */
+  radar: RadarItem[];
   /** True when any theme/editorial item came from a live news adapter. */
   liveNews: boolean;
   generatedISO: string;

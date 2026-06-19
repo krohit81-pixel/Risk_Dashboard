@@ -38,7 +38,7 @@ async function cmd(command: unknown[]): Promise<unknown> {
   return json.result ?? null;
 }
 
-async function kvGet<T>(key: string): Promise<T | null> {
+export async function kvGet<T>(key: string): Promise<T | null> {
   try {
     const v = (await cmd(["GET", key])) as string | null;
     return v ? (JSON.parse(v) as T) : null;
@@ -47,7 +47,7 @@ async function kvGet<T>(key: string): Promise<T | null> {
   }
 }
 
-async function kvSet(key: string, value: unknown): Promise<void> {
+export async function kvSet(key: string, value: unknown): Promise<void> {
   await cmd(["SET", key, JSON.stringify(value)]);
 }
 
