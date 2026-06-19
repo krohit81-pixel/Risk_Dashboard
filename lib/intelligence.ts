@@ -22,6 +22,10 @@ import type {
 const THEMES: CroTheme[] = [
   {
     id: "th-carry",
+    mizuhoAlignment: [
+      { riskId: 'rates-markets', riskName: 'Rising interest rates & market volatility', scenarioId: 'boj-jgb', scenarioLabel: 'BOJ normalisation / JGB yields', confidence: 'High', why: "Rising JGB yields mark down Mizuho's large domestic bond holdings (AFS/duration) and pressure capital.", whyLayman: 'As Japanese government bonds pay more, the bonds Mizuho already holds lose value on paper — which eats into its capital cushion.' },
+      { riskId: 'fx-funding', riskName: 'Foreign-currency funding & liquidity', scenarioId: 'usd-funding', scenarioLabel: 'USD funding squeeze', confidence: 'Medium', why: 'A disorderly carry unwind can tighten dollar funding just as a yen-based bank needs it most.', whyLayman: 'If the cheap-yen trade unwinds fast, dollars get more expensive to borrow exactly when Mizuho needs them.' },
+    ],
     topicId: "boj-normalisation",
     radarLabel: "BOJ normalisation",
     radarClass: "Japan",
@@ -62,6 +66,9 @@ const THEMES: CroTheme[] = [
   },
   {
     id: "th-inflation",
+    mizuhoAlignment: [
+      { riskId: 'rates-markets', riskName: 'Rising interest rates & market volatility', scenarioId: 'us-higher-for-longer', scenarioLabel: 'US higher-for-longer', confidence: 'High', why: "Sticky inflation keeping US rates high widens credit spreads and depresses Mizuho's bond-portfolio values.", whyLayman: 'If US prices stay hot, rates stay high — which makes risky borrowing pricier and lowers the value of bonds Mizuho holds.' },
+    ],
     topicId: "services-inflation",
     radarLabel: "Higher-for-longer rates",
     radarClass: "Macro",
@@ -101,6 +108,9 @@ const THEMES: CroTheme[] = [
   },
   {
     id: "th-privatecredit",
+    mizuhoAlignment: [
+      { riskId: 'econ-slowdown', riskName: 'Economic deterioration (US / global slowdown)', scenarioId: 'nbfi-private-credit', scenarioLabel: 'NBFI / private-credit stress', confidence: 'High', why: 'Opaque leverage in private credit reaches Mizuho via fund-finance lines and counterparty exposure rather than direct loans.', whyLayman: 'Mizuho is exposed to private-credit funds indirectly — through the financing and trading lines it extends them — so their stress can still land on the bank.' },
+    ],
     topicId: "private-credit",
     radarLabel: "Private-credit transparency",
     radarClass: "Regulatory",
@@ -141,6 +151,9 @@ const THEMES: CroTheme[] = [
   // Radar-only themes (covered as editorial / emerging risks, not expanded).
   {
     id: "th-cre",
+    mizuhoAlignment: [
+      { riskId: 'credit-concentration', riskName: 'Credit concentration', scenarioId: 'cre-office', scenarioLabel: 'Commercial real estate', confidence: 'High', why: 'The office refinancing wall raises default risk among CRE-heavy borrowers and reprices collateral in the book.', whyLayman: "Lots of property loans must refinance at much higher rates; some borrowers won't manage it, and the buildings backing the loans are worth less." },
+    ],
     topicId: "cre-refinancing",
     radarLabel: "CRE refinancing wall",
     radarClass: "Credit",
@@ -164,6 +177,9 @@ const THEMES: CroTheme[] = [
   },
   {
     id: "th-geo",
+    mizuhoAlignment: [
+      { riskId: 'geopolitical', riskName: 'Geopolitical risk', scenarioId: 'energy-supply', scenarioLabel: 'Energy / supply-chain shock', confidence: 'Medium', why: 'Conflict-driven energy or supply-chain shocks hit borrowers and can reignite the inflation that keeps rates high.', whyLayman: 'Wars and trade fights can spike energy prices and snarl supply chains, hurting borrowers and pushing inflation (and rates) back up.' },
+    ],
     topicId: "geopolitical-tail",
     radarLabel: "Geopolitical tail risk",
     radarClass: "Macro",

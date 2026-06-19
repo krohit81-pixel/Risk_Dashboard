@@ -6,6 +6,7 @@ import type { CroTheme } from "@/lib/types";
 import { Card, SeverityPill, Chip } from "../ui";
 import { Linkify } from "../learn/Linkify";
 import { SaveButton } from "../saved/SaveButton";
+import { MizuhoAlignmentBlock } from "./MizuhoAlignment";
 import type { SavedItem } from "@/lib/savedStore";
 import {
   HorizonPill,
@@ -67,6 +68,7 @@ function ThemeCard({ theme: t, learning, onOpenConcept, savedIds, onToggleSave, 
         <Linkify text={t.bankingImpact} onOpen={onOpenConcept} />
       </LabeledLine>
       <MizuhoBlock bullets={t.mizuho} />
+      <MizuhoAlignmentBlock items={t.mizuhoAlignment} learning={learning} />
 
       {/* Go deeper — mechanics/teaching layer */}
       <button

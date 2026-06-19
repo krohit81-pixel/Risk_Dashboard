@@ -207,6 +207,19 @@ export interface CroTheme {
   explain?: ThemeExplain;
   // Plain-English twin (whole-screen Learning view)
   layman?: ThemeLayman;
+  // v3.9 — mapping to Mizuho's published Top Risks (0..n; may be empty = no clean match)
+  mizuhoAlignment?: MizuhoAlignment[];
+}
+
+/** One mapping of a theme to a Mizuho published Top Risk + scenario (AI interpretation). */
+export interface MizuhoAlignment {
+  riskId: string;
+  riskName: string;        // resolved from the curated framework (display)
+  scenarioId: string;
+  scenarioLabel: string;   // resolved (display)
+  confidence: Confidence;  // derived High/Med/Low
+  why: string;             // transmission path FROM THIS EVENT (executive wording)
+  whyLayman?: string;      // plain-English twin (Learning view)
 }
 
 export interface ThemeLayman {

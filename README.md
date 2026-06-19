@@ -451,3 +451,21 @@ Deferred to V4: Ask About This, Add to Learn, Supabase, editable concept library
 - **Generation History** (`/api/runs`, `lib/runStore.ts`): 15-entry ring buffer recorded by both
   the cron and the regenerate route — time · scheduled/manual · ok/fail · provider · fallback.
   Surfaced in a "Generation History" section on Today.
+
+---
+
+## Version 3.9 — Mizuho Risk Alignment
+
+- **Curated Top Risks framework** (`lib/mizuhoTopRisks.ts`): Mizuho's published top-risk taxonomy
+  (as of March 2025 / FY2025), each risk with published-style scenarios + transmission paths.
+  Reference data — versioned locally, never fetched at runtime; quarterly diff-check cadence.
+- **Alignment step** (`alignThemesToMizuho`): a grounded LLM call maps each theme to 0..n
+  `{riskId, scenarioId, confidence, why}`. Strictly grounded — maps ONLY to supplied ids
+  (invalid pairs rejected, not invented), anchors each "why" to a specific scenario's path
+  (repetition guard), states transmission from THIS event, and **may return empty (no match)**.
+  Confidence derived High/Med/Low. Isolated — failure never breaks the briefing.
+- **Theme-card field** (`MizuhoAlignmentBlock`): purple chip(s) in Executive view (risk · scenario ·
+  confidence); a "Why Mizuho cares" plain-English narrative in Learning view (pre-translated twin).
+  Renders nothing when there's no match. Explicit provenance: framework = sourced fact, mapping =
+  AI interpretation (not Mizuho's own view or exposure).
+- Curated baseline themes ship with hand-authored alignments so the lens is visible pre-live-run.
