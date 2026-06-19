@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { fetchIndicators } from "@/lib/marketData";
 import { generateSnapshot } from "@/lib/snapshotEngine";
 import { saveSnapshot, slotForNow } from "@/lib/snapshotStore";
+import { recordRun } from "@/lib/runStore";
 import type { SnapshotSlot } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,15 @@ export async function GET(req: Request) {
     const snapshot = await generateSnapshot(slot, indicators); // throws on invalid
     await saveSnapshot(snapshot);
     console.log(`[cron] slot=${slot} saved · degradeReason=${snapshot.meta.degradeReason} · provider=${snapshot.meta.llmProvider}`);
+    await recordRun({
+      ranISO: new Date().toISOString(),
+      trigger: "scheduled",
+      ok: true,
+      provider: snapshot.meta.llmProvider,
+      fallbackUsed: snapshot.meta.llmProvider === "anthropic",
+      degradeReason: snapshot.meta.degradeReason,
+      themes: snapshot.meta.themesGenerated,
+    });
     return NextResponse.json({
       ok: true,
       slot,
@@ -48,6 +58,7 @@ export async function GET(req: Request) {
     });
   } catch (err) {
     // Do NOT overwrite the existing snapshot — graceful staleness.
+    await recordRun({ ranISO: new Date().toISOString(), trigger: "scheduled", ok: false, error: String(err) });
     return NextResponse.json(
       { ok: false, slot, error: String(err), note: "previous snapshot retained" },
       { status: 500 }

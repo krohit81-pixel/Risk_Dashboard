@@ -13,7 +13,8 @@ export interface SavedItem {
   bankingImpact: string;
   whyMizuho: string[];
   sources: string;
-  savedAtISO: string;
+  savedAtISO: string;   // when the user saved it
+  snapshotISO?: string; // original snapshot date for timeline context
 }
 
 const KEY = "saved:items";

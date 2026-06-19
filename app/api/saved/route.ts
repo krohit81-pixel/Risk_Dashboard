@@ -23,6 +23,7 @@ export async function POST(req: Request) {
       whyMizuho: Array.isArray(body.whyMizuho) ? body.whyMizuho.map(String) : [],
       sources: String(body.sources ?? ""),
       savedAtISO: new Date().toISOString(),
+      snapshotISO: body.snapshotISO ? String(body.snapshotISO) : undefined,
     };
     const items = await addSaved(item);
     return NextResponse.json({ ok: true, items });

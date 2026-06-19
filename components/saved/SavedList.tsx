@@ -9,6 +9,13 @@ const KIND_LABEL: Record<SavedItem["kind"], string> = {
   japan: "Japan & Asia",
 };
 
+function fmt(iso?: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
 export function SavedList({
   items,
   onRemove,
@@ -64,6 +71,10 @@ export function SavedList({
             </div>
           ) : null}
           {it.sources ? <p className="mt-1.5 text-2xs text-fg-faint">Source: {it.sources}</p> : null}
+          <p className="mt-1 text-2xs text-fg-faint">
+            Saved {fmt(it.savedAtISO)}
+            {it.snapshotISO ? ` · from snapshot ${fmt(it.snapshotISO)}` : ""}
+          </p>
         </div>
       ))}
     </div>

@@ -27,7 +27,7 @@ import {
   daysBetween,
   getLatestSnapshot,
 } from "./snapshotStore";
-import { ADAPTERS, relevanceScore, type RawStory } from "./newsAdapter";
+import { ADAPTERS, relevanceScore, sourceTierOf, hasCroSignal, isJunk, type RawStory } from "./newsAdapter";
 import { detectConcepts } from "./concepts";
 import { lensFor } from "./relevanceConfig";
 import { interpretWithProvider, llmAvailable, CRO_SYSTEM_PROMPT, type LlmReason } from "./llm";
@@ -99,7 +99,12 @@ export function curatedSnapshot(slot: SnapshotSlot, indicators: Indicator[]): Ed
 async function ingest(): Promise<RawStory[]> {
   // All adapters in parallel; a slow/failed source can't stall the others.
   const settled = await Promise.all(ADAPTERS.map((a) => a.fetchRaw().catch(() => null)));
-  return settled.flatMap((r) => r ?? []);
+  const all = settled.flatMap((r) => r ?? []);
+  // Root-cause clean: drop non-financial noise (entertainment/sports/crime/lifestyle)
+  // here, so neither themes nor the radar can ever surface it.
+  const cleaned = all.filter((s) => !isJunk(s));
+  console.log(`[gen] ingest: ${all.length} raw → ${cleaned.length} after junk filter`);
+  return cleaned;
 }
 
 function dedupe(stories: RawStory[]): RawStory[] {
@@ -250,25 +255,45 @@ Rules:
 }
 
 /**
- * "Also on the Radar" — headline-only breadth. Built deterministically from the
- * clusters that did NOT become full themes/editorial (no LLM call, no translation,
- * so zero added generation cost or truncation risk). Deduped against what's already
- * shown, US/relevance-ranked, capped.
+ * "Also on the Radar" — high-relevance developments that NARROWLY MISSED becoming
+ * full themes. Not a leftover bin: each item must clear a relevance floor, come from
+ * a credible source, carry a genuine CRO signal, and classify into a real lens.
+ * Unclassifiable / low-quality / junk items are dropped, not defaulted. Quality wins
+ * over quantity — if nothing clears the bar, the radar is empty.
  */
 function buildRadar(clusters: Cluster[], themes: CroTheme[], editorial: EditorialCard[]): RadarItem[] {
+  const RELEVANCE_FLOOR = 3; // must be a real near-miss, not filler
   const shown = [...themes.map((t) => t.title), ...editorial.map((e) => e.title)];
   const isDup = (title: string) => shown.some((s) => titleOverlap(s, title) > 0.5);
+
+  // Candidates = stories from clusters that did NOT anchor a theme (skip top 3).
+  const candidates: { story: { title: string; summary: string; source: string; url: string }; score: number; lens: string }[] = [];
+  for (const c of clusters.slice(3)) {
+    for (const s of c.stories) {
+      if (!s?.title) continue;
+      const text = `${s.title} ${s.summary}`;
+      const score = relevanceScore(s as any);
+      const tier = sourceTierOf(s.source);
+      const lens = lensFor(text);
+      const classified = lens !== "macro" || hasCroSignal(text); // don't default junk to "macro"
+      if (score < RELEVANCE_FLOOR) continue; // below near-miss bar
+      if (tier < 0) continue; // low-quality source
+      if (!hasCroSignal(text)) continue; // must carry a real CRO/financial signal
+      if (!classified) continue;
+      candidates.push({ story: s, score, lens });
+    }
+  }
+
+  // Best first; de-dupe by lead headline and against shown items; cap small.
+  candidates.sort((a, b) => b.score - a.score);
   const out: RadarItem[] = [];
   const seen = new Set<string>();
-  // Skip the top clusters that fed the themes; scan the rest for headline items.
-  for (const c of clusters.slice(3)) {
-    const lead = c.stories[0];
-    if (!lead?.title) continue;
-    const key = lead.title.toLowerCase().slice(0, 50);
-    if (seen.has(key) || isDup(lead.title)) continue;
+  for (const c of candidates) {
+    const key = c.story.title.toLowerCase().slice(0, 50);
+    if (seen.has(key) || isDup(c.story.title)) continue;
     seen.add(key);
-    out.push({ title: lead.title, source: lead.source, url: lead.url || undefined, lens: lensFor(`${lead.title} ${lead.summary}`) });
-    if (out.length >= 6) break;
+    out.push({ title: c.story.title, source: c.story.source, url: c.story.url || undefined, lens: c.lens });
+    if (out.length >= 4) break; // fewer, higher quality
   }
   return out;
 }

@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { fetchIndicators } from "@/lib/marketData";
 import { generateSnapshot } from "@/lib/snapshotEngine";
 import { saveSnapshot, kvGet, kvSet } from "@/lib/snapshotStore";
+import { recordRun } from "@/lib/runStore";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
@@ -47,6 +48,7 @@ export async function POST() {
       degradeReason: snapshot.meta.degradeReason,
     };
     await kvSet(KEY, done);
+    await recordRun({ ranISO: new Date().toISOString(), trigger: "manual", ok: true, provider: snapshot.meta.llmProvider, fallbackUsed: snapshot.meta.llmProvider === "anthropic", degradeReason: snapshot.meta.degradeReason, themes: snapshot.meta.themesGenerated });
     console.log(`[regen] saved · provider=${snapshot.meta.llmProvider} · degradeReason=${snapshot.meta.degradeReason}`);
     return NextResponse.json({
       ok: true,
@@ -61,6 +63,7 @@ export async function POST() {
       finishedISO: new Date().toISOString(),
       error: String(err),
     } satisfies RegenStatus);
+    await recordRun({ ranISO: new Date().toISOString(), trigger: "manual", ok: false, error: String(err) });
     console.log(`[regen] FAILED — previous snapshot retained: ${String(err)}`);
     return NextResponse.json({ ok: false, error: String(err), note: "previous snapshot retained" }, { status: 500 });
   }

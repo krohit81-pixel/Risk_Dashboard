@@ -23,13 +23,15 @@ export function JapanAsiaWatchSection({
   learning,
   savedIds,
   onToggleSave,
+  snapshotISO,
 }: {
   data: JAW;
   learning: boolean;
   savedIds?: Set<string>;
   onToggleSave?: (i: SavedItem) => void;
+  snapshotISO?: string;
 }) {
-  const savedItem: SavedItem = { id: "japan-watch", kind: "japan", title: "Japan & Asia Watch", interpretation: data.narrative, bankingImpact: "", whyMizuho: data.mizuho ?? [], sources: data.source, savedAtISO: "" };
+  const savedItem: SavedItem = { id: "japan-watch", kind: "japan", title: "Japan & Asia Watch", interpretation: data.narrative, bankingImpact: "", whyMizuho: data.mizuho ?? [], sources: data.source, savedAtISO: "", snapshotISO };
   return (
     <section className="rise">
       <Card className="px-4 py-3.5">

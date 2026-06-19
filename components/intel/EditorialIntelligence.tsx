@@ -21,11 +21,13 @@ export function EditorialIntelligence({
   learning,
   savedIds,
   onToggleSave,
+  snapshotISO,
 }: {
   cards: EditorialCard[];
   learning: boolean;
   savedIds?: Set<string>;
   onToggleSave?: (i: SavedItem) => void;
+  snapshotISO?: string;
 }) {
   return (
     <section className="rise">
@@ -90,7 +92,7 @@ export function EditorialIntelligence({
               {onToggleSave ? (
                 <span className="ml-auto">
                   <SaveButton
-                    item={{ id: c.id, kind: "editorial", title: c.title, interpretation: c.whyItMatters, bankingImpact: c.bankRisk ?? "", whyMizuho: [], sources: c.source, savedAtISO: "" }}
+                    item={{ id: c.id, kind: "editorial", title: c.title, interpretation: c.whyItMatters, bankingImpact: c.bankRisk ?? "", whyMizuho: [], sources: c.source, savedAtISO: "", snapshotISO }}
                     saved={Boolean(savedIds?.has(c.id))}
                     onToggle={onToggleSave}
                   />

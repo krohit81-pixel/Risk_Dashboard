@@ -24,6 +24,8 @@ import { ConceptLibrary } from "@/components/learn/ConceptLibrary";
 import { RadarSection } from "@/components/intel/RadarSection";
 import { SavedList } from "@/components/saved/SavedList";
 import type { SavedItem } from "@/lib/savedStore";
+import { RunHistory } from "@/components/RunHistory";
+import type { RunRecord } from "@/lib/runStore";
 import { resolveIntelligence } from "@/lib/layman";
 
 export default function Page() {
@@ -110,6 +112,19 @@ export default function Page() {
 
   // ── Manual regenerate ──
   const [regenState, setRegenState] = useState<"idle" | "running" | "failed">("idle");
+  const [runs, setRuns] = useState<RunRecord[]>([]);
+  const loadRuns = useCallback(async () => {
+    try {
+      const r = await fetch("/api/runs", { cache: "no-store" });
+      if (r.ok) setRuns(((await r.json()).runs ?? []) as RunRecord[]);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  useEffect(() => {
+    loadRuns();
+  }, [loadRuns]);
+
   const regenerate = useCallback(async () => {
     if (regenState === "running") return;
     setRegenState("running");
@@ -123,8 +138,10 @@ export default function Page() {
       }
     } catch {
       setRegenState("failed");
+    } finally {
+      loadRuns();
     }
-  }, [regenState, load]);
+  }, [regenState, load, loadRuns]);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-app">
@@ -242,20 +259,24 @@ export default function Page() {
                     onOpenConcept={openConcept}
                     savedIds={savedIds}
                     onToggleSave={toggleSave}
+                    snapshotISO={data.intelligence.generatedISO}
                   />
                 </CollapsibleSection>
 
                 <CollapsibleSection id="editorial" n="04" title="Editorial Intelligence" hint="other developments" defaultOpen={false}>
-                  <EditorialIntelligence cards={intel!.editorial} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} />
+                  <EditorialIntelligence cards={intel!.editorial} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
                 </CollapsibleSection>
                 <CollapsibleSection id="japanasia" n="05" title="Japan & Asia Watch" hint="daily narrative" defaultOpen={false}>
-                  <JapanAsiaWatchSection data={intel!.japanAsia} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} />
+                  <JapanAsiaWatchSection data={intel!.japanAsia} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
                 </CollapsibleSection>
                 {intel!.radar?.length ? (
-                  <CollapsibleSection id="radar" n="06" title="Also on the Radar" hint="headline-level breadth" defaultOpen={false}>
+                  <CollapsibleSection id="radar" n="06" title="Also on the Radar" hint="high-relevance near-misses" defaultOpen={false}>
                     <RadarSection items={intel!.radar} />
                   </CollapsibleSection>
                 ) : null}
+                <CollapsibleSection id="runs" n="07" title="Generation History" hint="recent runs" defaultOpen={false}>
+                  <RunHistory runs={runs} />
+                </CollapsibleSection>
               </>
             ) : null}
 

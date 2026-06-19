@@ -42,8 +42,8 @@ function PersistenceBadge({ theme }: { theme: CroTheme }) {
   return null;
 }
 
-function ThemeCard({ theme: t, learning, onOpenConcept, savedIds, onToggleSave }: { theme: CroTheme; learning: boolean; onOpenConcept?: (id: string) => void; savedIds?: Set<string>; onToggleSave?: (i: SavedItem) => void }) {
-  const savedItem: SavedItem = { id: t.topicId || t.id, kind: "theme", title: t.title, interpretation: t.whyItMatters, bankingImpact: t.bankingImpact, whyMizuho: t.mizuho ?? [], sources: t.source, savedAtISO: "" };
+function ThemeCard({ theme: t, learning, onOpenConcept, savedIds, onToggleSave, snapshotISO }: { theme: CroTheme; learning: boolean; onOpenConcept?: (id: string) => void; savedIds?: Set<string>; onToggleSave?: (i: SavedItem) => void; snapshotISO?: string }) {
+  const savedItem: SavedItem = { id: t.topicId || t.id, kind: "theme", title: t.title, interpretation: t.whyItMatters, bankingImpact: t.bankingImpact, whyMizuho: t.mizuho ?? [], sources: t.source, savedAtISO: "", snapshotISO };
   const [open, setOpen] = useState(learning);
   return (
     <Card className="px-4 py-3.5">
@@ -109,6 +109,7 @@ export function CroConversation({
   onOpenConcept,
   savedIds,
   onToggleSave,
+  snapshotISO,
 }: {
   themes: CroTheme[];
   expandedCount: number;
@@ -116,6 +117,7 @@ export function CroConversation({
   onOpenConcept?: (id: string) => void;
   savedIds?: Set<string>;
   onToggleSave?: (i: SavedItem) => void;
+  snapshotISO?: string;
 }) {
   const cards = themes.filter((t) => t.expanded);
   return (
@@ -126,7 +128,7 @@ export function CroConversation({
       </p>
       <div className="space-y-3">
         {cards.map((t) => (
-          <ThemeCard key={t.id} theme={t} learning={learning} onOpenConcept={onOpenConcept} savedIds={savedIds} onToggleSave={onToggleSave} />
+          <ThemeCard key={t.id} theme={t} learning={learning} onOpenConcept={onOpenConcept} savedIds={savedIds} onToggleSave={onToggleSave} snapshotISO={snapshotISO} />
         ))}
       </div>
     </section>

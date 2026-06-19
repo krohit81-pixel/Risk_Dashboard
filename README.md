@@ -436,3 +436,18 @@ large layman-translation call truncating mid-JSON; truncation is now named expli
   preserves last-good on failure). API: `/api/regenerate` (POST run, GET status).
 
 Deferred to V4: Ask About This, Add to Learn, Supabase, editable concept library, personal notes.
+
+---
+
+## Version 3.8.1 — Radar quality, junk filtering, run visibility
+
+- **Ingestion junk filter** (`isJunk` in `lib/newsAdapter.ts`): entertainment, sports, local
+  crime, lifestyle and junk domains are dropped at ingestion — improving BOTH theme and radar
+  quality (root-cause fix, not a radar patch).
+- **Radar = high-relevance near-misses**, not leftovers: each item must clear a relevance floor,
+  come from a credible source tier, carry a genuine CRO signal, and classify into a real lens.
+  Unclassifiable items are dropped (no "default to Macro"). Capped small; empty if nothing qualifies.
+- **Save for Later** now records **saved date + original snapshot date** for timeline context.
+- **Generation History** (`/api/runs`, `lib/runStore.ts`): 15-entry ring buffer recorded by both
+  the cron and the regenerate route — time · scheduled/manual · ok/fail · provider · fallback.
+  Surfaced in a "Generation History" section on Today.

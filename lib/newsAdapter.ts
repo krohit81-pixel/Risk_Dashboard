@@ -36,6 +36,43 @@ export const CRO_TOPICS = [
 
 const SUPPRESS = ["earnings beat", "stock surges", "meme", "retail traders", "quarterly profit", "price target"];
 
+/**
+ * Hard junk — categories that have no place on a CRO risk briefing regardless of
+ * source: entertainment, sports, local crime, lifestyle, gossip. Dropped at
+ * INGESTION so neither themes nor the radar ever see them.
+ */
+const JUNK = [
+  // entertainment
+  "bollywood", "hollywood", "box office", "teaser", "trailer", "movie", "film ", "actor", "actress",
+  "celebrity", "singer", "song ", "album", "netflix series", "tv show", "web series", "cast of", "premiere",
+  // sports
+  "cricket", "ipl ", "football match", "premier league", "nba ", "nfl ", "world cup", "tournament", "striker",
+  "midfielder", "touchdown", "playoff", "grand slam", "formula 1", "wrestling",
+  // local crime / lifestyle / misc
+  "burglary", "arrested", "stolen", "jewelry", "murder", "shooting", "robbery", "open house",
+  "horoscope", "recipe", "fashion week", "gossip", "dating", "wedding", "viral video", "obituary", "lottery",
+];
+
+const JUNK_DOMAINS = ["swapupdate", "roughdraftatlanta", "bollywood", "tmz", "eonline", "espn", "people.com"];
+
+/** True if a story is clearly non-financial noise — drop it entirely. */
+export function isJunk(story: RawStory): boolean {
+  const text = `${story.title} ${story.summary}`.toLowerCase();
+  const src = story.source.toLowerCase();
+  if (JUNK_DOMAINS.some((d) => src.includes(d))) return true;
+  return JUNK.some((j) => text.includes(j));
+}
+
+export function sourceTierOf(source: string): number {
+  return sourceTier(source);
+}
+
+/** Does the text contain a genuine CRO/financial signal? (radar gate) */
+export function hasCroSignal(text: string): boolean {
+  const t = text.toLowerCase();
+  return CRO_TOPICS.some((k) => t.includes(k));
+}
+
 // Source quality tiers. Finance wires outrank general/local outlets even on the
 // same keywords, so a Reuters/Nikkei/Finnhub story ranks above a local paper.
 const TIER1 = ["reuters", "bloomberg", "financial times", "ft.com", "wall street journal", "wsj", "nikkei", "cnbc", "finnhub", "marketaux", "fortune", "the economist", "barron"];
