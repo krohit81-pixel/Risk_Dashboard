@@ -215,18 +215,6 @@ export default function Page() {
                     Learning view — rewrites the conversation, editorial and Japan sections in plain English.
                   </p>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={regenerate}
-                  disabled={regenState === "running"}
-                  className={`mt-1 inline-flex w-fit items-center gap-1.5 rounded-lg border px-2.5 py-1 text-2xs font-semibold transition ${
-                    regenState === "running"
-                      ? "border-line bg-ink-800 text-fg-faint"
-                      : "border-line bg-ink-800 text-steel active:bg-ink-700"
-                  }`}
-                >
-                  {regenState === "running" ? "↻ Regenerating editorial…" : regenState === "failed" ? "↻ Retry (last attempt failed)" : "↻ Regenerate editorial"}
-                </button>
               </div>
             ) : null}
 
@@ -275,6 +263,23 @@ export default function Page() {
                   </CollapsibleSection>
                 ) : null}
                 <CollapsibleSection id="runs" n="07" title="Generation History" hint="recent runs" defaultOpen={false}>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-2xs leading-relaxed text-fg-faint">
+                      Re-run today's editorial now. Takes ~1–2 minutes; the last good briefing is kept if it fails.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={regenerate}
+                      disabled={regenState === "running"}
+                      className={`flex-none inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-2xs font-semibold transition ${
+                        regenState === "running"
+                          ? "border-line bg-ink-800 text-fg-faint"
+                          : "border-line bg-ink-800 text-steel active:bg-ink-700"
+                      }`}
+                    >
+                      {regenState === "running" ? "↻ Regenerating…" : regenState === "failed" ? "↻ Retry" : "↻ Regenerate"}
+                    </button>
+                  </div>
                   <RunHistory runs={runs} />
                 </CollapsibleSection>
               </>

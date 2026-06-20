@@ -170,7 +170,16 @@ async function geminiInterpret<T>(system: string, user: string): Promise<Provide
       body: JSON.stringify({
         system_instruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: user }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.4, maxOutputTokens: 8192 },
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.4,
+          maxOutputTokens: 8192,
+          // gemini-2.5-flash is a reasoning model; hidden thinking tokens count against
+          // maxOutputTokens and were truncating the JSON (finishReason=MAX_TOKENS) at ~4.7k
+          // chars, forcing slow Anthropic fallbacks that blew the 180s cron ceiling.
+          // Disabling thinking frees the whole budget for the actual JSON output.
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
       cache: "no-store",
     },

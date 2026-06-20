@@ -186,14 +186,17 @@ ${JSON.stringify(payload, null, 2)}
 
 Return ONE JSON object with this exact shape (no prose outside the JSON):
 {
-  "themes": [ { "id", "topicId", "radarLabel", "radarClass" (Market|Strategic|Credit|Regulatory|Banking|Macro|Japan), "expanded": true, "category", "severity" (Low|Moderate|Elevated|High), "horizon" (Immediate|Medium-term|Structural), "title", "whyItMatters", "bankingImpact", "mizuho" (3-4 strings), "lenses" [ { "kind", "question" } ], "signals" (3-4 strings), "questions" (3 strings), "talkingPoint", "followUp", "whatToUnderstand", "source", "confidence", "interpretation": true } ],
+  "themes": [ { "id", "topicId", "radarLabel", "radarClass" (Market|Strategic|Credit|Regulatory|Banking|Macro|Japan), "expanded": true, "category", "severity" (Low|Moderate|Elevated|High), "horizon" (Immediate|Medium-term|Structural), "title", "whyItMatters", "bankingImpact", "mizuho" (3-4 strings), "mizuhoRisks" (0-2 of { "riskId", "scenarioId", "confidence" (High|Medium|Low) }), "lenses" [ { "kind", "question" } ], "signals" (3-4 strings), "questions" (3 strings), "talkingPoint", "followUp", "whatToUnderstand", "source", "confidence", "interpretation": true } ],
   "editorial": [ { "id", "category", "severity", "horizon", "title", "whatHappened", "whyItMatters", "firstOrder", "secondOrder", "bankRiskKind", "bankRisk", "keyTakeaway", "whatToUnderstand", "source", "confidence" } ]${japanSchema}
 }
 Rules:
 - 3-5 themes (all expanded), 1-2 editorial cards${hasJapanNews ? ", one japanAsia object built ONLY from Japan/BOJ/yen/JGB/Nikkei stories" : ""}.
 - Each story cluster may anchor only ONE output item. Do NOT repeat the same development across a theme and an editorial card — editorial cards MUST cover different stories than the themes.
 - PRIORITISATION: the reader is onboarding with Mizuho **Americas**. Rank US-relevant developments FIRST — Federal Reserve / FOMC, the Treasury market and funding (issuance, repo/SOFR, liquidity), US credit (IG/HY spreads, private credit, leveraged loans/CLOs), the US banking sector (regional-bank stress, CRE, deposits, capital — SLR / Basel III endgame), US capital markets and US regulation (Fed/OCC/FDIC). Favour US banking/credit/regulatory specificity over generic US macro headlines. Keep Japan/BOJ/JGB/USDJPY developments as important secondary context (they also surface in the dedicated Japan section). Europe/EMEA is tertiary for now.
-- Rank by CRO relevance, not popularity. Keep each field concise. JSON only.`;
+- Rank by CRO relevance, not popularity. Keep each field concise. JSON only.
+
+MIZUHO TOP RISKS — for each theme, set "mizuhoRisks" by tagging 0-2 of the scenarios below that this theme would most plausibly travel down. Use ONLY these exact ids; never invent a risk or scenario. If none fit cleanly, use an empty array [] — a no-match is correct and expected. Do not write any explanation; just the ids + confidence.
+${topRisksForPrompt()}`;
 
   const { data: out, provider, reason } = await interpretWithProvider<Partial<IntelligenceLayer>>(
     CRO_SYSTEM_PROMPT,
@@ -216,13 +219,39 @@ Rules:
   // Distinct sources across all clusters → used to DERIVE confidence (not trust the model).
   const sourceCount = new Set(clusters.flatMap((c) => c.stories.map((s) => s.source))).size;
 
-  const themes = (out.themes as CroTheme[]).map((t) => {
+  let alignMapped = 0;
+  let alignDropped = 0;
+  const themes = (out.themes as (CroTheme & { mizuhoRisks?: { riskId: string; scenarioId: string; confidence: string }[] })[]).map((t) => {
     const anchorId = ANCHOR_BY_TOPIC[t.topicId];
     const anchor = anchorFromIndicators(anchorId, indicators);
     // Derived confidence: anchored + multi-source = High; single-source/no-anchor = Medium.
     const confidence = anchor && sourceCount >= 2 ? "High" : sourceCount >= 1 ? "Medium" : "Low";
-    return { ...t, anchorId, anchor, confidence: confidence as CroTheme["confidence"] };
+    // Resolve simple Mizuho tags → alignments. The "why" is the CURATED scenario path
+    // (accurate, no hallucination); plain-English twin is the curated pathLayman.
+    const tags = Array.isArray(t.mizuhoRisks) ? t.mizuhoRisks.slice(0, 2) : [];
+    const mizuhoAlignment: MizuhoAlignment[] = [];
+    for (const m of tags) {
+      const risk = topRiskById(m.riskId);
+      const scenario = scenarioById(m.riskId, m.scenarioId);
+      if (!risk || !scenario) {
+        alignDropped++;
+        continue;
+      }
+      mizuhoAlignment.push({
+        riskId: m.riskId,
+        riskName: risk.name,
+        scenarioId: m.scenarioId,
+        scenarioLabel: scenario.label,
+        confidence: normalizeConfidence(m.confidence),
+        why: scenario.path,
+        whyLayman: scenario.pathLayman,
+      });
+    }
+    alignMapped += mizuhoAlignment.length;
+    const { mizuhoRisks: _drop, ...rest } = t;
+    return { ...rest, anchorId, anchor, confidence: confidence as CroTheme["confidence"], mizuhoAlignment } as CroTheme;
   });
+  console.log(`[gen] mizuho tagging: ${alignMapped} mapped, ${alignDropped} rejected (invalid ids)`);
 
   // Fall back to curated for any section the model didn't supply, so the UI stays complete.
   const curated = buildIntelligence(indicators, true);
@@ -238,10 +267,33 @@ Rules:
   const editorial = dedupedEditorial.length ? dedupedEditorial : curated.editorial;
 
   // Japan: use model output ONLY when genuine Japan news existed; else curated narrative.
-  const japanAsia =
+  // Guard against a degenerate model object (narrative says "no news" / fields are N/A):
+  // collapse it to a clean empty card so the UI shows just the one explanatory line.
+  let japanAsia =
     hasJapanNews && out.japanAsia
       ? (out.japanAsia as IntelligenceLayer["japanAsia"])
       : curated.japanAsia;
+
+  const looksEmpty =
+    !hasJapanNews ||
+    /no specific japan/i.test(japanAsia.narrative || "") ||
+    (japanAsia.mizuho ?? []).every((m) => !m || /^n\/?a$/i.test(m.trim()));
+
+  if (looksEmpty) {
+    japanAsia = {
+      horizon: "Structural",
+      narrative: "No specific Japan-related developments in today's sources.",
+      mizuho: [],
+      lens: { kind: "Japan leadership lens", question: "" },
+      signals: [],
+      questions: [],
+      whatToUnderstand: "",
+      source: "No Japan-specific sources today",
+      confidence: "Low",
+      interpretation: true,
+      empty: true,
+    };
+  }
 
   const intel: IntelligenceLayer = {
     themes,
@@ -393,7 +445,6 @@ async function translateLayman(intel: IntelligenceLayer): Promise<void> {
     push(`T${i}.wtu`, t.whatToUnderstand);
     (t.questions ?? []).forEach((q, j) => push(`T${i}.q${j}`, q));
     (t.lenses ?? []).forEach((l, j) => push(`T${i}.lq${j}`, l.question));
-    (t.mizuhoAlignment ?? []).forEach((a, j) => push(`T${i}.al${j}`, a.why));
   });
   (intel.editorial ?? []).forEach((e, i) => {
     push(`E${i}.title`, e.title);
@@ -439,9 +490,6 @@ ${JSON.stringify(items)}`;
     L.questions = (t.questions ?? []).map((q, j) => map[`T${i}.q${j}`] ?? q);
     L.lensQuestions = (t.lenses ?? []).map((l, j) => map[`T${i}.lq${j}`] ?? l.question);
     t.layman = L;
-    (t.mizuhoAlignment ?? []).forEach((a, j) => {
-      if (map[`T${i}.al${j}`]) a.whyLayman = map[`T${i}.al${j}`];
-    });
   });
   (intel.editorial ?? []).forEach((e, i) => {
     e.layman = {
@@ -463,84 +511,6 @@ ${JSON.stringify(items)}`;
     };
   }
   console.log(`[gen] layman attached (${Object.keys(map).length} fields)`);
-}
-
-/**
- * Mizuho Risk Alignment (3.9). Maps each generated theme to Mizuho's CURATED published
- * Top Risks taxonomy → 0..n {riskId, scenarioId, confidence, why}. Strictly grounded:
- *  - maps ONLY to supplied risk/scenario ids (invalid pairs are rejected, not invented);
- *  - anchors each "why" to a specific published SCENARIO (the transmission path), not the
- *    headline risk — this is the repetition guard against generic risk-definition prose;
- *  - states the path FROM THIS EVENT, never the definition of the risk;
- *  - returns an EMPTY array for a theme when nothing maps cleanly (a valid outcome).
- * Isolated: failure leaves themes without alignment, never breaks the briefing.
- */
-async function alignThemesToMizuho(intel: IntelligenceLayer): Promise<void> {
-  const themes = intel.themes.filter((t) => t.expanded);
-  if (!themes.length) return;
-
-  const payload = themes.map((t, i) => ({
-    i,
-    title: t.title,
-    why: t.whyItMatters,
-    impact: t.bankingImpact,
-  }));
-
-  const system =
-    "You map risk-briefing themes onto a bank's OWN published Top Risks taxonomy. " +
-    "You may map ONLY to the risk ids and scenario ids provided — never invent a risk or scenario name. " +
-    "For each mapping, anchor the explanation to the specific SCENARIO's transmission path and explain how THIS " +
-    "theme would travel down that path to the bank — do NOT restate the definition of the risk. " +
-    "A theme may map to 0, 1 or 2 risks. If nothing maps cleanly, return an empty array for that theme — " +
-    "a no-match is correct and expected, not a failure. Set confidence to High, Medium or Low. JSON only.";
-
-  const user = `Mizuho published Top Risks (map ONLY to these ids):
-${topRisksForPrompt()}
-
-Themes:
-${JSON.stringify(payload, null, 2)}
-
-Return ONE JSON object:
-{ "alignments": [ { "i": <theme index>, "matches": [
-   { "riskId": "<id>", "scenarioId": "<id>", "confidence": "High|Medium|Low",
-     "why": "<one sentence: how THIS theme travels down THIS scenario's path to the bank>" } ] } ] }
-- matches may be an empty array. Map at most 2 per theme. Use only the ids listed above. JSON only.`;
-
-  const { data, reason } = await interpretWithProvider<{
-    alignments: { i: number; matches: { riskId: string; scenarioId: string; confidence: string; why: string }[] }[];
-  }>(system, user);
-
-  if (!data || !Array.isArray(data.alignments)) {
-    console.log(`[gen] mizuho alignment skipped (reason=${reason})`);
-    return;
-  }
-
-  let mapped = 0;
-  let dropped = 0;
-  for (const a of data.alignments) {
-    const t = themes[a.i];
-    if (!t || !Array.isArray(a.matches)) continue;
-    const valid: MizuhoAlignment[] = [];
-    for (const m of a.matches) {
-      const scenario = scenarioById(m.riskId, m.scenarioId);
-      const risk = topRiskById(m.riskId);
-      if (!scenario || !risk) {
-        dropped++; // reject invented / mismatched ids
-        continue;
-      }
-      valid.push({
-        riskId: m.riskId,
-        riskName: risk.name,
-        scenarioId: m.scenarioId,
-        scenarioLabel: scenario.label,
-        confidence: normalizeConfidence(m.confidence),
-        why: (m.why || "").trim(),
-      });
-    }
-    t.mizuhoAlignment = valid;
-    mapped += valid.length;
-  }
-  console.log(`[gen] mizuho alignment: ${mapped} mapped, ${dropped} rejected (invalid ids)`);
 }
 
 function normalizeConfidence(c: string): Confidence {
@@ -649,14 +619,6 @@ export async function generateSnapshot(
       }
     } catch (e) {
       console.log("[gen] persistence update skipped:", (e as Error).message);
-    }
-
-    // Mizuho Risk Alignment (3.9) — map each theme to the curated Top Risks taxonomy.
-    // Runs BEFORE layman translation so the "why Mizuho cares" text gets a twin too.
-    try {
-      await alignThemesToMizuho(intel);
-    } catch (e) {
-      console.log("[gen] mizuho alignment skipped:", (e as Error).message);
     }
 
     // Whole-screen plain-English layer (3.6) — replaces per-term "Explain simply".

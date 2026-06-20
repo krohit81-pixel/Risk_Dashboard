@@ -2,7 +2,6 @@
 "use client";
 
 import type { MizuhoAlignment } from "@/lib/types";
-import { MIZUHO_TOP_RISKS_ASOF } from "@/lib/mizuhoTopRisks";
 
 const CONF_DOT: Record<string, string> = {
   High: "bg-mizuho",
@@ -56,11 +55,6 @@ export function MizuhoAlignmentBlock({
           ))}
         </div>
       )}
-
-      <p className="mt-2 text-[10px] leading-relaxed text-fg-faint">
-        Framework: Mizuho published Top Risks ({MIZUHO_TOP_RISKS_ASOF}) — sourced fact. The mapping to
-        this theme is AI interpretation, not Mizuho's own view or exposure.
-      </p>
     </div>
   );
 }

@@ -32,6 +32,23 @@ export function JapanAsiaWatchSection({
   snapshotISO?: string;
 }) {
   const savedItem: SavedItem = { id: "japan-watch", kind: "japan", title: "Japan & Asia Watch", interpretation: data.narrative, bankingImpact: "", whyMizuho: data.mizuho ?? [], sources: data.source, savedAtISO: "", snapshotISO };
+
+  // No genuine Japan news today → show only the explanatory line.
+  if (data.empty) {
+    return (
+      <section className="rise">
+        <Card className="px-4 py-3.5">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-fg-muted">
+              Japan risk narrative
+            </span>
+          </div>
+          <p className="text-[14px] leading-relaxed text-fg-muted">{data.narrative}</p>
+        </Card>
+      </section>
+    );
+  }
+
   return (
     <section className="rise">
       <Card className="px-4 py-3.5">

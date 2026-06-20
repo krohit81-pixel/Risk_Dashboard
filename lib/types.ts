@@ -295,6 +295,8 @@ export interface JapanAsiaWatch {
   confidence: Confidence;
   interpretation: boolean;
   layman?: JapanLayman;
+  /** True when no genuine Japan news existed — render only the narrative line. */
+  empty?: boolean;
 }
 
 export interface JapanLayman {

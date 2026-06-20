@@ -133,6 +133,12 @@ export function CroConversation({
           <ThemeCard key={t.id} theme={t} learning={learning} onOpenConcept={onOpenConcept} savedIds={savedIds} onToggleSave={onToggleSave} snapshotISO={snapshotISO} />
         ))}
       </div>
+      {cards.some((t) => t.mizuhoAlignment?.length) ? (
+        <p className="mt-3 text-[10px] leading-relaxed text-fg-faint">
+          Mizuho Top Risk mappings are AI interpretation against Mizuho's published framework (Mar 2025),
+          not Mizuho's own view or exposure.
+        </p>
+      ) : null}
     </section>
   );
 }

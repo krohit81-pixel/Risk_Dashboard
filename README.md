@@ -469,3 +469,24 @@ Deferred to V4: Ask About This, Add to Learn, Supabase, editable concept library
   Renders nothing when there's no match. Explicit provenance: framework = sourced fact, mapping =
   AI interpretation (not Mizuho's own view or exposure).
 - Curated baseline themes ship with hand-authored alignments so the lens is visible pre-live-run.
+
+---
+
+## Version 3.9a — robustness + bug fixes
+
+- **Cron robustness (root cause).** `gemini-2.5-flash` is a reasoning model; its hidden thinking
+  tokens were consuming `maxOutputTokens` and truncating the JSON (`finishReason=MAX_TOKENS`),
+  forcing slow Anthropic fallbacks that overran the 180s cron. Fixed by disabling thinking
+  (`generationConfig.thinkingConfig.thinkingBudget: 0`).
+- **Two LLM calls, not three.** The Mizuho alignment is now *simple tagging* folded into the
+  interpret call: each theme returns `mizuhoRisks: [{riskId, scenarioId, confidence}]` (0–2, may be
+  empty). Tags are validated against the curated framework (invalid ids rejected) and resolved
+  locally — the "why" is the curated scenario `path` / `pathLayman`, so there is no model-written
+  mapping prose to hallucinate or translate. Removed the dedicated alignment call.
+- **Japan empty-state.** When there's no real Japan news (or a degenerate N/A object), the Japan
+  card shows only the "No specific Japan-related developments…" line — no N/A bullets/lens/signals
+  and no save action.
+- **Regenerate button moved** out of the learning-toggle row (misclick risk) into the Generation
+  History section, with an explanatory line.
+- **Mizuho caveat shown once** — a single short provenance line at the bottom of the CRO
+  Conversation section, instead of repeating under every theme.
