@@ -31,7 +31,8 @@ export function JapanAsiaWatchSection({
   onToggleSave?: (i: SavedItem) => void;
   snapshotISO?: string;
 }) {
-  const savedItem: SavedItem = { id: "japan-watch", kind: "japan", title: "Japan & Asia Watch", interpretation: data.narrative, bankingImpact: "", whyMizuho: data.mizuho ?? [], sources: data.source, savedAtISO: "", snapshotISO };
+  const dayKey = (snapshotISO || "").slice(0, 10);
+  const savedItem: SavedItem = { id: `japan-watch-${dayKey}`, kind: "japan", title: "Japan & Asia Watch", interpretation: data.narrative, bankingImpact: "", whyMizuho: data.mizuho ?? [], sources: data.source, savedAtISO: "", snapshotISO };
 
   // No genuine Japan news today → show only the explanatory line.
   if (data.empty) {

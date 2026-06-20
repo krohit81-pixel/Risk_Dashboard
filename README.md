@@ -513,3 +513,17 @@ through the same CRO framework as the daily editorial.
 - API: `POST /api/research/analyze` (`{mode:"text"|"url", text?|url?}`), `maxDuration=60`.
 
 Out of scope (roadmap): PDF/DOCX, OCR, Ask About This, Supabase, personal notes, multi-turn chat.
+
+---
+
+## Version 4.0a — Japan empty-state fix
+
+- **Robust degenerate-Japan detection** (`isDegenerateJapan`). The 3.9a collapse matched one
+  literal phrase ("no specific Japan"); the model phrases "no Japan news" many ways, so a card
+  like *"No specific news related to Japan, BOJ, Yen, JGB, or Nikkei was provided… cannot be
+  populated"* slipped through and rendered with generic filler bullets/lens/signals + a save
+  button. Detection now matches the *absence signal* across phrasings (plus all-N/A bullets and
+  generic "general-trend" signals), and is verified not to fire on real Japan narratives
+  (including "BOJ kept policy unchanged with no immediate change…").
+- **Date-specific Japan save id** (`japan-watch-<date>`) so a past save no longer reads as
+  "Saved" on a different day's card. (The empty card hides the save action entirely.)

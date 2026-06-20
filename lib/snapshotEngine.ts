@@ -158,6 +158,39 @@ function titleOverlap(a: string, b: string): number {
 }
 
 /** Ask the LLM to interpret clusters into the intelligence shape (grounded). */
+/**
+ * Detects a degenerate "no Japan news" object the model sometimes returns when asked
+ * for a Japan section it can't fill — it admits there's nothing, then pads the structure
+ * with generic global commentary. Phrasing varies a lot, so we match the *absence*
+ * signal robustly rather than one literal sentence, and also flag all-N/A / generic-filler
+ * bullets. False positives on a real Japan narrative are unlikely (those describe BOJ/JGB/yen
+ * developments, not their absence).
+ */
+function isDegenerateJapan(j: { narrative?: string; mizuho?: string[]; signals?: string[] }): boolean {
+  const narr = (j.narrative || "").toLowerCase();
+  const absence =
+    /\bno\s+(specific|relevant|direct|significant|material|notable|particular)?\s*(japan|asia|regional)?\s*(news|developments?|information|updates?|stories|data|items?|content)\b/.test(narr) ||
+    /\b(cannot|could not|can't|unable to|couldn't)\b[^.]*\b(populat|provide|report|fill|cover|detail)/.test(narr) ||
+    /\bno\b[^.]*\b(japan|boj|yen|jgb|nikkei)\b[^.]*\b(news|provided|available|found|reported|developments?|mentioned)\b/.test(narr) ||
+    /\bnot\s+(provided|available|present|found|reported|mentioned)\b/.test(narr) ||
+    /\bno\s+(japan|boj|yen|jgb|nikkei)[- ]?(specific|related|relevant)/.test(narr);
+
+  const naBullets =
+    Array.isArray(j.mizuho) &&
+    j.mizuho.length > 0 &&
+    j.mizuho.every((m) => !m || /^n\/?a$/i.test(m.trim()));
+
+  // Generic-filler tell: signals that disclaim themselves as broad/global rather than Japan-specific.
+  const genericSignals =
+    Array.isArray(j.signals) &&
+    j.signals.length > 0 &&
+    j.signals.every((sgl) => /general trend|broad|global/i.test(sgl)) &&
+    !JP_TERMS.test(`${j.signals.join(" ")}`);
+
+  return absence || naBullets || genericSignals;
+}
+const JP_TERMS = /japan|boj|jgb|yen|nikkei|tokyo/i;
+
 async function interpretClusters(
   clusters: Cluster[],
   indicators: Indicator[]
@@ -244,10 +277,7 @@ Rules:
       ? (out.japanAsia as IntelligenceLayer["japanAsia"])
       : curated.japanAsia;
 
-  const looksEmpty =
-    !hasJapanNews ||
-    /no specific japan/i.test(japanAsia.narrative || "") ||
-    (japanAsia.mizuho ?? []).every((m) => !m || /^n\/?a$/i.test(m.trim()));
+  const looksEmpty = !hasJapanNews || isDegenerateJapan(japanAsia);
 
   if (looksEmpty) {
     japanAsia = {
