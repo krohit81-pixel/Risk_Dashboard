@@ -124,48 +124,85 @@ Return ONE JSON object (no prose outside it):
   "title": "<concise headline for this content>",
   "whatHappened": "<2-3 sentence factual summary of the content>",
   "whyItMatters": "<macro / market significance>",
-  "bankingImpact": "<implications across credit, market, liquidity, funding, capital, operational risk — only those that genuinely apply>",
+  "bankingImpact": [
+    { "area": "<one of: Credit risk | Market risk | Liquidity & funding | Capital | Operational risk>",
+      "impact": "<the implication for THIS area, executive risk language, grounded in the content>",
+      "layman": "<the same point in plain English, minimal jargon>" }
+  ],
   "laymanWhatHappened": "<same as whatHappened, plain English, minimal jargon>",
-  "laymanWhyItMatters": "<same as whyItMatters, plain English>",
-  "laymanBankingImpact": "<same as bankingImpact, plain English>"
+  "laymanWhyItMatters": "<same as whyItMatters, plain English>"
 }
+- bankingImpact is an ARRAY. Include ONLY the areas that genuinely apply to this content — omit the rest, do NOT pad with "N/A" or "none".
+- Use ONLY these area labels: "Credit risk", "Market risk", "Liquidity & funding", "Capital", "Operational risk". At most one entry per area.
+- Every area MUST include both "impact" and "layman".
 JSON only.`;
 
   const { data, provider, reason } = await interpretWithProvider<{
     title: string;
     whatHappened: string;
     whyItMatters: string;
-    bankingImpact: string;
+    bankingImpact: { area: string; impact: string; layman: string }[] | string;
     laymanWhatHappened: string;
     laymanWhyItMatters: string;
-    laymanBankingImpact: string;
   }>(system, user);
 
   if (!data || !data.whatHappened) {
     throw new Error(`analysis failed (reason=${reason})`);
   }
 
+  // Normalise banking impact into bulleted areas. Defensive: the model may
+  // occasionally return a string (old shape) instead of the array — wrap it.
+  const ALLOWED = ["Credit risk", "Market risk", "Liquidity & funding", "Capital", "Operational risk"];
+  const canon = (a: string): string => {
+    const v = (a || "").toLowerCase();
+    if (v.startsWith("credit")) return "Credit risk";
+    if (v.startsWith("market")) return "Market risk";
+    if (v.startsWith("liquid") || v.includes("funding")) return "Liquidity & funding";
+    if (v.startsWith("capital")) return "Capital";
+    if (v.startsWith("oper")) return "Operational risk";
+    return a || "";
+  };
+  let areas: { area: string; impact: string; layman: string }[] = [];
+  if (Array.isArray(data.bankingImpact)) {
+    const seen = new Set<string>();
+    for (const it of data.bankingImpact) {
+      const area = canon(it?.area || "");
+      const impact = (it?.impact || "").trim();
+      if (!ALLOWED.includes(area) || !impact || seen.has(area)) continue;
+      seen.add(area);
+      areas.push({ area, impact, layman: (it?.layman || impact).trim() });
+    }
+  } else if (typeof data.bankingImpact === "string" && data.bankingImpact.trim()) {
+    // Back-compat fallback — single blended string with no per-area split.
+    areas = [{ area: "Banking impact", impact: data.bankingImpact.trim(), layman: data.bankingImpact.trim() }];
+  }
+
+  // Combined strings for back-compat consumers (savedStore, alignment input, fallback render).
+  const impactCombined = areas.map((a) => `${a.area}: ${a.impact}`).join(" ");
+  const laymanImpactCombined = areas.map((a) => `${a.area}: ${a.layman}`).join(" ");
+
   // Dedicated alignment (shared with editorial) for this single item.
   const [alignment] = await alignToMizuho([
-    { title: data.title || "", why: data.whyItMatters || "", impact: data.bankingImpact || "" },
+    { title: data.title || "", why: data.whyItMatters || "", impact: impactCombined },
   ]);
 
   // Related concepts: link ONLY to existing curated concepts (never auto-create).
   const relatedConcepts = detectConcepts(
-    `${data.title} ${data.whatHappened} ${data.whyItMatters} ${data.bankingImpact}`
+    `${data.title} ${data.whatHappened} ${data.whyItMatters} ${impactCombined}`
   );
 
   return {
     title: data.title || "Untitled analysis",
     whatHappened: data.whatHappened,
     whyItMatters: data.whyItMatters || "",
-    bankingImpact: data.bankingImpact || "",
+    bankingImpact: impactCombined,
+    bankingImpactAreas: areas,
     mizuhoAlignment: alignment ?? [],
     relatedConcepts,
     layman: {
       whatHappened: data.laymanWhatHappened || data.whatHappened,
       whyItMatters: data.laymanWhyItMatters || data.whyItMatters || "",
-      bankingImpact: data.laymanBankingImpact || data.bankingImpact || "",
+      bankingImpact: laymanImpactCombined,
     },
     sourceType: meta.sourceType,
     originalUrl: meta.originalUrl,

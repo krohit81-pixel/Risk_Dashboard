@@ -1,8 +1,8 @@
 // components/research/ResearchWorkspace.tsx
 "use client";
 
-import { useState } from "react";
-import type { ResearchAnalysis } from "@/lib/types";
+import { useState, useEffect } from "react";
+import type { ResearchAnalysis, BankingImpactArea } from "@/lib/types";
 import type { SavedItem } from "@/lib/savedStore";
 import { CONCEPTS } from "@/lib/concepts";
 import { MizuhoAlignmentBlock } from "@/components/intel/MizuhoAlignment";
@@ -25,6 +25,23 @@ export function ResearchWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<ResearchAnalysis | null>(null);
   const [learning, setLearning] = useState(false);
+  const [quota, setQuota] = useState<{ used: number; cap: number; remaining: number } | null>(null);
+
+  // Show remaining Research budget for today (cheap GET, no analysis spent).
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/research/analyze")
+      .then((r) => r.json())
+      .then((j) => {
+        if (alive && j?.ok && j.quota) setQuota(j.quota);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const capped = quota ? quota.remaining <= 0 : false;
 
   async function analyze() {
     setLoading(true);
@@ -37,6 +54,7 @@ export function ResearchWorkspace({
         body: JSON.stringify(mode === "url" ? { mode, url } : { mode, text }),
       });
       const j = await res.json();
+      if (j.quota) setQuota(j.quota);
       if (!res.ok || !j.ok) {
         setError(j.error || "Analysis failed. Please try again.");
         if (j.fallbackToText) setMode("text");
@@ -126,17 +144,30 @@ export function ResearchWorkspace({
             </p>
           ) : null}
 
+          {capped ? (
+            <p className="rounded-lg border border-elevated/30 bg-elevated/5 px-3 py-2 text-2xs leading-relaxed text-elevated">
+              Research is paused for today to protect the daily briefing&rsquo;s quota
+              {quota ? ` (used ${quota.used} of ${quota.cap})` : ""}. It resets after midnight IST.
+            </p>
+          ) : null}
+
           <button
             onClick={analyze}
-            disabled={loading || (mode === "text" ? text.trim().length < 200 : url.trim().length < 8)}
+            disabled={capped || loading || (mode === "text" ? text.trim().length < 200 : url.trim().length < 8)}
             className={`w-full rounded-xl px-4 py-3 text-sm font-semibold transition ${
-              loading || (mode === "text" ? text.trim().length < 200 : url.trim().length < 8)
+              capped || loading || (mode === "text" ? text.trim().length < 200 : url.trim().length < 8)
                 ? "bg-ink-800 text-fg-faint"
                 : "bg-steel/15 text-steel active:bg-steel/25"
             }`}
           >
-            {loading ? "Analyzing… (~20–30s)" : "Analyze"}
+            {loading ? "Analyzing… (~20–30s)" : capped ? "Paused until tomorrow" : "Analyze"}
           </button>
+
+          {quota && !capped ? (
+            <p className="text-center text-[10px] text-fg-faint">
+              {quota.remaining} of {quota.cap} analyses left today
+            </p>
+          ) : null}
         </>
       ) : (
         <>
@@ -171,7 +202,7 @@ export function ResearchWorkspace({
 
             <FieldBlock label="What happened" text={show(analysis.whatHappened, analysis.layman?.whatHappened)} />
             <FieldBlock label="Why it matters" text={show(analysis.whyItMatters, analysis.layman?.whyItMatters)} />
-            <FieldBlock label="Banking impact" text={show(analysis.bankingImpact, analysis.layman?.bankingImpact)} />
+            <ImpactBlock areas={analysis.bankingImpactAreas} fallback={show(analysis.bankingImpact, analysis.layman?.bankingImpact)} learning={learning} />
 
             <MizuhoAlignmentBlock items={analysis.mizuhoAlignment} learning={learning} />
             {analysis.mizuhoAlignment.length === 0 ? (
@@ -235,5 +266,36 @@ function FieldBlock({ label, text }: { label: string; text: string }) {
       <span className="font-semibold uppercase tracking-wide text-steel text-2xs">{label}</span>{" "}
       <span className="align-middle">{text}</span>
     </p>
+  );
+}
+
+function ImpactBlock({
+  areas,
+  fallback,
+  learning,
+}: {
+  areas?: BankingImpactArea[];
+  fallback: string;
+  learning: boolean;
+}) {
+  // No structured areas (older analysis or single blended string) → render as before.
+  if (!areas || areas.length === 0) {
+    return <FieldBlock label="Banking impact" text={fallback} />;
+  }
+  return (
+    <div className="mt-2.5">
+      <p className="font-semibold uppercase tracking-wide text-steel text-2xs">Banking impact</p>
+      <ul className="mt-1 space-y-1.5">
+        {areas.map((a, i) => (
+          <li key={i} className="flex gap-2 text-[13.5px] leading-relaxed text-fg-muted">
+            <span aria-hidden className="mt-[2px] text-steel">•</span>
+            <span>
+              <span className="font-semibold text-fg">{a.area}.</span>{" "}
+              {learning ? a.layman || a.impact : a.impact}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

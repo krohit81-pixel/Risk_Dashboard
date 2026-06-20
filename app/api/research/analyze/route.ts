@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { analyzeContent } from "@/lib/analyze";
+import { getResearchQuota, incrementResearchCount } from "@/lib/researchQuota";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -72,12 +73,37 @@ async function fetchUrlText(url: string): Promise<{ ok: true; text: string } | {
   }
 }
 
+export async function GET() {
+  // Lightweight — lets the UI show remaining Research budget without spending any.
+  const quota = await getResearchQuota();
+  return NextResponse.json({ ok: true, quota });
+}
+
 export async function POST(req: Request) {
   let body: { mode?: string; text?: string; url?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+  }
+
+  // ── Reservation guard (V4.1) ──────────────────────────────────────────────
+  // Research is capped per IST day so it can never starve the daily editorial of
+  // Gemini quota. The cron + regenerate are exempt (they never call this counter),
+  // so editorial always keeps headroom — Research degrades first, never the briefing.
+  const quota = await getResearchQuota();
+  if (quota.remaining <= 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        capped: true,
+        quota,
+        error:
+          `Research is paused for today (used ${quota.used} of ${quota.cap}) to protect the daily ` +
+          `briefing's quota. It resets after midnight IST.`,
+      },
+      { status: 429 }
+    );
   }
 
   const mode = body.mode === "url" ? "url" : "text";
@@ -88,14 +114,15 @@ export async function POST(req: Request) {
       if (!url) return NextResponse.json({ ok: false, error: "Enter a URL." }, { status: 400 });
       const fetched = await fetchUrlText(url);
       if (!fetched.ok) {
-        // Graceful fallback — guide the user to the reliable path.
+        // Graceful fallback — guide the user to the reliable path. No slot consumed (no LLM call).
         return NextResponse.json(
           { ok: false, error: `${fetched.error} Try pasting the article text instead.`, fallbackToText: true },
           { status: 422 }
         );
       }
       const analysis = await analyzeContent(fetched.text, { sourceType: "url", originalUrl: url });
-      return NextResponse.json({ ok: true, analysis });
+      const used = await incrementResearchCount();
+      return NextResponse.json({ ok: true, analysis, quota: { ...quota, used, remaining: Math.max(0, quota.cap - used) } });
     }
 
     const text = (body.text || "").trim();
@@ -106,7 +133,8 @@ export async function POST(req: Request) {
       );
     }
     const analysis = await analyzeContent(text, { sourceType: "text" });
-    return NextResponse.json({ ok: true, analysis });
+    const used = await incrementResearchCount();
+    return NextResponse.json({ ok: true, analysis, quota: { ...quota, used, remaining: Math.max(0, quota.cap - used) } });
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: "Analysis failed — the model couldn't process this content. Please try again." },

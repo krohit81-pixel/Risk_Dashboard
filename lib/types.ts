@@ -222,18 +222,30 @@ export interface MizuhoAlignment {
   whyLayman?: string;      // plain-English twin (Learning view)
 }
 
+/**
+ * One bulleted banking-impact area (V4.1). Mirrors the curated BankImplication
+ * taxonomy. Only areas that genuinely apply are emitted — no N/A padding.
+ * `layman` is the per-area plain-English twin (Learning view, always generated).
+ */
+export interface BankingImpactArea {
+  area: string;   // e.g. "Credit risk", "Market risk", "Liquidity & funding", "Capital", "Operational risk"
+  impact: string; // executive prose
+  layman: string; // plain-English twin (parity with the Today tab)
+}
+
 /** A single Research-workspace analysis of user-supplied content (ephemeral unless saved). */
 export interface ResearchAnalysis {
   title: string;
   whatHappened: string;
   whyItMatters: string;
-  bankingImpact: string;
+  bankingImpact: string;               // combined string — back-compat (savedStore, alignment input)
+  bankingImpactAreas?: BankingImpactArea[]; // V4.1 — bulleted areas, each with a layman twin
   mizuhoAlignment: MizuhoAlignment[]; // may be empty (no clean match)
   relatedConcepts: string[];          // ids of EXISTING curated concepts only
   layman?: {
     whatHappened: string;
     whyItMatters: string;
-    bankingImpact: string;
+    bankingImpact: string;            // combined layman string — back-compat
   };
   sourceType: "text" | "url";
   originalUrl?: string;
