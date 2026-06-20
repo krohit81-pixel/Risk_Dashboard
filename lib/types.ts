@@ -222,6 +222,26 @@ export interface MizuhoAlignment {
   whyLayman?: string;      // plain-English twin (Learning view)
 }
 
+/** A single Research-workspace analysis of user-supplied content (ephemeral unless saved). */
+export interface ResearchAnalysis {
+  title: string;
+  whatHappened: string;
+  whyItMatters: string;
+  bankingImpact: string;
+  mizuhoAlignment: MizuhoAlignment[]; // may be empty (no clean match)
+  relatedConcepts: string[];          // ids of EXISTING curated concepts only
+  layman?: {
+    whatHappened: string;
+    whyItMatters: string;
+    bankingImpact: string;
+  };
+  sourceType: "text" | "url";
+  originalUrl?: string;
+  analyzedISO: string;
+  truncated?: boolean;
+  provider?: string;
+}
+
 export interface ThemeLayman {
   title?: string;
   whyItMatters?: string;

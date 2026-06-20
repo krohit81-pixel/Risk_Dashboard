@@ -7,6 +7,7 @@ const KIND_LABEL: Record<SavedItem["kind"], string> = {
   theme: "CRO Conversation",
   editorial: "Editorial",
   japan: "Japan & Asia",
+  analysis: "Research",
 };
 
 function fmt(iso?: string): string {
@@ -71,10 +72,27 @@ export function SavedList({
             </div>
           ) : null}
           {it.sources ? <p className="mt-1.5 text-2xs text-fg-faint">Source: {it.sources}</p> : null}
-          <p className="mt-1 text-2xs text-fg-faint">
-            Saved {fmt(it.savedAtISO)}
-            {it.snapshotISO ? ` · from snapshot ${fmt(it.snapshotISO)}` : ""}
-          </p>
+          {it.kind === "analysis" ? (
+            <p className="mt-1 text-2xs text-fg-faint">
+              {it.sourceType === "url" ? "From URL" : "Pasted text"}
+              {it.originalUrl ? (
+                <>
+                  {" · "}
+                  <a href={it.originalUrl} target="_blank" rel="noopener noreferrer" className="text-steel underline">
+                    open link
+                  </a>
+                </>
+              ) : null}
+              {it.analysisDateISO ? ` · analyzed ${fmt(it.analysisDateISO)}` : ""}
+              {" · saved "}
+              {fmt(it.savedAtISO)}
+            </p>
+          ) : (
+            <p className="mt-1 text-2xs text-fg-faint">
+              Saved {fmt(it.savedAtISO)}
+              {it.snapshotISO ? ` · from snapshot ${fmt(it.snapshotISO)}` : ""}
+            </p>
+          )}
         </div>
       ))}
     </div>

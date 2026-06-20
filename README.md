@@ -490,3 +490,26 @@ Deferred to V4: Ask About This, Add to Learn, Supabase, editable concept library
   History section, with an explanatory line.
 - **Mizuho caveat shown once** — a single short provenance line at the bottom of the CRO
   Conversation section, instead of repeating under every theme.
+
+---
+
+## Version 4.0 — Research Workspace
+
+A new **Research** tab (Today · Markets · Research · Learn) analyzes any user-supplied content
+through the same CRO framework as the daily editorial.
+
+- **Inputs:** paste text (primary, reliable) or a URL (best-effort — premium/paywalled sites
+  degrade gracefully to "paste the text instead"). PDF/DOCX/OCR deferred to V4.1.
+- **Shared pipeline** (`lib/analyze.ts`): `analyzeContent()` produces What Happened · Why It
+  Matters · Banking Impact · Why Mizuho cares · plain-English twin · linked existing concepts.
+  Input capped (~4k words) and labelled when truncated.
+- **Dedicated Mizuho alignment restored** (`alignToMizuho`): a focused tags-only call (invalid ids
+  rejected; "why" from the curated scenario path), reused by BOTH editorial and Research. Reverts
+  the 3.9a inline-tagging that was under-producing alignments.
+- **Isolation:** Research is ephemeral — it never touches the daily snapshot, run history or theme
+  generation. It persists only on **Save to Learn**.
+- **Save to Learn → Saved Analyses** in the Learn tab, with source-type, analysis-date, save-date
+  and original-URL metadata. Reuses `savedStore` (new `analysis` kind) + `SavedList`.
+- API: `POST /api/research/analyze` (`{mode:"text"|"url", text?|url?}`), `maxDuration=60`.
+
+Out of scope (roadmap): PDF/DOCX, OCR, Ask About This, Supabase, personal notes, multi-turn chat.

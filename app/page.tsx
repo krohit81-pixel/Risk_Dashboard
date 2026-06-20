@@ -26,6 +26,7 @@ import { SavedList } from "@/components/saved/SavedList";
 import type { SavedItem } from "@/lib/savedStore";
 import { RunHistory } from "@/components/RunHistory";
 import type { RunRecord } from "@/lib/runStore";
+import { ResearchWorkspace } from "@/components/research/ResearchWorkspace";
 import { resolveIntelligence } from "@/lib/layman";
 
 export default function Page() {
@@ -33,7 +34,7 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [learning, setLearning] = useState(false);
-  const [tab, setTab] = useState<"today" | "markets" | "learn">("today");
+  const [tab, setTab] = useState<"today" | "markets" | "research" | "learn">("today");
   const [openConceptId, setOpenConceptId] = useState<string | null>(null);
   const openConcept = (id: string) => {
     setOpenConceptId(id);
@@ -68,6 +69,8 @@ export default function Page() {
   // ── Save for Later ──
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const savedIds = new Set(savedItems.map((s) => s.id));
+  const savedAnalyses = savedItems.filter((s) => s.kind === "analysis");
+  const savedDaily = savedItems.filter((s) => s.kind !== "analysis");
   const loadSaved = useCallback(async () => {
     try {
       const r = await fetch("/api/saved", { cache: "no-store" });
@@ -306,20 +309,34 @@ export default function Page() {
               </>
             ) : null}
 
+            {/* ===== RESEARCH ===== */}
+            {tab === "research" ? (
+              <CollapsibleSection id="research" n="01" title="Research Workspace" hint="analyze any content" lockOpen>
+                <ResearchWorkspace
+                  onOpenConcept={openConcept}
+                  onToggleSave={toggleSave}
+                  savedIds={savedIds}
+                />
+              </CollapsibleSection>
+            ) : null}
+
             {/* ===== LEARN ===== */}
             {tab === "learn" ? (
               <>
-                <CollapsibleSection id="saved" n="01" title="Saved for Later" hint={`${savedItems.length} item${savedItems.length === 1 ? "" : "s"}`} defaultOpen={savedItems.length > 0}>
-                  <SavedList items={savedItems} onRemove={removeSavedItem} />
+                <CollapsibleSection id="analyses" n="01" title="Saved Analyses" hint={`${savedAnalyses.length} item${savedAnalyses.length === 1 ? "" : "s"}`} defaultOpen={savedAnalyses.length > 0}>
+                  <SavedList items={savedAnalyses} onRemove={removeSavedItem} />
                 </CollapsibleSection>
-                <CollapsibleSection id="library" n="02" title="Concept Library" hint="your growing glossary" lockOpen>
+                <CollapsibleSection id="saved" n="02" title="Saved for Later" hint={`${savedDaily.length} item${savedDaily.length === 1 ? "" : "s"}`} defaultOpen={savedDaily.length > 0}>
+                  <SavedList items={savedDaily} onRemove={removeSavedItem} />
+                </CollapsibleSection>
+                <CollapsibleSection id="library" n="03" title="Concept Library" hint="your growing glossary" lockOpen>
                   <ConceptLibrary
                     conceptSeen={data.conceptSeen ?? {}}
                     openId={openConceptId}
                     onConsumeOpen={() => setOpenConceptId(null)}
                   />
                 </CollapsibleSection>
-                <CollapsibleSection id="weekly" n="03" title="Weekly Learning Summary" hint="generated weekly" defaultOpen={false}>
+                <CollapsibleSection id="weekly" n="04" title="Weekly Learning Summary" hint="generated weekly" defaultOpen={false}>
                   <WeeklyLearningSection data={data.intelligence.weekly} />
                 </CollapsibleSection>
               </>
@@ -343,6 +360,7 @@ export default function Page() {
           {([
             ["today", "Today"],
             ["markets", "Markets"],
+            ["research", "Research"],
             ["learn", "Learn"],
           ] as const).map(([id, label]) => (
             <button

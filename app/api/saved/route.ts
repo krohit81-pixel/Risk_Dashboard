@@ -24,6 +24,10 @@ export async function POST(req: Request) {
       sources: String(body.sources ?? ""),
       savedAtISO: new Date().toISOString(),
       snapshotISO: body.snapshotISO ? String(body.snapshotISO) : undefined,
+      sourceType: body.sourceType,
+      analysisDateISO: body.analysisDateISO ? String(body.analysisDateISO) : undefined,
+      originalUrl: body.originalUrl ? String(body.originalUrl) : undefined,
+      relatedConcepts: Array.isArray(body.relatedConcepts) ? body.relatedConcepts.map(String) : undefined,
     };
     const items = await addSaved(item);
     return NextResponse.json({ ok: true, items });

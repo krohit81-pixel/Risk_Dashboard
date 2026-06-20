@@ -1,4 +1,4 @@
-# Risk Dashboard — Master Context (v3.9)
+# Risk Dashboard — Master Context (v4.0)
 
 > Permanent reference for all future development. Read this first. It tells you what the app is, why it exists, how it works, what is built, the principles that must never break, the lessons we learned the hard way, and how to extend it. **Facts** are stated plainly; inferences are marked **[Assumption]**.
 
@@ -28,15 +28,16 @@
 
 ---
 
-## 3. Current Version Snapshot — v3.9
+## 3. Current Version Snapshot — v4.0
 
-**Major capabilities.** Live market data layer (17 indicators); frozen daily AI editorial layer; live news ingestion (4 adapters) + LLM interpretation (Gemini-first, Anthropic backup); **whole-screen plain-English Learning view**; **personal concept library (Learn tab)**; **Mizuho Risk Alignment on every theme** (chip in Executive view, "Why Mizuho cares" twin in Learning view); theme persistence (NEW / Day-N / seen N×) with stable-id tracking; three-tab mobile UI; full provider-selection diagnostics; degradation visibility.
+**Major capabilities.** Live market data layer (17 indicators); frozen daily AI editorial layer; live news ingestion (4 adapters) + LLM interpretation (Gemini-first, Anthropic backup); **whole-screen plain-English Learning view**; **personal concept library (Learn tab)**; **Mizuho Risk Alignment on every theme** (chip in Executive view, "Why Mizuho cares" twin in Learning view); theme persistence (NEW / Day-N / seen N×) with stable-id tracking; four-tab mobile UI (Today · Markets · Research · Learn); full provider-selection diagnostics; degradation visibility.
 
 **What changed across 3.4 → 3.9.**
 - **3.4** — Built-in "Explain simply" (per-term Layman + Risk-language), grounded; header overlap fix. *(Superseded by 3.6; now retired.)*
 - **3.5** — **Learn tab became a concept library**: ~24 curated CRO concepts (Layman · Risk-language · why-a-CRO-cares · visual chain · "where seen"), auto-collected as themes mention them, pinnable, searchable; theme terms link into Learn.
 - **3.6** — **Learning view became a whole-screen plain-English rewrite**: every prose field swaps to a pre-generated layman twin. The toggle is now a *language switch*, not a "show more" switch. "Explain simply" retired.
 - **3.7** — Polish: toggle scoped to **Today** tab and sections 03+ only; persistence fixed via **topicId normalisation**; "Explain This" removed everywhere; footer is name-only. Provider-selection diagnostics added.
+- **4.0** — **Research Workspace.** A new **Research** tab (Today · Markets · Research · Learn) turns the dashboard from "tell me what happened today" into "help me understand any risk content." The user pastes text (primary) or a URL (best-effort) and gets the SAME framework as editorial — What Happened · Why It Matters · Banking Impact · Why Mizuho cares · Learning twin · linked existing concepts — via a **shared `analyzeContent()` pipeline**. Actions: **Save to Learn** / **Analyze another**. Saved analyses become a content type in Learn (with source-type, analysis-date, save-date, original-URL metadata). Research is **fully isolated** from the daily snapshot (ephemeral; persists nothing unless saved). This release also **restored the dedicated Mizuho alignment call** (inline tagging in 3.9a under-produced — only ~1 theme aligned; a focused call restores reliable coverage). PDF/DOCX/OCR, Ask-About-This, Supabase, notes and chat remain out of scope.
 - **3.9** — **Mizuho Risk Alignment.** Each theme is mapped to Mizuho's published **Top Risks** (and the specific published *scenario* under each) by a grounded interpretation step. Renders as a purple alignment chip in Executive view and a *"Why Mizuho cares"* narrative twin in Learning view — anchored to the published scenario, with derived confidence, and **allowed to return no match**. Backed by a curated, locally-held Top Risks framework refreshed on a **quarterly** diff-check.
 
 **User workflow.** Open app → **Today** tab (brief → what changed → themes) for a 2-minute read; on each theme, scan the **Mizuho alignment chip**; flip **Learning view** to read the conversation/editorial/Japan sections in plain English *and* expand each alignment into "why Mizuho cares"; tap **Go deeper** for mechanics/talking points; tap a risk term to jump to its **Learn** entry; **Markets** tab for the numbers; **Learn** tab to browse/pin/search.
@@ -53,14 +54,17 @@
 
 **Two-clock model (core architectural decision).** The **data layer** (indicators) is live on every load. The **editorial layer** (themes/narratives/layman twins/Mizuho alignments) is generated on a schedule, frozen all day, read from KV. They must stay decoupled.
 
+**Research is a deliberate third path (ephemeral).** The Research workspace makes an on-demand, interactive LLM call the user waits on. It is **completely isolated** from the two clocks: it never reads or writes the daily snapshot, never records runs, never affects theme generation/persistence. It computes, displays, and discards — persisting only when the user explicitly *Saves to Learn* (into the same `saved:items` store, as a new `analysis` kind). The two clocks stay intact; Research sits beside them.
+
 **Data flow.**
 ```
 FRED + Yahoo ─▶ indicators ─▶ /api/dashboard ─▶ UI (live each load)
-News adapters ─▶ dedupe ─▶ cluster ─▶ relevance+source-tier rank
-            ─▶ LLM interpret (grounded) ─▶ validate
-            ─▶ LLM Mizuho alignment (grounded; against curated Top Risks; may be empty)
-            ─▶ LLM layman translation (grounded twin)
-            ─▶ concept auto-collect ─▶ KV snapshot
+News adapters ─▶ dedupe ─▶ cluster ─▶ junk-filter + relevance/source-tier rank
+            ─▶ LLM: interpret (grounded) ─▶ DEDICATED Mizuho alignment call (tags → validated → curated why) ─▶ layman twin
+            ─▶ concept auto-collect ─▶ KV snapshot (frozen daily)
+User content (paste / URL) ─▶ /api/research/analyze ─▶ shared analyzeContent()
+            ─▶ interpret (grounded) + DEDICATED alignment + layman + link existing concepts
+            ─▶ returned to UI (ephemeral; saved to Learn only on request)
             ─▶ /api/dashboard reads snapshot ─▶ UI (frozen daily)
 ```
 
@@ -77,7 +81,7 @@ Format: *purpose · value · inputs → outputs · deps · maturity · future.*
 3. **Top Developments** — 24–72h headline cards. **Mature.** *(Not toggled.)*
 4. **CRO Conversation (themes)** — ranked themes with NEW/Day-N/seen + Go-deeper; risk terms link into Learn; **Mizuho Risk Alignment field**; full plain-English twin in Learning view. The product's core. Deps: snapshotEngine, llm, layman, concepts, mizuhoTopRisks, KV. **Mature/evolving.**
 5. **Editorial Intelligence** — other sourced developments (first/second-order); plain-English twin. **Mature.**
-6. **Japan & Asia Watch** — daily Japan narrative; plain-English twin; curated fallback. **Mature.**
+6. **Japan & Asia Watch** — daily Japan narrative; plain-English twin; curated fallback. When there is no genuine Japan news (or the model returns a degenerate N/A object), the card collapses to a single explanatory line — no empty sub-sections, no save action. **Mature.**
 7. **CRO Dashboard** — 17 indicators grouped. Reference. **Mature.** Future: sparklines.
 8. **Japan Watch** — USD/JPY, JGB10Y, BOJ, Nikkei, Japan CPI. **Mature.**
 9. **Regional Heat Map** — tappable RAG + one-line read. **Mature.**
@@ -85,6 +89,8 @@ Format: *purpose · value · inputs → outputs · deps · maturity · future.*
 11. **Concept Library (Learn tab)** — ~24 curated CRO concepts; auto-collected, pinnable, searchable; linked from theme terms. Deps: `concepts.ts`, KV, localStorage pins. **Mature/evolving.** Future: editable + Supabase (V4).
 12. **Weekly Learning** — lessons + concepts (secondary to the library). **Mature.**
 13. **Snapshot Header** — provenance: timestamp, provider, sources, coverage, **degrade reason**. **Mature.**
+15. **Research Workspace (Research tab)** — analyze any pasted text or URL through the editorial framework; Executive/Learning toggle; Save to Learn / Analyze another. *Inputs → outputs:* content → one `ResearchAnalysis` (framework + alignment + linked concepts). *Deps:* `analyze.ts`, `llm`, `mizuhoTopRisks`, `concepts`, `savedStore`. **Isolated; ephemeral.** **New (v4.0).** Future: PDF/DOCX (V4.1), Ask-About-This (later).
+16. **Saved Analyses (Learn tab)** — saved Research analyses with source-type/analysis-date/save-date/URL metadata; reuses `savedStore` (`analysis` kind) + `SavedList`. **New (v4.0).**
 14. **Mizuho Top Risks framework + Risk Alignment** — *purpose:* map each theme to Mizuho's Board-named top risks and their published scenarios. *Value:* the durable learning spine — rehearses the event→Mizuho-taxonomy→balance-sheet move the role requires. *Inputs → outputs:* curated Top Risks file + theme → 0..n alignments `{riskId, scenarioId, confidence, why}`. *Renders inside the theme card* (chip in Exec, "Why Mizuho cares" in Learning) — **not** as its own section. *Deps:* `lib/mizuhoTopRisks.ts` (curated), interpretation step. **New (v3.9).** Future: banded relevance weighting; per-risk "where seen" history.
 
 ---
@@ -97,7 +103,7 @@ Format: *purpose · value · inputs → outputs · deps · maturity · future.*
 
 ## 7. Design System
 
-**Layout philosophy.** Mobile-first (iPhone), executive-first: minimal scrolling, progressive disclosure, three tabs separating daily read from reference and learning.
+**Layout philosophy.** Mobile-first (iPhone), executive-first: minimal scrolling, progressive disclosure, four tabs: daily read · reference · research workspace · learning.
 
 **Typography.** System fonts (proxy-safe); tight hierarchy; tabular numerals.
 
@@ -113,9 +119,15 @@ Format: *purpose · value · inputs → outputs · deps · maturity · future.*
 
 ## 8. AI & Intelligence Layer
 
-**Existing.** Provider-agnostic LLM interpretation: **Gemini-first** (`gemini-2.5-flash`, free), **Anthropic backup** (Haiku), else curated. The generation run makes grounded LLM calls: (1) interpret news clusters → themes + editorial + (conditional) Japan narrative; (2) **map each theme to the curated Mizuho Top Risks** → 0..n `{riskId, scenarioId, confidence, why}`; (3) **translate** every prose field (including the "why Mizuho cares" text) into a plain-English twin. Each step validated and isolated so its failure never breaks the briefing.
+**Existing.** Provider-agnostic LLM interpretation: **Gemini-first** (`gemini-2.5-flash`, free), **Anthropic backup** (Haiku), else curated. **Gemini "thinking" is disabled (`thinkingBudget: 0`)** — as a reasoning model its hidden thinking tokens were consuming `maxOutputTokens`, truncating JSON (`finishReason=MAX_TOKENS`) and forcing slow fallbacks that overran the 180s cron.
 
-**Mizuho alignment — grounding rules.** The model maps *only* to the supplied curated risks/scenarios (no invented risk names); anchors each "why" to a specific published **scenario**, not the headline risk (the repetition guard); states the transmission path from *this* event, never the definition of the risk; and **returns an empty array when nothing maps cleanly** — a no-match is a valid, expected output, not a failure. Confidence is derived (High/Med/Low), never model-stamped.
+**Shared pipeline (`lib/analyze.ts`).** Both entry points reuse the same primitives:
+- `alignToMizuho(items)` — a **DEDICATED** grounded call mapping items → 0..n curated Top-Risk scenarios. The model returns **tags only** (riskId/scenarioId/confidence); invalid ids are rejected; the displayed "why" is the **curated scenario `path`/`pathLayman`** (no hallucinated mapping prose). Restored as a dedicated call in 4.0 after inline tagging (3.9a) under-produced — a focused call gives reliable coverage. With thinking disabled it is small and fast.
+- `analyzeContent(content, meta)` — one grounded call producing the standard framework + plain-English twin, then `alignToMizuho` + link to existing curated concepts. Input is capped (~4k words) and labelled when truncated.
+
+The **editorial run** = interpret clusters → `alignToMizuho(themes)` → layman twin → concept collect → KV. The **Research run** = `analyzeContent` (interpret + alignment + concepts), returned and discarded unless saved. Each step validated and isolated so failure never breaks the briefing.
+
+**Mizuho alignment — grounding rules.** The model only *tags* with the supplied curated risk/scenario **ids** (invalid ids are rejected, never invented); it writes no mapping prose. The displayed "why Mizuho cares" is the curated scenario **path** (the transmission mechanism) — accurate by construction and immune to hallucination. A theme may tag **0–2** scenarios; an **empty set is valid and expected** when nothing maps cleanly. Confidence is normalised to High/Med/Low.
 
 **Prompting strategy.** Strict grounding — interpret/translate only supplied content; numbers re-anchored to the live data spine; rank by CRO relevance; cross-section de-duplication; Japan section only when genuine Japan news exists.
 
@@ -176,7 +188,10 @@ The CRO / Risk Committee / Japan Leadership / Global Bank roles are **simulated 
 - **Concept auto-collect is curated-only** — novel terms not auto-defined (deliberate).
 - **Concept library content is hardcoded** (`concepts.ts`); pins per-device. Editing + multi-device → Supabase (V4).
 - **Mizuho Top Risks framework is hardcoded/curated** (`lib/mizuhoTopRisks.ts`). Quarterly diff-check against the governance page is currently a manual/cron reminder; real cadence is ~annual. A published change requires a manual edit + redeploy. Mapping quality depends on the model anchoring to scenarios — watch for generic, risk-definition-restating "why" text and tighten the prompt if it appears.
-- **Gemini vs Anthropic provider stability** — diagnostics added; confirm runtime key binding on a live run.
+- **Gemini truncation (resolved 3.9a)** — `gemini-2.5-flash` thinking tokens were truncating JSON and forcing slow fallbacks (180s cron overrun); fixed by disabling thinking. Confirm on a live run that both calls finish `finishReason=STOP` on Gemini.
+- **Research URL fetch is best-effort** — premium/paywalled sites (Reuters/FT/Nikkei/WSJ) routinely 403/JS-render; the route degrades gracefully to "paste the text instead." Text is the reliable tier. PDF/DOCX deferred to V4.1.
+- **Research input is capped (~4k words)** and labelled when truncated — long BIS/IMF reports are summarised from the head, not silently whole-claimed.
+- **Saved analyses share the `saved:items` cap (50)** with daily saves; revisit if the library outgrows it (Supabase is the eventual home, deferred).
 - **No automated tests / monitoring** beyond cron logs and degrade reasons.
 - **Single daily snapshot** (evening cron removed) — acceptable by decision.
 
@@ -186,7 +201,9 @@ The CRO / Risk Committee / Japan Leadership / Global Bank roles are **simulated 
 
 **Completed:** v1 → v2 → v3 (CRO intelligence layer) → v3.1 (two-clock, KV, cron) → v3.2 (live news + LLM) → v3.3 (robustness, persistence, tabs, Go-deeper) → v3.4 (Explain simply) → v3.5 (Learn library) → v3.6 (whole-screen Learning view) → v3.7 (toggle scope, persistence normalisation, diagnostics) → **v3.9 (Mizuho Risk Alignment: theme → Top Risks/scenario mapping, chip + "why Mizuho cares" twin, curated quarterly-refresh framework, fact/interpretation provenance).**
 
-**Next — V4 (specced, staged):** **V4.0** cleanups + cross-section dedupe; **V4.1** "Regenerate Editorial" UI button; **V4.2** Supabase migration + editable concept library + concept history, then **"Ask a follow-up"** (single-turn, context-scoped, grounded). The Mizuho lens deliberately lands *before* follow-up: thinking in Mizuho's taxonomy sharpens the questions the user will ask.
+**Completed in 4.0:** Research Workspace (paste-text + best-effort URL), shared `analyzeContent()`, dedicated alignment restored, Save to Learn, Saved Analyses in Learn.
+
+**Next — V4.1+ (staged):** **V4.1** PDF/DOCX upload + extraction for Research (the heavy, flaky input tier — kept separate on purpose); then OCR/screenshots; then **Ask About This** (single-turn, context-scoped, grounded follow-up on a saved analysis or theme); then Supabase + editable concept library + personal notes. Each remains out of current scope.
 
 **Medium term:** banded Mizuho relevance weighting; per-top-risk "where seen" history (which risks recur); richer per-theme teaching; sharper Japan sourcing; sparklines.
 
@@ -222,6 +239,11 @@ The CRO / Risk Committee / Japan Leadership / Global Bank roles are **simulated 
 10. **Prototype structural changes before coding them.** Throwaway clickable HTML lets the user feel the flow on a phone first.
 11. **Curated core + auto-collect, never auto-define.** Hand-author definitions (concepts) and curate reference frameworks (Top Risks) for accuracy; let the model collect *appearances* and propose *mappings*, but never invent the underlying facts.
 12. **Resist scope creep; stage releases.** "Fewer, better" beats "more." Recommend-before-build.
+14. **Know your model's token accounting.** A reasoning model spends hidden "thinking" tokens out of the same `maxOutputTokens` budget as the answer — which silently truncated our JSON and cascaded into fallback-driven timeouts. Disabling thinking (or budgeting for it) is mandatory when you need complete structured output. Instrument `finishReason`; don't assume the cap is about answer length.
+16. **Reuse the framework, not the engine.** The Research workspace's value is the *interpretation framework*, not a second pipeline. Building it as a new entry point into shared primitives (`analyzeContent`, `alignToMizuho`, concept linking) kept it lightweight and guarantees identical output whether content comes from the cron or the user.
+17. **Isolation is a feature.** Research had to be ephemeral and walled off from the daily snapshot — an interactive third path that never pollutes editorial history. Keeping it stateless-until-saved preserved the two-clock guarantees while adding an interactive surface.
+18. **A merge that helps latency can starve quality — measure the feature, not just the clock.** Folding alignment into the interpret call (3.9a) fixed nothing the thinking-disable hadn't already fixed, and it quietly cut alignment coverage to ~1 theme. The dedicated call was restored. Reducing calls is only a win if the deprioritised step still does its job.
+15. **Fold a call when its output can be curated.** The Mizuho mapping became a *tag* (ids only) once we realised the explanatory "why" should be curated reference text, not model prose. That removed a whole LLM round-trip AND a translation pass AND the hallucination surface. Ask whether a step's prose really needs to be generated, or can be looked up.
 13. **Map to published scenarios, not headline tags — and allow no match.** A lens that maps every event to some top risk is astrology; the willingness to return "no clean alignment" is what makes the mapping credible. Anchor each alignment to a specific published *scenario* (the transmission path), which also prevents the narratives converging into repetitive risk-definitions. (Worked example: private-credit/NBFI stress maps to a *scenario under "US slowdown"* — there is no standalone "NBFI" top risk; mapping to the real published scenario is both more accurate and more teachable than inventing a tag.)
 
 ---

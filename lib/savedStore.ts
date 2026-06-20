@@ -6,8 +6,8 @@
 import { kvGet, kvSet, storeAvailable } from "./snapshotStore";
 
 export interface SavedItem {
-  id: string; // stable id from the source item (topicId/editorial id/"japan")
-  kind: "theme" | "editorial" | "japan";
+  id: string; // stable id from the source item (topicId/editorial id/"japan"/analysis id)
+  kind: "theme" | "editorial" | "japan" | "analysis";
   title: string;
   interpretation: string; // why it matters
   bankingImpact: string;
@@ -15,6 +15,11 @@ export interface SavedItem {
   sources: string;
   savedAtISO: string;   // when the user saved it
   snapshotISO?: string; // original snapshot date for timeline context
+  // ── Research analyses (V4.0) — lightweight metadata so Learn stays useful over time ──
+  sourceType?: "text" | "url" | "theme" | "editorial" | "japan";
+  analysisDateISO?: string; // when the analysis was generated
+  originalUrl?: string;     // source URL if analysed from a link
+  relatedConcepts?: string[];
 }
 
 const KEY = "saved:items";
