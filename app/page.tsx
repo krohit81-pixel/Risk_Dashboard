@@ -299,6 +299,12 @@ export default function Page() {
                   <JapanWatch indicators={data.japanWatch} />
                 </CollapsibleSection>
                 <CollapsibleSection id="heatmap" n="03" title="Global Risk Heat Map" hint="tap a region" defaultOpen>
+                  {data.weeklyRefreshedISO ? (
+                    <p className="mb-2 rounded-lg border border-steel/25 bg-steel/5 px-3 py-1.5 text-2xs leading-relaxed text-steel">
+                      Weekly view · heat map, emerging risks & implications refreshed{" "}
+                      {new Date(data.weeklyRefreshedISO).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+                    </p>
+                  ) : null}
                   <RiskHeatMap regions={data.heatMap} />
                 </CollapsibleSection>
                 <CollapsibleSection id="emerging" n="04" title="Top Emerging Risks" hint="watchlist" defaultOpen={false}>
@@ -330,7 +336,7 @@ export default function Page() {
                 <CollapsibleSection id="saved" n="02" title="Saved for Later" hint={`${savedDaily.length} item${savedDaily.length === 1 ? "" : "s"}`} defaultOpen={savedDaily.length > 0}>
                   <SavedList items={savedDaily} onRemove={removeSavedItem} />
                 </CollapsibleSection>
-                <CollapsibleSection id="library" n="03" title="Concept Library" hint="your growing glossary" lockOpen>
+                <CollapsibleSection id="library" n="03" title="Concept Library" hint="your growing glossary" defaultOpen>
                   <ConceptLibrary
                     conceptSeen={data.conceptSeen ?? {}}
                     openId={openConceptId}

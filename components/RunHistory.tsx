@@ -22,6 +22,11 @@ export function RunHistory({ runs }: { runs: RunRecord[] }) {
           <span className="rounded-full border border-line bg-ink-700 px-1.5 py-0.5 font-semibold uppercase tracking-wide text-fg-faint">
             {r.trigger}
           </span>
+          {r.job === "weekly" ? (
+            <span className="rounded-full border border-steel/30 bg-steel/10 px-1.5 py-0.5 font-semibold uppercase tracking-wide text-steel">
+              weekly
+            </span>
+          ) : null}
           <span className="ml-auto text-fg-faint">
             {r.ok ? (
               <>

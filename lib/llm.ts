@@ -75,8 +75,12 @@ function apiErrorMessage(body: string): string {
 }
 
 /** Send a prompt, return parsed JSON, or null on any failure (caller falls back). */
-export async function interpret<T>(system: string, user: string): Promise<T | null> {
-  return (await interpretWithProvider<T>(system, user)).data;
+export async function interpret<T>(
+  system: string,
+  user: string,
+  opts: { forceProvider?: "anthropic" } = {}
+): Promise<T | null> {
+  return (await interpretWithProvider<T>(system, user, opts)).data;
 }
 
 /**
@@ -87,16 +91,21 @@ export async function interpret<T>(system: string, user: string): Promise<T | nu
  */
 export async function interpretWithProvider<T>(
   system: string,
-  user: string
+  user: string,
+  opts: { forceProvider?: "anthropic" } = {}
 ): Promise<{ data: T | null; provider: "gemini" | "anthropic" | "none"; reason: LlmReason }> {
   const hasGemini = Boolean(process.env.GEMINI_API_KEY);
   const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
+  const forceAnthropic = opts.forceProvider === "anthropic";
 
   console.log(`[gen] providers available gemini=${hasGemini} anthropic=${hasAnthropic}`);
-  console.log(`[gen] provider selection starting`);
+  console.log(`[gen] provider selection starting${forceAnthropic ? " (forced=anthropic)" : ""}`);
 
-  // ── Gemini (primary) ──
-  if (geminiDisabled()) {
+  // ── Gemini (primary) — skipped entirely when a call forces Anthropic (e.g. the
+  //    weekly job, kept off the scarce free-tier Gemini quota by design) ──
+  if (forceAnthropic) {
+    console.log(`[gen] provider=gemini skipped reason=forced_anthropic`);
+  } else if (geminiDisabled()) {
     console.log(`[gen] provider=gemini skipped reason=config_disabled`);
   } else if (!hasGemini) {
     console.log(`[gen] provider=gemini skipped reason=missing_api_key`);

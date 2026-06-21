@@ -28,6 +28,11 @@ export async function POST(req: Request) {
       analysisDateISO: body.analysisDateISO ? String(body.analysisDateISO) : undefined,
       originalUrl: body.originalUrl ? String(body.originalUrl) : undefined,
       relatedConcepts: Array.isArray(body.relatedConcepts) ? body.relatedConcepts.map(String) : undefined,
+      // ── V4.1a full-piece capture — persist the deeper content (was being dropped) ──
+      whatHappened: body.whatHappened ? String(body.whatHappened) : undefined,
+      bankingImpactAreas: Array.isArray(body.bankingImpactAreas) ? body.bankingImpactAreas : undefined,
+      layman: body.layman && typeof body.layman === "object" ? body.layman : undefined,
+      detail: body.detail && typeof body.detail === "object" ? body.detail : undefined,
     };
     const items = await addSaved(item);
     return NextResponse.json({ ok: true, items });

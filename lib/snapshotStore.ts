@@ -105,6 +105,15 @@ export async function saveWeekly(weekly: EditorialSnapshot["intelligence"]["week
   await kvSet(WEEKLY, weekly);
 }
 
+// ── V4.2 weekly Markets artifact (heat map + emerging risks + implications) ──
+const WEEKLY_MARKETS = "weekly:markets";
+export async function getWeeklyMarkets(): Promise<import("./types").WeeklyMarkets | null> {
+  return kvGet(WEEKLY_MARKETS);
+}
+export async function saveWeeklyMarkets(m: import("./types").WeeklyMarkets): Promise<void> {
+  await kvSet(WEEKLY_MARKETS, m);
+}
+
 // ── IST time helpers ──
 
 /** Current time shifted to IST (UTC+5:30). */

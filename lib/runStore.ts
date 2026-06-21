@@ -14,6 +14,8 @@ export interface RunRecord {
   degradeReason?: string;
   themes?: number;
   error?: string;
+  /** V4.2 — which job produced this run. Defaults to the daily editorial. */
+  job?: "editorial" | "weekly";
 }
 
 const KEY = "runs:log";

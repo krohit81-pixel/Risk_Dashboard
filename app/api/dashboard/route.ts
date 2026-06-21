@@ -17,6 +17,8 @@ import {
   istDateKey,
   slotForNow,
   getConceptSeen,
+  getWeeklyMarkets,
+  getWeekly,
 } from "@/lib/snapshotStore";
 import { curatedSnapshot, attachLiveDrift } from "@/lib/snapshotEngine";
 import { buildOvernight } from "@/lib/overnight";
@@ -55,9 +57,19 @@ export async function GET() {
   const developments = [...derived, ...curated].slice(0, 5);
 
   const usBase = HEAT_MAP_BASE.find((h) => h.region === "United States")!;
-  const heatMap = HEAT_MAP_BASE.map((h) =>
-    h.region === "United States" ? usHeatFromData(indicators, usBase) : h
-  );
+
+  // ── V4.2 — weekly Markets refresh (sections 03–05). When a weekly artifact
+  //    exists, serve it FROZEN (whole heat map, severity included — no daily US
+  //    overlay). Otherwise fall back to the curated spine with the live US cell. ──
+  const weeklyMarkets = await getWeeklyMarkets();
+  const heatMap = weeklyMarkets
+    ? weeklyMarkets.heatMap
+    : HEAT_MAP_BASE.map((h) =>
+        h.region === "United States" ? usHeatFromData(indicators, usBase) : h
+      );
+  const emergingRisks = weeklyMarkets ? weeklyMarkets.emergingRisks : EMERGING_RISKS;
+  const implications = weeklyMarkets ? weeklyMarkets.implications : IMPLICATIONS_BASE;
+  const weeklyRefreshedISO = weeklyMarkets?.generatedISO;
 
   const anyLive = indicators.some((i) => i.live);
   const byId = (id: string) => indicators.find((i) => i.id === id)!;
@@ -78,20 +90,27 @@ export async function GET() {
   snapshot = attachLiveDrift(snapshot, indicators);
   snapshot.meta = { ...snapshot.meta, stale };
 
+  // V4.2 — if a weekly Learning summary was generated, serve it over the static seed.
+  const weeklyLearning = await getWeekly();
+  const intelligence = weeklyLearning
+    ? { ...snapshot.intelligence, weekly: weeklyLearning }
+    : snapshot.intelligence;
+
   const payload: DashboardData = {
     brief,
     developments,
     indicators,
-    emergingRisks: EMERGING_RISKS,
+    emergingRisks,
     heatMap,
-    implications: IMPLICATIONS_BASE,
+    implications,
     japanWatch,
     overnight: buildOvernight(indicators),
     conceptSeen: await getConceptSeen(),
-    intelligence: snapshot.intelligence,
+    intelligence,
     snapshotMeta: snapshot.meta,
     anyLive,
     updatedISO,
+    weeklyRefreshedISO,
   };
 
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });

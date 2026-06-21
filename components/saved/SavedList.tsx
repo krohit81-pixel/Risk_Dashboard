@@ -75,6 +75,7 @@ function SavedCard({
   onRemove: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [cardOpen, setCardOpen] = useState(true); // each saved item is collapsible
   const show = (exec?: string, lay?: string) => (learning && lay ? lay : exec) || "";
   const showList = (exec?: string[], lay?: string[]) =>
     (learning && lay && lay.length ? lay : exec) ?? [];
@@ -103,187 +104,203 @@ function SavedCard({
         <span className="rounded-full border border-line bg-ink-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-fg-muted">
           {KIND_LABEL[it.kind]}
         </span>
+        <button
+          onClick={() => setCardOpen((v) => !v)}
+          aria-label={cardOpen ? "Collapse" : "Expand"}
+          className="text-2xs text-fg-faint"
+        >
+          {cardOpen ? "\u25be" : "\u25b8"}
+        </button>
         <button onClick={() => onRemove(it.id)} className="ml-auto text-2xs font-semibold text-fg-faint">
           Remove
         </button>
       </div>
 
-      <h4 className="text-[14.5px] font-semibold leading-snug text-fg">{it.title}</h4>
+      <button onClick={() => setCardOpen((v) => !v)} className="block w-full text-left">
+        <h4 className="text-[14.5px] font-semibold leading-snug text-fg">{it.title}</h4>
+      </button>
 
-      {show(it.whatHappened, it.layman?.whatHappened) ? (
-        <Line label="What happened">{show(it.whatHappened, it.layman?.whatHappened)}</Line>
-      ) : null}
-
-      {show(it.interpretation, it.layman?.interpretation) ? (
-        <Line label="Why it matters">{show(it.interpretation, it.layman?.interpretation)}</Line>
-      ) : null}
-
-      {impactAreas.length ? (
-        <div className="mt-1">
-          <p className="text-2xs font-semibold uppercase tracking-wide text-steel">Banking impact</p>
-          <ul className="mt-1 space-y-1">
-            {impactAreas.map((a, i) => (
-              <li key={i} className="flex gap-2 text-[13px] leading-relaxed text-fg-muted">
-                <span aria-hidden className="mt-[2px] text-steel">•</span>
-                <span>
-                  <span className="font-semibold text-fg">{a.area}.</span>{" "}
-                  {learning ? a.layman || a.impact : a.impact}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : show(it.bankingImpact, it.layman?.bankingImpact) ? (
-        <Line label="Banking impact">{show(it.bankingImpact, it.layman?.bankingImpact)}</Line>
-      ) : null}
-
-      {whyMizuho.length ? (
-        <div className="mt-1.5">
-          <p className="text-2xs font-semibold uppercase tracking-wide text-mizuho">Why Mizuho cares</p>
-          <ul className="mt-0.5 list-disc pl-4 text-[13px] leading-relaxed text-fg-muted">
-            {whyMizuho.map((m, i) => (
-              <li key={i}>{m}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {hasDetail ? (
+      {cardOpen ? (
         <>
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="mt-3 flex w-full items-center gap-1.5 text-left text-xs font-semibold text-steel"
-          >
-            {open ? "\u25be Hide detail" : "\u2192 Full detail"}
-            <span className="font-normal text-fg-faint">
-              {open ? "" : "\u2014 lenses, signals, questions, talking points"}
-            </span>
-          </button>
+          {show(it.whatHappened, it.layman?.whatHappened) ? (
+            <Line label="What happened">{show(it.whatHappened, it.layman?.whatHappened)}</Line>
+          ) : null}
 
-          {open ? (
-            <div className="mt-2 space-y-3">
-              {d!.lenses?.length ? (
-                <div className="border-l-2 border-steel/60 pl-3">
-                  {d!.lenses.map((l, i) => (
-                    <p key={i} className="text-[13px] leading-relaxed text-fg-muted">
-                      <span className="font-semibold text-steel">{l.label} — </span>
-                      {show(l.question, l.questionLayman)}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
+          {show(it.interpretation, it.layman?.interpretation) ? (
+            <Line label="Why it matters" tone="interpret">{show(it.interpretation, it.layman?.interpretation)}</Line>
+          ) : null}
 
-              {d!.firstOrder || d!.secondOrder ? (
-                <div className="grid grid-cols-1 gap-2">
-                  {show(d!.firstOrder, d!.firstOrderLayman) ? (
-                    <Sub label="First-order">{show(d!.firstOrder, d!.firstOrderLayman)}</Sub>
-                  ) : null}
-                  {show(d!.secondOrder, d!.secondOrderLayman) ? (
-                    <Sub label="Second-order">{show(d!.secondOrder, d!.secondOrderLayman)}</Sub>
-                  ) : null}
-                </div>
-              ) : null}
+          {impactAreas.length ? (
+            <div className="mt-1">
+              <p className="text-2xs font-semibold uppercase tracking-wide text-steel">Banking impact</p>
+              <ul className="mt-1 space-y-1">
+                {impactAreas.map((a, i) => (
+                  <li key={i} className="flex gap-2 text-[13px] leading-relaxed text-fg-muted">
+                    <span aria-hidden className="mt-[2px] text-steel">•</span>
+                    <span>
+                      <span className="font-semibold text-fg">{a.area}.</span>{" "}
+                      {learning ? a.layman || a.impact : a.impact}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : show(it.bankingImpact, it.layman?.bankingImpact) ? (
+            <Line label="Banking impact">{show(it.bankingImpact, it.layman?.bankingImpact)}</Line>
+          ) : null}
 
-              {show(d!.keyTakeaway, d!.keyTakeawayLayman) ? (
-                <div className="rounded-lg border border-line-soft bg-ink-850 px-3 py-2">
-                  <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">Key takeaway</p>
-                  <p className="mt-0.5 text-[13px] leading-relaxed text-fg">
-                    {show(d!.keyTakeaway, d!.keyTakeawayLayman)}
-                  </p>
-                </div>
-              ) : null}
-
-              {d!.signals?.length ? (
-                <div>
-                  <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">Signals to watch</p>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {d!.signals.map((s, i) => (
-                      <span key={i} className="rounded-md border border-line bg-ink-700 px-2 py-0.5 text-2xs text-fg-muted">
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              {showList(d!.questions, d!.questionsLayman).length ? (
-                <div>
-                  <p className="text-2xs font-semibold uppercase tracking-wide text-steel">
-                    Questions leadership may ask
-                  </p>
-                  <ul className="mt-1 space-y-1 text-[13px] leading-relaxed text-fg-muted">
-                    {showList(d!.questions, d!.questionsLayman).map((q, i) => (
-                      <li key={i}>• {q}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              {show(d!.talkingPoint, d!.talkingPointLayman) || show(d!.followUp, d!.followUpLayman) ? (
-                <div className="border-l-2 border-amber/60 pl-3">
-                  {show(d!.talkingPoint, d!.talkingPointLayman) ? (
-                    <>
-                      <p className="text-2xs font-semibold uppercase tracking-wide text-amber">
-                        If this comes up in a meeting
-                      </p>
-                      <p className="mt-0.5 text-[13px] leading-relaxed text-fg">
-                        {show(d!.talkingPoint, d!.talkingPointLayman)}
-                      </p>
-                    </>
-                  ) : null}
-                  {show(d!.followUp, d!.followUpLayman) ? (
-                    <>
-                      <p className="mt-2 text-2xs font-semibold uppercase tracking-wide text-amber">
-                        Follow-up question
-                      </p>
-                      <p className="mt-0.5 text-[13px] leading-relaxed text-fg-muted">
-                        {show(d!.followUp, d!.followUpLayman)}
-                      </p>
-                    </>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {show(d!.whatToUnderstand, d!.whatToUnderstandLayman) ? (
-                <Sub label="What to understand">{show(d!.whatToUnderstand, d!.whatToUnderstandLayman)}</Sub>
-              ) : null}
+          {whyMizuho.length ? (
+            <div className="mt-1.5">
+              <p className="text-2xs font-semibold uppercase tracking-wide text-mizuho">Why Mizuho cares</p>
+              <ul className="mt-0.5 list-disc pl-4 text-[13px] leading-relaxed text-fg-muted">
+                {whyMizuho.map((m, i) => (
+                  <li key={i}>{m}</li>
+                ))}
+              </ul>
             </div>
           ) : null}
-        </>
-      ) : null}
 
-      {it.sources ? <p className="mt-2 text-2xs text-fg-faint">Source: {it.sources}</p> : null}
-
-      {it.kind === "analysis" ? (
-        <p className="mt-1 text-2xs text-fg-faint">
-          {it.sourceType === "url" ? "From URL" : "Pasted text"}
-          {it.originalUrl ? (
+          {hasDetail ? (
             <>
-              {" · "}
-              <a href={it.originalUrl} target="_blank" rel="noopener noreferrer" className="text-steel underline">
-                open link
-              </a>
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className="mt-3 flex w-full items-center gap-1.5 text-left text-xs font-semibold text-steel"
+              >
+                {open ? "\u25be Hide detail" : "\u2192 Full detail"}
+                <span className="font-normal text-fg-faint">
+                  {open ? "" : "\u2014 lenses, signals, questions, talking points"}
+                </span>
+              </button>
+
+              {open ? (
+                <div className="mt-2 space-y-3">
+                  {d!.lenses?.length ? (
+                    <div className="border-l-2 border-steel/60 pl-3">
+                      {d!.lenses.map((l, i) => (
+                        <p key={i} className="text-[13px] leading-relaxed text-fg-muted">
+                          <span className="font-semibold text-steel">{l.label} — </span>
+                          {show(l.question, l.questionLayman)}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {d!.firstOrder || d!.secondOrder ? (
+                    <div className="grid grid-cols-1 gap-2">
+                      {show(d!.firstOrder, d!.firstOrderLayman) ? (
+                        <Sub label="First-order">{show(d!.firstOrder, d!.firstOrderLayman)}</Sub>
+                      ) : null}
+                      {show(d!.secondOrder, d!.secondOrderLayman) ? (
+                        <Sub label="Second-order">{show(d!.secondOrder, d!.secondOrderLayman)}</Sub>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {show(d!.keyTakeaway, d!.keyTakeawayLayman) ? (
+                    <div className="rounded-lg border border-line-soft bg-ink-850 px-3 py-2">
+                      <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">Key takeaway</p>
+                      <p className="mt-0.5 text-[13px] leading-relaxed text-fg">
+                        {show(d!.keyTakeaway, d!.keyTakeawayLayman)}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {d!.signals?.length ? (
+                    <div>
+                      <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">Signals to watch</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {d!.signals.map((s, i) => (
+                          <span key={i} className="rounded-md border border-line bg-ink-700 px-2 py-0.5 text-2xs text-fg-muted">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {showList(d!.questions, d!.questionsLayman).length ? (
+                    <div>
+                      <p className="text-2xs font-semibold uppercase tracking-wide text-steel">
+                        Questions leadership may ask
+                      </p>
+                      <ul className="mt-1 space-y-1 text-[13px] leading-relaxed text-fg-muted">
+                        {showList(d!.questions, d!.questionsLayman).map((q, i) => (
+                          <li key={i}>• {q}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {show(d!.talkingPoint, d!.talkingPointLayman) || show(d!.followUp, d!.followUpLayman) ? (
+                    <div className="border-l-2 border-amber/60 pl-3">
+                      {show(d!.talkingPoint, d!.talkingPointLayman) ? (
+                        <>
+                          <p className="text-2xs font-semibold uppercase tracking-wide text-amber">
+                            If this comes up in a meeting
+                          </p>
+                          <p className="mt-0.5 text-[13px] leading-relaxed text-fg">
+                            {show(d!.talkingPoint, d!.talkingPointLayman)}
+                          </p>
+                        </>
+                      ) : null}
+                      {show(d!.followUp, d!.followUpLayman) ? (
+                        <>
+                          <p className="mt-2 text-2xs font-semibold uppercase tracking-wide text-amber">
+                            Follow-up question
+                          </p>
+                          <p className="mt-0.5 text-[13px] leading-relaxed text-fg-muted">
+                            {show(d!.followUp, d!.followUpLayman)}
+                          </p>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {show(d!.whatToUnderstand, d!.whatToUnderstandLayman) ? (
+                    <Sub label="What to understand">{show(d!.whatToUnderstand, d!.whatToUnderstandLayman)}</Sub>
+                  ) : null}
+                </div>
+              ) : null}
             </>
           ) : null}
-          {it.analysisDateISO ? ` · analyzed ${fmt(it.analysisDateISO)}` : ""}
-          {" · saved "}
-          {fmt(it.savedAtISO)}
-        </p>
-      ) : (
-        <p className="mt-1 text-2xs text-fg-faint">
-          Saved {fmt(it.savedAtISO)}
-          {it.snapshotISO ? ` · from snapshot ${fmt(it.snapshotISO)}` : ""}
-        </p>
-      )}
+
+          {it.sources ? <p className="mt-2 text-2xs text-fg-faint">Source: {it.sources}</p> : null}
+
+          {it.kind === "analysis" ? (
+            <p className="mt-1 text-2xs text-fg-faint">
+              {it.sourceType === "url" ? "From URL" : "Pasted text"}
+              {it.originalUrl ? (
+                <>
+                  {" · "}
+                  <a href={it.originalUrl} target="_blank" rel="noopener noreferrer" className="text-steel underline">
+                    open link
+                  </a>
+                </>
+              ) : null}
+              {it.analysisDateISO ? ` · analyzed ${fmt(it.analysisDateISO)}` : ""}
+              {" · saved "}
+              {fmt(it.savedAtISO)}
+            </p>
+          ) : (
+            <p className="mt-1 text-2xs text-fg-faint">
+              Saved {fmt(it.savedAtISO)}
+              {it.snapshotISO ? ` · from snapshot ${fmt(it.snapshotISO)}` : ""}
+            </p>
+          )}
+        </>
+      ) : null}
     </div>
   );
 }
 
-function Line({ label, children }: { label: string; children: React.ReactNode }) {
+function Line({ label, children, tone }: { label: string; children: React.ReactNode; tone?: "interpret" }) {
+  // Match the Today/Research palette: interpretation ("Why it matters") in amber,
+  // sourced/structural labels in steel.
+  const color = tone === "interpret" ? "text-amber" : "text-steel";
   return (
     <p className="mt-1.5 text-[13px] leading-relaxed text-fg-muted">
-      <span className="font-semibold text-steel">{label}: </span>
+      <span className={`font-semibold ${color}`}>{label}: </span>
       {children}
     </p>
   );

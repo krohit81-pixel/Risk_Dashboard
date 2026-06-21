@@ -121,6 +121,22 @@ export interface DashboardData {
   snapshotMeta: SnapshotMeta;
   anyLive: boolean;
   updatedISO: string;
+  /** V4.2 — when the weekly Markets refresh (sections 03–05) was last generated, if any. */
+  weeklyRefreshedISO?: string;
+}
+
+/**
+ * V4.2 — frozen weekly Markets artifact. Generated once a week via Anthropic
+ * (off the Gemini quota), grounded on the week's daily snapshots + live indicators.
+ * The curated spine is preserved: region/id/development labels stay fixed; only the
+ * ratings and reads are re-rated. Whole heat map is refreshed (severity included).
+ */
+export interface WeeklyMarkets {
+  generatedISO: string;
+  provider?: string;
+  heatMap: RegionHeat[];
+  emergingRisks: EmergingRisk[];
+  implications: BankImplication[];
 }
 
 // ─────────────────────────────────────────────────────────────

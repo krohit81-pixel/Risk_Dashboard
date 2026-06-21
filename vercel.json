@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/editorial?slot=morning", "schedule": "30 22 * * *" }
+    { "path": "/api/cron/editorial?slot=morning", "schedule": "30 22 * * *" },
+    { "path": "/api/cron/weekly", "schedule": "30 0 * * 6" }
   ]
 }
