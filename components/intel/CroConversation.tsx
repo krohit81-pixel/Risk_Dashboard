@@ -8,6 +8,7 @@ import { Linkify } from "../learn/Linkify";
 import { SaveButton } from "../saved/SaveButton";
 import { MizuhoAlignmentBlock } from "./MizuhoAlignment";
 import type { SavedItem } from "@/lib/savedStore";
+import { savedFromTheme } from "@/lib/savedMappers";
 import {
   HorizonPill,
   LabeledLine,
@@ -43,8 +44,10 @@ function PersistenceBadge({ theme }: { theme: CroTheme }) {
   return null;
 }
 
-function ThemeCard({ theme: t, learning, onOpenConcept, savedIds, onToggleSave, snapshotISO }: { theme: CroTheme; learning: boolean; onOpenConcept?: (id: string) => void; savedIds?: Set<string>; onToggleSave?: (i: SavedItem) => void; snapshotISO?: string }) {
-  const savedItem: SavedItem = { id: t.topicId || t.id, kind: "theme", title: t.title, interpretation: t.whyItMatters, bankingImpact: t.bankingImpact, whyMizuho: t.mizuho ?? [], sources: t.source, savedAtISO: "", snapshotISO };
+function ThemeCard({ theme: t, raw, learning, onOpenConcept, savedIds, onToggleSave, snapshotISO }: { theme: CroTheme; raw?: CroTheme; learning: boolean; onOpenConcept?: (id: string) => void; savedIds?: Set<string>; onToggleSave?: (i: SavedItem) => void; snapshotISO?: string }) {
+  // Map from the RAW theme so BOTH executive + layman variants are captured (resolved
+  // themes lose the executive original when the Learning view is active).
+  const savedItem: SavedItem = savedFromTheme(raw ?? t, snapshotISO);
   const [open, setOpen] = useState(learning);
   return (
     <Card className="px-4 py-3.5">
@@ -106,6 +109,7 @@ function ThemeCard({ theme: t, learning, onOpenConcept, savedIds, onToggleSave, 
 
 export function CroConversation({
   themes,
+  rawThemes,
   expandedCount,
   learning,
   onOpenConcept,
@@ -114,6 +118,7 @@ export function CroConversation({
   snapshotISO,
 }: {
   themes: CroTheme[];
+  rawThemes?: CroTheme[];
   expandedCount: number;
   learning: boolean;
   onOpenConcept?: (id: string) => void;
@@ -122,6 +127,7 @@ export function CroConversation({
   snapshotISO?: string;
 }) {
   const cards = themes.filter((t) => t.expanded);
+  const rawById = new Map((rawThemes ?? []).map((t) => [t.id, t]));
   return (
     <section className="rise">
       <p className="mb-3 text-[13px] italic leading-relaxed text-fg-muted">
@@ -130,7 +136,7 @@ export function CroConversation({
       </p>
       <div className="space-y-3">
         {cards.map((t) => (
-          <ThemeCard key={t.id} theme={t} learning={learning} onOpenConcept={onOpenConcept} savedIds={savedIds} onToggleSave={onToggleSave} snapshotISO={snapshotISO} />
+          <ThemeCard key={t.id} theme={t} raw={rawById.get(t.id)} learning={learning} onOpenConcept={onOpenConcept} savedIds={savedIds} onToggleSave={onToggleSave} snapshotISO={snapshotISO} />
         ))}
       </div>
       {cards.some((t) => t.mizuhoAlignment?.length) ? (

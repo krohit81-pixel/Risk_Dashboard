@@ -2,16 +2,43 @@
 // "Save for Later" — persists the INTERPRETED snapshot of a theme/editorial/Japan
 // item (not the raw article), so valuable content survives the next generation.
 // Single-user, KV-backed, capped. No tags/folders (kept deliberately simple).
+//
+// V4.1a — full-piece capture: saved items now carry the deeper sections (lenses,
+// signals, leadership questions, talking point, follow-up, what-to-understand,
+// editorial first/second-order + key takeaway) AND a plain-English (layman) twin
+// for every field, so Learn can reproduce the piece with a working Learning toggle.
 
 import { kvGet, kvSet, storeAvailable } from "./snapshotStore";
+import type { BankingImpactArea } from "./types";
+
+/** Deeper "Go deeper" content captured for full-piece recall (V4.1a). Each field has an optional layman twin. */
+export interface SavedDetail {
+  lenses?: { label: string; question: string; questionLayman?: string }[];
+  signals?: string[]; // factual watch-items; not translated
+  questions?: string[];
+  questionsLayman?: string[];
+  talkingPoint?: string;
+  talkingPointLayman?: string;
+  followUp?: string;
+  followUpLayman?: string;
+  whatToUnderstand?: string;
+  whatToUnderstandLayman?: string;
+  // Editorial-only
+  firstOrder?: string;
+  firstOrderLayman?: string;
+  secondOrder?: string;
+  secondOrderLayman?: string;
+  keyTakeaway?: string;
+  keyTakeawayLayman?: string;
+}
 
 export interface SavedItem {
   id: string; // stable id from the source item (topicId/editorial id/"japan"/analysis id)
   kind: "theme" | "editorial" | "japan" | "analysis";
   title: string;
-  interpretation: string; // why it matters
-  bankingImpact: string;
-  whyMizuho: string[];
+  interpretation: string; // why it matters (executive)
+  bankingImpact: string;  // combined string (executive)
+  whyMizuho: string[];    // executive
   sources: string;
   savedAtISO: string;   // when the user saved it
   snapshotISO?: string; // original snapshot date for timeline context
@@ -20,6 +47,16 @@ export interface SavedItem {
   analysisDateISO?: string; // when the analysis was generated
   originalUrl?: string;     // source URL if analysed from a link
   relatedConcepts?: string[];
+  // ── V4.1a — full-piece + Learning-view parity in Learn ──
+  whatHappened?: string;                    // factual summary (editorial / research)
+  bankingImpactAreas?: BankingImpactArea[]; // bulleted impact, each with its own layman twin
+  layman?: {
+    whatHappened?: string;
+    interpretation?: string; // why-it-matters twin
+    bankingImpact?: string;  // combined impact twin
+    whyMizuho?: string[];
+  };
+  detail?: SavedDetail;
 }
 
 const KEY = "saved:items";

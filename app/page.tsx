@@ -245,6 +245,7 @@ export default function Page() {
                 <CollapsibleSection id="conversation" n="03" title="Today's CRO Conversation" hint="ranked themes · tap Go deeper" lockOpen>
                   <CroConversation
                     themes={intel!.themes}
+                    rawThemes={data.intelligence.themes}
                     expandedCount={data.intelligence.expandedCount}
                     learning={learning}
                     onOpenConcept={openConcept}
@@ -255,10 +256,10 @@ export default function Page() {
                 </CollapsibleSection>
 
                 <CollapsibleSection id="editorial" n="04" title="Editorial Intelligence" hint="other developments" defaultOpen={false}>
-                  <EditorialIntelligence cards={intel!.editorial} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
+                  <EditorialIntelligence cards={intel!.editorial} rawCards={data.intelligence.editorial} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
                 </CollapsibleSection>
                 <CollapsibleSection id="japanasia" n="05" title="Japan & Asia Watch" hint="daily narrative" defaultOpen={false}>
-                  <JapanAsiaWatchSection data={intel!.japanAsia} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
+                  <JapanAsiaWatchSection data={intel!.japanAsia} raw={data.intelligence.japanAsia} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
                 </CollapsibleSection>
                 {intel!.radar?.length ? (
                   <CollapsibleSection id="radar" n="06" title="Also on the Radar" hint="high-relevance near-misses" defaultOpen={false}>

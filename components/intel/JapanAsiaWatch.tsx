@@ -4,6 +4,7 @@
 import type { JapanAsiaWatch as JAW } from "@/lib/types";
 import { SaveButton } from "../saved/SaveButton";
 import type { SavedItem } from "@/lib/savedStore";
+import { savedFromJapan } from "@/lib/savedMappers";
 import { Card } from "../ui";
 import {
   HorizonPill,
@@ -20,19 +21,21 @@ import {
 
 export function JapanAsiaWatchSection({
   data,
+  raw,
   learning,
   savedIds,
   onToggleSave,
   snapshotISO,
 }: {
   data: JAW;
+  raw?: JAW;
   learning: boolean;
   savedIds?: Set<string>;
   onToggleSave?: (i: SavedItem) => void;
   snapshotISO?: string;
 }) {
-  const dayKey = (snapshotISO || "").slice(0, 10);
-  const savedItem: SavedItem = { id: `japan-watch-${dayKey}`, kind: "japan", title: "Japan & Asia Watch", interpretation: data.narrative, bankingImpact: "", whyMizuho: data.mizuho ?? [], sources: data.source, savedAtISO: "", snapshotISO };
+  // Map from RAW so both executive + layman variants are captured.
+  const savedItem: SavedItem = savedFromJapan(raw ?? data, snapshotISO);
 
   // No genuine Japan news today → show only the explanatory line.
   if (data.empty) {

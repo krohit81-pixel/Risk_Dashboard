@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import type { ResearchAnalysis, BankingImpactArea } from "@/lib/types";
 import type { SavedItem } from "@/lib/savedStore";
+import { savedFromAnalysis } from "@/lib/savedMappers";
 import { CONCEPTS } from "@/lib/concepts";
 import { MizuhoAlignmentBlock } from "@/components/intel/MizuhoAlignment";
 
@@ -76,22 +77,7 @@ export function ResearchWorkspace({
     setUrl("");
   }
 
-  const savedItem: SavedItem | null = analysis
-    ? {
-        id: `analysis-${analysis.analyzedISO}`,
-        kind: "analysis",
-        title: analysis.title,
-        interpretation: analysis.whyItMatters,
-        bankingImpact: analysis.bankingImpact,
-        whyMizuho: analysis.mizuhoAlignment.map((a) => `${a.riskName} · ${a.scenarioLabel}`),
-        sources: analysis.originalUrl || "Pasted text",
-        savedAtISO: "",
-        sourceType: analysis.sourceType,
-        analysisDateISO: analysis.analyzedISO,
-        originalUrl: analysis.originalUrl,
-        relatedConcepts: analysis.relatedConcepts,
-      }
-    : null;
+  const savedItem: SavedItem | null = analysis ? savedFromAnalysis(analysis) : null;
   const isSaved = savedItem ? Boolean(savedIds?.has(savedItem.id)) : false;
 
   const show = (exec: string, lay?: string) => (learning && lay ? lay : exec);

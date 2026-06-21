@@ -4,6 +4,7 @@
 import type { EditorialCard } from "@/lib/types";
 import { SaveButton } from "../saved/SaveButton";
 import type { SavedItem } from "@/lib/savedStore";
+import { savedFromEditorial } from "@/lib/savedMappers";
 import { Card, SeverityPill, Chip } from "../ui";
 import {
   HorizonPill,
@@ -18,17 +19,20 @@ import {
 
 export function EditorialIntelligence({
   cards,
+  rawCards,
   learning,
   savedIds,
   onToggleSave,
   snapshotISO,
 }: {
   cards: EditorialCard[];
+  rawCards?: EditorialCard[];
   learning: boolean;
   savedIds?: Set<string>;
   onToggleSave?: (i: SavedItem) => void;
   snapshotISO?: string;
 }) {
+  const rawById = new Map((rawCards ?? []).map((c) => [c.id, c]));
   return (
     <section className="rise">
       <div className="space-y-3">
@@ -92,7 +96,7 @@ export function EditorialIntelligence({
               {onToggleSave ? (
                 <span className="ml-auto">
                   <SaveButton
-                    item={{ id: c.id, kind: "editorial", title: c.title, interpretation: c.whyItMatters, bankingImpact: c.bankRisk ?? "", whyMizuho: [], sources: c.source, savedAtISO: "", snapshotISO }}
+                    item={savedFromEditorial(rawById.get(c.id) ?? c, snapshotISO)}
                     saved={Boolean(savedIds?.has(c.id))}
                     onToggle={onToggleSave}
                   />
