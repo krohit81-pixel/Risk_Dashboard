@@ -17,9 +17,15 @@ export function BankImplications({ items }: { items: BankImplication[] }) {
     <section className="rise">
       <div className="space-y-3">
         {items.map((it) => (
-          <Card key={it.development} className="overflow-hidden">
+          <Card key={it.riskId ?? it.development} className="overflow-hidden">
             <div className="border-b border-line-soft bg-ink-850 px-4 py-2.5">
               <h3 className="text-[14px] font-semibold text-fg">{it.development}</h3>
+              {it.riskName ? (
+                <p className="mt-0.5 text-2xs text-fg-faint">
+                  Linked to emerging risk:{" "}
+                  <span className="font-semibold text-elevated">{it.riskName}</span>
+                </p>
+              ) : null}
             </div>
             <div className="divide-y divide-line-soft/60">
               {LENSES.map(({ key, label }) => (

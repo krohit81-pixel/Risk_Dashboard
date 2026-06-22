@@ -160,6 +160,57 @@ export function normalizeTopicId(id: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+/**
+ * V4.3 — closed topic vocabulary for robust day-over-day persistence.
+ *
+ * The model proposes a `topicId` per theme; trusting it verbatim caused two faults:
+ * (a) collision — a new story reusing a broad slug (e.g. "geopolitical-tail") inherited
+ * an old theme's first-seen date and showed "Day 5"; (b) drift — a recurring theme
+ * getting a fresh slug and wrongly showing NEW. `resolveTopicId` maps to a canonical id
+ * ONLY when the title actually supports it, and otherwise mints a specific title-derived
+ * slug (collision-resistant). Canonical ids match the curated theme anchors.
+ */
+const TOPIC_VOCAB: { id: string; keywords: string[] }[] = [
+  { id: "boj-normalisation", keywords: ["boj", "bank of japan", "yen", "jgb", "carry", "normalis", "ueda"] },
+  { id: "services-inflation", keywords: ["inflation", "services", "cpi", "sticky", "price pressure", "core pce"] },
+  { id: "fed-policy", keywords: ["fed", "federal reserve", "fomc", "powell", "warsh", "rate cut", "rate hike", "hawkish", "dovish"] },
+  { id: "private-credit", keywords: ["private credit", "direct lending", "shadow bank", "nonbank", "non-bank"] },
+  { id: "cre-refinancing", keywords: ["cre", "commercial real estate", "office", "refinanc", "property loan", "landlord"] },
+  { id: "china-slowdown", keywords: ["china", "chinese", "evergrande", "property sector", "beijing", "yuan"] },
+  { id: "credit-spreads", keywords: ["credit spread", "high yield", "hy spread", "risk-off", "risk off", "spread widen"] },
+  { id: "geopolitical-tail", keywords: ["geopolit", "conflict", "war", "tariff", "trade war", "sanction", "middle east", "ukraine", "taiwan"] },
+];
+
+function titleHits(titleLow: string, keywords: string[]): number {
+  return keywords.reduce((n, k) => (titleLow.includes(k) ? n + 1 : n), 0);
+}
+
+/**
+ * Resolve a stable persistence id from the model's proposed id + the theme title.
+ * - If the model's id is a known canonical AND the title supports it → keep it.
+ * - Else, route to the best canonical the TITLE matches (>=1 keyword).
+ * - Else, mint a specific slug from the title (resists collision onto broad slugs).
+ */
+export function resolveTopicId(modelId: string, title: string): string {
+  const norm = normalizeTopicId(modelId);
+  const titleLow = (title || "").toLowerCase();
+
+  const claimed = TOPIC_VOCAB.find((v) => v.id === norm);
+  if (claimed && titleHits(titleLow, claimed.keywords) >= 1) return claimed.id;
+
+  let best: { id: string; hits: number } | null = null;
+  for (const v of TOPIC_VOCAB) {
+    const hits = titleHits(titleLow, v.keywords);
+    if (hits > 0 && (!best || hits > best.hits)) best = { id: v.id, hits };
+  }
+  if (best) return best.id;
+
+  // No canonical fits — use a specific title slug (first ~7 words) so a genuinely
+  // new theme gets its own stable id rather than colliding with a broad one.
+  const titleSlug = normalizeTopicId(title).split("-").slice(0, 7).join("-");
+  return titleSlug || norm || "theme";
+}
+
 export async function getTopicSeen(): Promise<TopicSeenMap> {
   if (!storeAvailable()) return memTopics.map;
   const map = await kvGet<TopicSeenMap>(TOPIC_KEY);

@@ -61,6 +61,9 @@ export interface RegionHeat {
 
 export interface BankImplication {
   development: string;
+  /** V4.3 — link to the Emerging Risk this implication belongs to (1:1 with EmergingRisk.id). */
+  riskId?: string;
+  riskName?: string;
   creditRisk: string;
   marketRisk: string;
   liquidityRisk: string;
@@ -219,6 +222,7 @@ export interface CroTheme {
   dayN?: number;         // days since first seen (1 = new today)
   isNew?: boolean;       // first seen today
   seenCount?: number;    // number of snapshots this topic has appeared in
+  whatsNew?: string;     // V4.3 — what changed since the prior snapshot (recurring themes only)
   // "Explain simply" (retired in 3.6, kept for back-compat)
   explain?: ThemeExplain;
   // Plain-English twin (whole-screen Learning view)

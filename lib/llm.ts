@@ -48,6 +48,25 @@ const ANTHROPIC_TIMEOUT = Number(process.env.ANTHROPIC_TIMEOUT_MS || 60000);
 
 export type LlmReason = "ok" | "timeout" | "invalid_json" | "http_error" | "no_key" | "exception";
 
+/** V4.3 — gap before the single transient retry on Gemini. Env-tunable; default 35s. */
+const GEMINI_RETRY_MS = (() => {
+  const n = Number(process.env.GEMINI_RETRY_MS);
+  return Number.isFinite(n) && n >= 0 ? n : 35000;
+})();
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Transient = worth one retry: 503 high-demand, 429, 5xx, or a timeout. Permanent
+ *  failures (bad key, invalid JSON) are not retried. */
+function isTransient<T>(r: ProviderResult<T>): boolean {
+  if (r.reason === "timeout") return true;
+  if (r.reason === "http_error") {
+    const s = r.status ?? 0;
+    return s === 429 || (s >= 500 && s <= 599);
+  }
+  return false;
+}
+
 /** Rich result from a single provider attempt, for diagnostics. */
 interface ProviderResult<T> {
   data: T | null;
@@ -122,6 +141,29 @@ export async function interpretWithProvider<T>(
       console.log(`[gen] provider=gemini success`);
       console.log(`[gen] llm provider=gemini reason=ok`);
       return { data: g.data, provider: "gemini", reason: "ok" };
+    }
+
+    // V4.3 — single retry for TRANSIENT failures (503 high-demand, 429, timeout,
+    // 5xx) before spending the Anthropic fallback. One attempt, ~35s gap, capped to
+    // stay well under the 180s function budget. Permanent failures (bad key,
+    // invalid JSON) skip the retry and fall straight through.
+    if (isTransient(g)) {
+      console.log(
+        `[gen] provider=gemini transient (reason=${g.reason}${g.status !== undefined ? ` status=${g.status}` : ""}) — retrying once in ${GEMINI_RETRY_MS}ms`
+      );
+      await sleep(GEMINI_RETRY_MS);
+      try {
+        g = await geminiInterpret<T>(system, user);
+      } catch (e) {
+        const err = e as Error;
+        g = { data: null, reason: "exception", message: err?.message?.slice(0, 200), errorType: err?.name };
+      }
+      if (g.data) {
+        console.log(`[gen] provider=gemini success (after retry)`);
+        console.log(`[gen] llm provider=gemini reason=ok`);
+        return { data: g.data, provider: "gemini", reason: "ok" };
+      }
+      console.log(`[gen] provider=gemini retry failed reason=${g.reason}`);
     }
     console.log(
       `[gen] provider=gemini failed reason=${g.reason}` +

@@ -24,8 +24,10 @@ import {
   recordTopicsSeen,
   recordConceptsSeen,
   normalizeTopicId,
+  resolveTopicId,
   daysBetween,
   getLatestSnapshot,
+  getRecentSnapshots,
 } from "./snapshotStore";
 import { ADAPTERS, relevanceScore, sourceTierOf, hasCroSignal, isJunk, type RawStory } from "./newsAdapter";
 import { detectConcepts } from "./concepts";
@@ -588,6 +590,26 @@ export async function generateSnapshot(
     }
   }
 
+/**
+ * V4.3 — deterministic "what's new" for a recurring theme, diffed against the prior
+ * snapshot. No LLM call (quota-safe): surfaces a severity change and/or a newly added
+ * signal. Returns undefined when nothing material changed (UI then shows nothing).
+ */
+function computeWhatsNew(
+  t: { severity?: string; signals?: string[] },
+  prev?: { severity?: string; signals?: string[] }
+): string | undefined {
+  if (!prev) return undefined;
+  const parts: string[] = [];
+  if (prev.severity && t.severity && prev.severity !== t.severity) {
+    parts.push(`severity now ${t.severity} (was ${prev.severity})`);
+  }
+  const prevSignals = new Set((prev.signals ?? []).map((s) => s.trim().toLowerCase()));
+  const newSignal = (t.signals ?? []).find((s) => s && !prevSignals.has(s.trim().toLowerCase()));
+  if (newSignal) parts.push(`new signal — ${newSignal}`);
+  return parts.length ? parts.join("; ") : undefined;
+}
+
   const seed = intelligence === null;
   const intel = intelligence ?? buildIntelligence(indicators, false);
 
@@ -595,13 +617,31 @@ export async function generateSnapshot(
   if (!seed && !usedLastGood) {
     try {
       const dateKey = istDateKey();
-      // Normalise topicIds so the same theme matches day-over-day despite
-      // casing/punctuation drift from the model (stable persistence).
-      for (const t of intel.themes) t.topicId = normalizeTopicId(t.topicId);
+      // Robust persistence ids (V4.3): map to a canonical topic only when the title
+      // supports it; otherwise a specific title slug — prevents new themes inheriting
+      // an old theme's first-seen date via a reused broad slug.
+      for (const t of intel.themes) t.topicId = resolveTopicId(t.topicId, t.title);
       const map = await recordTopicsSeen(
         intel.themes.map((t) => t.topicId),
         dateKey
       );
+      // Prior snapshot (most recent from an earlier day) → power the "what's new" delta.
+      let prevThemes: Record<string, { severity?: string; signals?: string[]; whyItMatters?: string }> = {};
+      try {
+        const recent = await getRecentSnapshots(3);
+        const prior = recent.find((s) => istDateKey(new Date(s.meta.generatedISO)) < dateKey);
+        if (prior) {
+          for (const pt of prior.intelligence?.themes ?? []) {
+            prevThemes[pt.topicId] = {
+              severity: pt.severity,
+              signals: pt.signals,
+              whyItMatters: pt.whyItMatters,
+            };
+          }
+        }
+      } catch {
+        /* prior unavailable → no delta, never blocks generation */
+      }
       for (const t of intel.themes) {
         const s = map[t.topicId];
         if (s) {
@@ -609,6 +649,8 @@ export async function generateSnapshot(
           t.seenCount = s.count;                      // unique days seen
           t.dayN = daysBetween(s.firstISO, dateKey) + 1; // calendar days since first seen
           t.isNew = s.firstISO === dateKey;
+          // What's new on a recurring theme — deterministic diff vs the prior snapshot.
+          if (!t.isNew) t.whatsNew = computeWhatsNew(t, prevThemes[t.topicId]);
         }
       }
     } catch (e) {

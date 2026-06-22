@@ -15,7 +15,7 @@
 
 import { fetchIndicators } from "./marketData";
 import { interpretWithProvider } from "./llm";
-import { EMERGING_RISKS, HEAT_MAP_BASE, IMPLICATIONS_BASE } from "./fallbackData";
+import { EMERGING_RISKS, HEAT_MAP_BASE } from "./fallbackData";
 import {
   getRecentSnapshots,
   saveWeekly,
@@ -64,7 +64,7 @@ async function reRateMarkets(ctx: string): Promise<{
   heatMap?: { region: string; heat: string; reason: string }[];
   emergingRisks?: { id: string; probability: string; impact: string; trend: string; note: string }[];
   implications?: {
-    development: string;
+    riskId: string;
     creditRisk: string;
     marketRisk: string;
     liquidityRisk: string;
@@ -82,14 +82,6 @@ async function reRateMarkets(ctx: string): Promise<{
       trend: r.trend,
       note: r.note,
     })),
-    implications: IMPLICATIONS_BASE.map((i) => ({
-      development: i.development,
-      creditRisk: i.creditRisk,
-      marketRisk: i.marketRisk,
-      liquidityRisk: i.liquidityRisk,
-      capital: i.capital,
-      profitability: i.profitability,
-    })),
   };
 
   const system =
@@ -102,19 +94,19 @@ ${JSON.stringify(spine)}
 
 ${ctx}
 
-Return ONE JSON object, same structure, with updated values only:
+Return ONE JSON object with updated values only:
 {
   "heatMap": [{ "region": "<unchanged>", "heat": "Green|Amber|Red", "reason": "<one-line read, <=140 chars>" }],
   "emergingRisks": [{ "id": "<unchanged>", "probability": "Low|Medium|High", "impact": "Low|Moderate|Severe", "trend": "up|down|stable", "note": "<one-line, <=160 chars>" }],
-  "implications": [{ "development": "<unchanged>", "creditRisk": "...", "marketRisk": "...", "liquidityRisk": "...", "capital": "...", "profitability": "..." }]
+  "implications": [{ "riskId": "<one of the emergingRisks ids above>", "creditRisk": "...", "marketRisk": "...", "liquidityRisk": "...", "capital": "...", "profitability": "..." }]
 }
-Keep every region/id/development from the spine; do not add or drop any. JSON only.`;
+For "implications", produce EXACTLY ONE entry per emerging risk (same ids), describing what THAT risk means for a global bank across the five areas. Keep every region/id from the spine; do not add or drop any. JSON only.`;
 
   const { data } = await interpretWithProvider<{
     heatMap?: { region: string; heat: string; reason: string }[];
     emergingRisks?: { id: string; probability: string; impact: string; trend: string; note: string }[];
     implications?: {
-      development: string;
+      riskId: string;
       creditRisk: string;
       marketRisk: string;
       liquidityRisk: string;
@@ -172,19 +164,23 @@ function mergeMarkets(rr: NonNullable<Awaited<ReturnType<typeof reRateMarkets>>>
     };
   });
 
-  const implByDev = new Map((rr.implications ?? []).map((i) => [i.development, i]));
-  const implications: BankImplication[] = IMPLICATIONS_BASE.map((base) => {
-    const u = implByDev.get(base.development);
-    if (!u) return base;
-    const pick = (next: string | undefined, prev: string) =>
-      typeof next === "string" && next.trim() ? next.trim() : prev;
+  // V4.3 — implications are now keyed to emerging risks (1:1). Build one per risk,
+  // linked via riskId; overlay the model's per-area reads, falling back to the risk
+  // note so every cell is populated.
+  const implByRisk = new Map((rr.implications ?? []).map((i) => [i.riskId, i]));
+  const implications: BankImplication[] = EMERGING_RISKS.map((risk) => {
+    const u = implByRisk.get(risk.id);
+    const pick = (next: string | undefined) =>
+      typeof next === "string" && next.trim() ? next.trim() : risk.note;
     return {
-      ...base,
-      creditRisk: pick(u.creditRisk, base.creditRisk),
-      marketRisk: pick(u.marketRisk, base.marketRisk),
-      liquidityRisk: pick(u.liquidityRisk, base.liquidityRisk),
-      capital: pick(u.capital, base.capital),
-      profitability: pick(u.profitability, base.profitability),
+      development: risk.name,
+      riskId: risk.id,
+      riskName: risk.name,
+      creditRisk: pick(u?.creditRisk),
+      marketRisk: pick(u?.marketRisk),
+      liquidityRisk: pick(u?.liquidityRisk),
+      capital: pick(u?.capital),
+      profitability: pick(u?.profitability),
     };
   });
 

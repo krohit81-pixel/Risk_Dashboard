@@ -60,6 +60,12 @@ function ThemeCard({ theme: t, raw, learning, onOpenConcept, savedIds, onToggleS
         </span>
       </div>
       <h3 className="text-[15px] font-semibold leading-snug text-fg">{t.title}</h3>
+      {t.whatsNew ? (
+        <p className="mt-2 rounded-lg border border-calm/30 bg-calm/5 px-2.5 py-1.5 text-2xs leading-relaxed text-calm">
+          <span className="font-semibold">What&rsquo;s new: </span>
+          {t.whatsNew}
+        </p>
+      ) : null}
       {t.anchor ? (
         <div className="mt-2">
           <AnchorChip anchor={t.anchor} />

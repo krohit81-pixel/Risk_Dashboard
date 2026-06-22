@@ -1,9 +1,9 @@
 # Engineering Reference
 
-**Version:** V4.1a
+**Version:** V4.3
 **Last Updated:** Current Release
 **Audience:** Future Claude sessions (and any engineer) picking this project up cold.
-**Companion doc:** `risk-dashboard-master-context-v4_1a.md` (product/context). Read that first, then this.
+**Companion doc:** `risk-dashboard-master-context-v4_3.md` (product/context). Read that first, then this.
 
 > How to read this document. This is durable engineering knowledge, not a code listing. Where something is a verified fact about the implementation it is stated plainly. Where something is a judgement, assumption, or recommendation it is marked **(judgement)** or **(assumption)**. Do not treat recommendations as constraints the user has approved — re-confirm scope with the user before building.
 
@@ -79,6 +79,7 @@ app/
     cron/editorial/     WRITE path — scheduled daily generation (maxDuration 180)
     regenerate/         WRITE path — manual re-run, busy-guarded, last-good-safe (maxDuration 180)
     research/analyze/   EPHEMERAL — analyze pasted text / best-effort URL (maxDuration 60); POST gated by daily cap, GET returns remaining quota
+    cron/weekly/        (V4.2) weekly Markets + Weekly Learning refresh — Anthropic-only, CRON_SECRET, Sat ~06:00 IST
     saved/              CRUD for saved items (KV)
     runs/               READ generation history (KV ring buffer)
 
@@ -89,6 +90,7 @@ lib/                    All heavy logic lives here (keep it this way)
   analyze.ts            ★ Shared interpretation primitives: alignToMizuho() + analyzeContent() (editorial + Research)
   researchQuota.ts      ★ Research daily-cap reservation guard (V4.1): getResearchQuota / incrementResearchCount, RESEARCH_DAILY_CAP
   savedMappers.ts       ★ (V4.1a) raw source item → full SavedItem (exec + layman twins + deeper detail)
+  weeklyEngine.ts       ★ (V4.2) weekly Markets re-rate + Weekly Learning, Anthropic-forced, spine-locked, fail-soft
   mizuhoTopRisks.ts     ★ Curated Mizuho Top Risks taxonomy + scenario paths + id validation
   newsAdapter.ts        News ingestion adapters, relevance scoring, source tiers, junk filter
   relevanceConfig.ts    Phase-aware four-lens weighting (US/macro/Japan/Europe), ONBOARDING_PHASE knob
@@ -265,6 +267,24 @@ For each source: purpose · usage · refresh · failure handling · fallback · 
 - **Mappers.** `savedMappers.ts` exposes `savedFromAnalysis / savedFromTheme / savedFromEditorial / savedFromJapan`. **Critical:** themes/editorial/japan must be mapped from the **RAW (unresolved)** object. `resolveIntelligence()` overwrites the main fields with layman text when the Learning view is active (it preserves `.layman` but discards the executive original), so mapping a *resolved* item would lose the executive variant. `page.tsx` therefore passes `data.intelligence.*` (raw) as `rawThemes` / `rawCards` / `raw` alongside the resolved objects used for display; components map from raw. Research maps from the `ResearchAnalysis` directly (it already holds both variants).
 - **Render.** `SavedList` owns a Learning/Executive toggle (**default Learning**, per product preference) and a per-card *Full detail* expander. Impact renders as bullets from `bankingImpactAreas`, falling back to the combined string. Every field shows its layman twin when Learning is on.
 - **Storage decision.** Stays on **Vercel KV** — records are text-only and small; no relational/auth/concurrency need. Supabase remains the eventual home for multi-device + editable concepts + notes + search (separate workstream). Single-key `saved:items` array, cap 50, last-write-wins.
+
+### Weekly Markets refresh + Weekly Learning (`lib/weeklyEngine.ts` + `app/api/cron/weekly`, V4.2)
+
+- **Why a separate weekly job.** Markets sections 03–05 (heat map, emerging risks, implications) and Weekly Learning are structural — daily regeneration is noise and burns the scarce Gemini RPD. Refreshing them **weekly on Anthropic** keeps them current without touching the daily Gemini budget. Standing rule: **Gemini = daily editorial + Research; Anthropic = weekly.**
+- **Provider override.** `interpret(...)` / `interpretWithProvider(...)` now take `{ forceProvider?: "anthropic" }`. When set, the Gemini block is skipped entirely and the call goes straight to Anthropic; on failure it returns `none` (NO Gemini fallback — the whole point is to spare Gemini). Diagnostics log `forced=anthropic` / `skipped reason=forced_anthropic`.
+- **Engine.** `generateWeekly()` builds a compact week context from `getRecentSnapshots(7)` (theme titles + severities) + live indicators, then makes **two forced-Anthropic calls in parallel**: (1) re-rate the Markets spine, (2) Weekly Learning. Each is independently fail-soft.
+- **Spine-locked re-rate.** The Markets call is seeded with the curated spine JSON (`HEAT_MAP_BASE` / `EMERGING_RISKS` / `IMPLICATIONS_BASE`) and instructed to keep every region/id/development label fixed, updating only ratings + reads. `mergeMarkets()` enforces this: it iterates the curated base, overlays re-rated values **only** when they match a known region/id/development and pass enum/non-empty validation, and discards anything else. The model cannot invent or drop risks. Whole heat map refreshed (severity included).
+- **Artifacts (KV).** `saveWeeklyMarkets()` → `weekly:markets` (`WeeklyMarkets`: generatedISO + heatMap + emergingRisks + implications); `saveWeekly()` → `weekly` (Weekly Learning). The dashboard route reads both: when `weekly:markets` exists it serves the **frozen** heat map / emerging / implications (the daily live US overlay is bypassed) and sets `weeklyRefreshedISO`; when `weekly` exists it overrides `intelligence.weekly`. Absent either, the curated path (with live US cell) is served unchanged.
+- **Cron + logging.** `app/api/cron/weekly` (CRON_SECRET, `maxDuration` 180) calls `generateWeekly()` and records a run with `job: "weekly"`. `vercel.json` schedule `30 0 * * 6` = Sat 00:30 UTC = **06:00 IST Saturday** (ready for weekend review; runs after that morning's daily editorial). RunHistory shows a `weekly` tag.
+- **Fail-soft.** A missed/failed weekly run leaves the previous artifact in place (graceful staleness) and logs `weekly_failed_last_good_retained` / `partial_weekly_refresh`. Never throws to break the cron. **Caveat:** re-rate *content* quality is unmonitored — sanity-check the first weekend run.
+
+### V4.3 — reliability, theme hygiene, risk↔implication linkage
+
+- **Transient Gemini retry (`lib/llm.ts`).** `interpretWithProvider` now retries a failed Gemini call **once** when the failure is *transient* — `isTransient()` = reason `timeout`, or `http_error` with status 429 / 5xx. Gap `GEMINI_RETRY_MS` (default 35000, env-tunable), a single attempt, then the existing Anthropic fallback. Permanent failures (`no_key`, `invalid_json`, 4xx other than 429) skip the retry. Forced-Anthropic calls (weekly) never reach this path. Sized to stay under the 180s function budget (one ~35s wait, not a loop).
+- **Robust theme persistence (`resolveTopicId`, `lib/snapshotStore.ts`).** Replaces blind trust of the model's `topicId`. A closed `TOPIC_VOCAB` (canonical id + keywords) is matched against the theme **title**: a model-claimed canonical id is kept only if the title supports it; otherwise the best title-keyword match wins; otherwise a specific title slug is minted (collision-resistant). Used in `snapshotEngine` in place of `normalizeTopicId` for the persistence key. Fixes the “new story shows Day N” collision and the reverse drift.
+- **“What’s new” (`computeWhatsNew`, `lib/snapshotEngine.ts`).** For recurring themes, a **deterministic, LLM-free** diff vs the prior snapshot (fetched via `getRecentSnapshots(3)`, first earlier-day match by `topicId`): surfaces a severity change and/or a newly added signal into `CroTheme.whatsNew`, rendered as a green callout in `CroConversation`. Returns nothing when unchanged. No quota cost.
+- **Risks ↔ Implications link (`BankImplication.riskId`, `lib/weeklyEngine.ts`).** Bank Implications are keyed 1:1 to Emerging Risks. The weekly Markets call now asks for **one implication per emerging risk** (by `riskId`); `mergeMarkets` builds a `BankImplication` for each of the 5 risks (`development` = risk name, `riskId`/`riskName` set, per-area reads from the model, falling back to the risk note so no cell is empty). `BankImplications` shows the linked risk name. **Cold-start:** before the first weekly run the dashboard still serves the curated 3 (`IMPLICATIONS_BASE`, unlinked) — full 1:1 linkage appears after a weekly run.
+- **Saved-card colour fix.** `amber` is not a defined Tailwind token; SavedList used `text-amber`/`border-amber` → no colour → white text. Switched to the real tokens: meeting block `elevated` (gold), “what I should understand” `calm` (green), matching the Today tab.
 - **Vercel KV (Upstash Redis).** Purpose: the only persistent store — frozen snapshot, saved items (cap 50), run history (cap 15), concept-seen, regen/busy flags. Usage: write on generation/save; read on load. Failure: store-unavailable falls back to in-memory where possible; reads degrade. Limits: single store; no migrations; not a relational DB (Supabase deferred for when a feature truly needs it).
 
 **Provider data (LLM):** Gemini 2.5 Flash (primary, free), Anthropic Haiku (fallback, paid). See §9.
@@ -353,7 +373,7 @@ How to add features without eroding the architecture.
 
 ## 13. Future Build Rules (explicit instructions for future Claude)
 
-1. **Read context first.** `risk-dashboard-master-context-v4_1a.md`, then this document, before proposing anything.
+1. **Read context first.** `risk-dashboard-master-context-v4_3.md`, then this document, before proposing anything.
 2. **Recommend before building.** This user works propose→approve→build. Present a plan and trade-offs; get explicit approval. Prototype (throwaway HTML) before large builds when UI is involved.
 3. **Preserve executive-first + mobile-first.** One screenful matters; minimal formatting; semantic color tokens; `max-w-app`.
 4. **Preserve learning-first philosophy.** Plain-English twins, tutor-not-terminal, no read-time LLM calls in Learning view.
@@ -373,7 +393,7 @@ How to add features without eroding the architecture.
 
 ## 14. Current State Snapshot
 
-**What exists today (V4.1a).** A 4-tab mobile dashboard (Today · Markets · Research · Learn): live indicators; a daily frozen editorial (US-first themes, editorial cards, Japan watch with robust empty-state, quality-gated radar); whole-screen Learning twins; curated Concept Library with auto-collect; Save-for-Later + Saved Analyses with metadata; manual Regenerate; Generation History; **Mizuho Top-Risk alignment** via a dedicated call; and a **Research workspace** (paste-text primary, best-effort URL) on a shared `analyzeContent` pipeline, fully isolated from the daily snapshot, with a **daily reservation cap** and **bulleted per-area banking impact** (each with a plain-English twin) added in V4.1.
+**What exists today (V4.3).** A 4-tab mobile dashboard (Today · Markets · Research · Learn): live indicators; a daily frozen editorial (US-first themes, editorial cards, Japan watch with robust empty-state, quality-gated radar); whole-screen Learning twins; curated Concept Library with auto-collect; Save-for-Later + Saved Analyses with metadata; manual Regenerate; Generation History; **Mizuho Top-Risk alignment** via a dedicated call; and a **Research workspace** (paste-text primary, best-effort URL) on a shared `analyzeContent` pipeline, fully isolated from the daily snapshot, with a **daily reservation cap** and **bulleted per-area banking impact** (each with a plain-English twin) added in V4.1.
 
 **What is stable.** The two-clock architecture; `llm` provider abstraction (with thinking disabled); `snapshotEngine` pipeline; `analyze` primitives; `snapshotStore`/KV pattern; curated taxonomy/fallbacks; the interpretation framework and UI shell.
 
@@ -389,8 +409,8 @@ How to add features without eroding the architecture.
 
 When starting a fresh session on this project, in order:
 
-1. **Read `risk-dashboard-master-context-v4_1a.md`** (product, history, scope, principles).
-2. **Read `engineering-reference-v4_1a.md`** (this document — architecture, decisions, guardrails).
+1. **Read `risk-dashboard-master-context-v4_3.md`** (product, history, scope, principles).
+2. **Read `engineering-reference-v4_3.md`** (this document — architecture, decisions, guardrails).
 3. **Review the repository**, prioritising the ★ stable-foundation modules in §3/§4. Confirm current state rather than assuming; verify which components are live (some top-level legacy components may be unused).
 4. **Summarise your understanding back to the user** before proposing changes — state what you believe the task is, which layer it touches, and any risks. Distinguish facts from assumptions.
 5. **Design before implementing.** Produce a plan: where it integrates, which patterns it reuses, what it must not break, trade-offs. For UI, offer a throwaway prototype. Get explicit approval (this user works recommend→approve→build).
@@ -402,4 +422,4 @@ When starting a fresh session on this project, in order:
 
 ---
 
-*End of Engineering Reference v4.1a. Treat §10 (Design Decisions), §12 (Extension Framework), and §13 (Future Build Rules) as the most important sections to preserve across versions — they encode why the system is the way it is and how to extend it without repeating past mistakes.*
+*End of Engineering Reference v4.3. Treat §10 (Design Decisions), §12 (Extension Framework), and §13 (Future Build Rules) as the most important sections to preserve across versions — they encode why the system is the way it is and how to extend it without repeating past mistakes.*
