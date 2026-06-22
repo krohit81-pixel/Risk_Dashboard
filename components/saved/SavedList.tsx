@@ -233,10 +233,10 @@ function SavedCard({
                   ) : null}
 
                   {show(d!.talkingPoint, d!.talkingPointLayman) || show(d!.followUp, d!.followUpLayman) ? (
-                    <div className="border-l-2 border-amber/60 pl-3">
+                    <div className="border-l-2 border-elevated/60 pl-3">
                       {show(d!.talkingPoint, d!.talkingPointLayman) ? (
                         <>
-                          <p className="text-2xs font-semibold uppercase tracking-wide text-amber">
+                          <p className="text-2xs font-semibold uppercase tracking-wide text-elevated">
                             If this comes up in a meeting
                           </p>
                           <p className="mt-0.5 text-[13px] leading-relaxed text-fg">
@@ -246,7 +246,7 @@ function SavedCard({
                       ) : null}
                       {show(d!.followUp, d!.followUpLayman) ? (
                         <>
-                          <p className="mt-2 text-2xs font-semibold uppercase tracking-wide text-amber">
+                          <p className="mt-2 text-2xs font-semibold uppercase tracking-wide text-elevated">
                             Follow-up question
                           </p>
                           <p className="mt-0.5 text-[13px] leading-relaxed text-fg-muted">
@@ -258,7 +258,14 @@ function SavedCard({
                   ) : null}
 
                   {show(d!.whatToUnderstand, d!.whatToUnderstandLayman) ? (
-                    <Sub label="What to understand">{show(d!.whatToUnderstand, d!.whatToUnderstandLayman)}</Sub>
+                    <div className="border-l-2 border-calm/60 pl-3">
+                      <p className="text-2xs font-semibold uppercase tracking-wide text-calm">
+                        What I should understand
+                      </p>
+                      <p className="mt-0.5 text-[13px] leading-relaxed text-fg-muted">
+                        {show(d!.whatToUnderstand, d!.whatToUnderstandLayman)}
+                      </p>
+                    </div>
                   ) : null}
                 </div>
               ) : null}
@@ -295,9 +302,10 @@ function SavedCard({
 }
 
 function Line({ label, children, tone }: { label: string; children: React.ReactNode; tone?: "interpret" }) {
-  // Match the Today/Research palette: interpretation ("Why it matters") in amber,
-  // sourced/structural labels in steel.
-  const color = tone === "interpret" ? "text-amber" : "text-steel";
+  // Match the Today/Research palette: interpretation ("Why it matters") in gold,
+  // sourced/structural labels in steel. (`elevated`/`steel` are the defined tokens;
+  // `amber` is NOT a token and renders as no colour — that was the white-text bug.)
+  const color = tone === "interpret" ? "text-elevated" : "text-steel";
   return (
     <p className="mt-1.5 text-[13px] leading-relaxed text-fg-muted">
       <span className={`font-semibold ${color}`}>{label}: </span>
