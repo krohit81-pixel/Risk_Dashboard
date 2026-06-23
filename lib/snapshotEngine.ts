@@ -195,7 +195,8 @@ const JP_TERMS = /japan|boj|jgb|yen|nikkei|tokyo/i;
 
 async function interpretClusters(
   clusters: Cluster[],
-  indicators: Indicator[]
+  indicators: Indicator[],
+  opts: { forceProvider?: "anthropic" } = {}
 ): Promise<{ intel: IntelligenceLayer | null; provider: "gemini" | "anthropic" | "none"; reason: LlmReason }> {
   const payload = clusters.slice(0, 5).map((c) => ({
     topic: c.topic,
@@ -231,10 +232,14 @@ Rules:
 
   const { data: out, provider, reason } = await interpretWithProvider<Partial<IntelligenceLayer>>(
     CRO_SYSTEM_PROMPT,
-    user
+    user,
+    opts
   );
   if (!out || !Array.isArray(out.themes) || out.themes.length < 3) {
-    // data came back but was unusable → treat as invalid JSON for retry/visibility
+    // Valid JSON can still be unusable if the model under-produces themes. Treat as
+    // invalid for retry/visibility (the retry escalates to Anthropic — see caller).
+    const count = Array.isArray(out?.themes) ? out!.themes!.length : 0;
+    console.log(`[gen] usable-theme check failed: ${count} themes (<3) provider=${provider}`);
     return { intel: null, provider, reason: reason === "ok" ? "invalid_json" : reason };
   }
 
@@ -549,10 +554,11 @@ export async function generateSnapshot(
   } else if (clusters.length > 0) {
     let interp = await interpretClusters(clusters, indicators);
     console.log(`[gen] llm provider=${interp.provider} reason=${interp.reason}`);
-    // Retry once on invalid JSON (Pro headroom makes this affordable).
+    // Retry once on invalid/unusable JSON — ESCALATE to Anthropic rather than re-trying
+    // Gemini (which just under-produced). Gives the backup a real chance before last-good.
     if (!interp.intel && interp.reason === "invalid_json") {
-      console.log("[gen] invalid JSON → retrying once");
-      interp = await interpretClusters(clusters, indicators);
+      console.log("[gen] invalid/unusable JSON → retrying once on Anthropic");
+      interp = await interpretClusters(clusters, indicators, { forceProvider: "anthropic" });
       console.log(`[gen] retry provider=${interp.provider} reason=${interp.reason}`);
     }
     intelligence = interp.intel;
