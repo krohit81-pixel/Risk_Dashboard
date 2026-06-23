@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { analyzeContent } from "@/lib/analyze";
+import { extractFromImage, type ImageInput } from "@/lib/llm";
 import { getResearchQuota, incrementResearchCount } from "@/lib/researchQuota";
 
 export const dynamic = "force-dynamic";
@@ -80,7 +81,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  let body: { mode?: string; text?: string; url?: string };
+  let body: { mode?: string; text?: string; url?: string; images?: ImageInput[] };
   try {
     body = await req.json();
   } catch {
@@ -106,9 +107,37 @@ export async function POST(req: Request) {
     );
   }
 
-  const mode = body.mode === "url" ? "url" : "text";
+  const mode = body.mode === "url" ? "url" : body.mode === "image" ? "image" : "text";
 
   try {
+    if (mode === "image") {
+      const images = Array.isArray(body.images) ? body.images.slice(0, 4) : [];
+      if (!images.length) {
+        return NextResponse.json({ ok: false, error: "Add at least one image." }, { status: 400 });
+      }
+      // Step 1 — transcribe visible text (multimodal). Step 2 — same analyzeContent pipeline.
+      const extracted = await extractFromImage(images);
+      if (!extracted.text || extracted.text.trim().length < 60) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "Couldn't read enough text from that image. Try a clearer/closer screenshot, or paste the text instead.",
+            fallbackToText: true,
+          },
+          { status: 422 }
+        );
+      }
+      const analysis = await analyzeContent(extracted.text, { sourceType: "image" });
+      const used = await incrementResearchCount();
+      return NextResponse.json({
+        ok: true,
+        analysis,
+        transcript: extracted.text,
+        quota: { ...quota, used, remaining: Math.max(0, quota.cap - used) },
+      });
+    }
+
     if (mode === "url") {
       const url = (body.url || "").trim();
       if (!url) return NextResponse.json({ ok: false, error: "Enter a URL." }, { status: 400 });

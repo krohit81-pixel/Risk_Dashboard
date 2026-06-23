@@ -102,6 +102,68 @@ export async function interpret<T>(
   return (await interpretWithProvider<T>(system, user, opts)).data;
 }
 
+/** V4.4 — base64 image input (no data: prefix) for multimodal transcription. */
+export interface ImageInput {
+  mimeType: string;
+  data: string;
+}
+
+/**
+ * V4.4 — transcribe visible text from screenshots via Gemini multimodal (step one of
+ * the two-step Research image pipeline). Returns VERBATIM text only; the transcript is
+ * then fed to the unchanged analyzeContent() pipeline. Deterministic (temp 0), Gemini-
+ * only (no Anthropic image fallback in v1 — Tier 1 reliability makes that unnecessary).
+ */
+export async function extractFromImage(
+  images: ImageInput[]
+): Promise<{ text: string; provider: "gemini" | "none"; reason: LlmReason }> {
+  if (!process.env.GEMINI_API_KEY) return { text: "", provider: "none", reason: "no_key" };
+  if (!images.length) return { text: "", provider: "none", reason: "exception" };
+
+  const instruction =
+    "Transcribe ALL visible text from the image(s) verbatim, in natural reading order. " +
+    "Do NOT summarize, interpret, translate, or infer anything not visibly present. " +
+    "For charts or tables, report only the labels and values actually shown. " +
+    "If multiple images are provided, transcribe them in order as one continuous document. " +
+    "Output plain text only — no commentary.";
+
+  const parts: unknown[] = [{ text: instruction }];
+  for (const img of images.slice(0, 4)) {
+    parts.push({ inline_data: { mime_type: img.mimeType, data: img.data } });
+  }
+
+  const key = process.env.GEMINI_API_KEY!;
+  const { res, timedOut } = await fetchTimeout(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts }],
+        generationConfig: { temperature: 0, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } },
+      }),
+      cache: "no-store",
+    },
+    GEMINI_TIMEOUT
+  );
+
+  if (!res) return { text: "", provider: "none", reason: timedOut ? "timeout" : "http_error" };
+  if (!res.ok) return { text: "", provider: "none", reason: "http_error" };
+  try {
+    const json: { candidates?: { content?: { parts?: { text?: string }[] } }[] } = await res.json();
+    const text = (json?.candidates?.[0]?.content?.parts ?? [])
+      .map((p) => p?.text ?? "")
+      .join("\n")
+      .trim();
+    console.log(`[research] image transcription length=${text.length} images=${images.length}`);
+    return text
+      ? { text, provider: "gemini", reason: "ok" }
+      : { text: "", provider: "none", reason: "invalid_json" };
+  } catch {
+    return { text: "", provider: "none", reason: "exception" };
+  }
+}
+
 /**
  * Gemini first (free); Anthropic only as fallback. Every decision point emits an
  * explicit diagnostic so an unattended run reveals exactly why a provider was

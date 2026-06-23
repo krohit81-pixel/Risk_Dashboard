@@ -9,7 +9,7 @@
 // for every field, so Learn can reproduce the piece with a working Learning toggle.
 
 import { kvGet, kvSet, storeAvailable } from "./snapshotStore";
-import type { BankingImpactArea } from "./types";
+import type { BankingImpactArea, FocusItem } from "./types";
 
 /** Deeper "Go deeper" content captured for full-piece recall (V4.1a). Each field has an optional layman twin. */
 export interface SavedDetail {
@@ -43,10 +43,11 @@ export interface SavedItem {
   savedAtISO: string;   // when the user saved it
   snapshotISO?: string; // original snapshot date for timeline context
   // ── Research analyses (V4.0) — lightweight metadata so Learn stays useful over time ──
-  sourceType?: "text" | "url" | "theme" | "editorial" | "japan";
+  sourceType?: "text" | "url" | "image" | "theme" | "editorial" | "japan";
   analysisDateISO?: string; // when the analysis was generated
   originalUrl?: string;     // source URL if analysed from a link
   relatedConcepts?: string[];
+  focus?: FocusItem[];      // V4.4 — personalized focus (Research analyses)
   // ── V4.1a — full-piece + Learning-view parity in Learn ──
   whatHappened?: string;                    // factual summary (editorial / research)
   bankingImpactAreas?: BankingImpactArea[]; // bulleted impact, each with its own layman twin

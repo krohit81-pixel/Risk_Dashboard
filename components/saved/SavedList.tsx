@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import type { SavedItem } from "@/lib/savedStore";
+import { FocusBlock } from "@/components/research/ResearchWorkspace";
 
 const KIND_LABEL: Record<SavedItem["kind"], string> = {
   theme: "CRO Conversation",
@@ -159,6 +160,8 @@ function SavedCard({
               </ul>
             </div>
           ) : null}
+
+          <FocusBlock items={it.focus} />
 
           {hasDetail ? (
             <>

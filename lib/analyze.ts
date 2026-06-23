@@ -8,6 +8,7 @@
 // mapping prose); plain-English twin is the curated pathLayman.
 
 import { interpretWithProvider } from "./llm";
+import { generateFocus } from "./focus";
 import { detectConcepts } from "./concepts";
 import {
   topRisksForPrompt,
@@ -94,7 +95,7 @@ Return ONE JSON object:
 const MAX_CONTENT_CHARS = 16000; // ~4k words — cap input; label when truncated
 
 export interface AnalyzeMeta {
-  sourceType: "text" | "url";
+  sourceType: "text" | "url" | "image";
   originalUrl?: string;
 }
 
@@ -186,6 +187,15 @@ JSON only.`;
     { title: data.title || "", why: data.whyItMatters || "", impact: impactCombined },
   ]);
 
+  // V4.4 — personalized "what should I focus on?" (dedicated call; may be empty).
+  const focus = await generateFocus({
+    title: data.title || "",
+    whatHappened: data.whatHappened,
+    whyItMatters: data.whyItMatters || "",
+    bankingImpact: impactCombined,
+    alignment: alignment ?? [],
+  });
+
   // Related concepts: link ONLY to existing curated concepts (never auto-create).
   const relatedConcepts = detectConcepts(
     `${data.title} ${data.whatHappened} ${data.whyItMatters} ${impactCombined}`
@@ -199,6 +209,7 @@ JSON only.`;
     bankingImpactAreas: areas,
     mizuhoAlignment: alignment ?? [],
     relatedConcepts,
+    focus,
     layman: {
       whatHappened: data.laymanWhatHappened || data.whatHappened,
       whyItMatters: data.laymanWhyItMatters || data.whyItMatters || "",

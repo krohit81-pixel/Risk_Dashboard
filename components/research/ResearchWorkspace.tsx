@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { ResearchAnalysis, BankingImpactArea } from "@/lib/types";
+import type { ResearchAnalysis, BankingImpactArea, FocusItem } from "@/lib/types";
+import type { ImageInput } from "@/lib/llm";
 import type { SavedItem } from "@/lib/savedStore";
 import { savedFromAnalysis } from "@/lib/savedMappers";
 import { CONCEPTS } from "@/lib/concepts";
@@ -19,9 +20,12 @@ export function ResearchWorkspace({
   onToggleSave?: (item: SavedItem) => void;
   savedIds?: Set<string>;
 }) {
-  const [mode, setMode] = useState<"text" | "url">("text");
+  const [mode, setMode] = useState<"text" | "url" | "image">("text");
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
+  const [images, setImages] = useState<ImageInput[]>([]);
+  const [transcript, setTranscript] = useState<string | null>(null);
+  const [showTranscript, setShowTranscript] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<ResearchAnalysis | null>(null);
@@ -48,11 +52,15 @@ export function ResearchWorkspace({
     setLoading(true);
     setError(null);
     setAnalysis(null);
+    setTranscript(null);
+    setShowTranscript(false);
     try {
+      const payload =
+        mode === "url" ? { mode, url } : mode === "image" ? { mode, images } : { mode, text };
       const res = await fetch("/api/research/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mode === "url" ? { mode, url } : { mode, text }),
+        body: JSON.stringify(payload),
       });
       const j = await res.json();
       if (j.quota) setQuota(j.quota);
@@ -61,6 +69,7 @@ export function ResearchWorkspace({
         if (j.fallbackToText) setMode("text");
       } else {
         setAnalysis(j.analysis as ResearchAnalysis);
+        if (j.transcript) setTranscript(j.transcript as string);
         setLearning(false);
       }
     } catch {
@@ -70,11 +79,35 @@ export function ResearchWorkspace({
     }
   }
 
+  async function onPickImages(files: FileList | null) {
+    if (!files?.length) return;
+    setError(null);
+    const next: ImageInput[] = [];
+    for (const file of Array.from(files).slice(0, 4 - images.length)) {
+      if (!file.type.startsWith("image/")) continue;
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Each image must be under 5MB.");
+        continue;
+      }
+      const data = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(",")[1] || "");
+        r.onerror = () => reject(new Error("read failed"));
+        r.readAsDataURL(file);
+      });
+      if (data) next.push({ mimeType: file.type, data });
+    }
+    setImages((prev) => [...prev, ...next].slice(0, 4));
+  }
+
   function reset() {
     setAnalysis(null);
     setError(null);
     setText("");
     setUrl("");
+    setImages([]);
+    setTranscript(null);
+    setShowTranscript(false);
   }
 
   const savedItem: SavedItem | null = analysis ? savedFromAnalysis(analysis) : null;
@@ -92,7 +125,7 @@ export function ResearchWorkspace({
           </p>
 
           <div className="flex gap-1.5">
-            {(["text", "url"] as const).map((m) => (
+            {(["text", "url", "image"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
@@ -100,7 +133,7 @@ export function ResearchWorkspace({
                   mode === m ? "border-steel/50 bg-steel/10 text-steel" : "border-line bg-ink-800 text-fg-faint"
                 }`}
               >
-                {m === "text" ? "Paste text" : "From URL"}
+                {m === "text" ? "Paste text" : m === "url" ? "From URL" : "Image"}
               </button>
             ))}
           </div>
@@ -113,7 +146,7 @@ export function ResearchWorkspace({
               rows={8}
               className="w-full resize-y rounded-xl border border-line bg-ink-800 px-3.5 py-3 text-[13px] leading-relaxed text-fg placeholder:text-fg-faint focus:border-steel/50 focus:outline-none"
             />
-          ) : (
+          ) : mode === "url" ? (
             <input
               type="url"
               inputMode="url"
@@ -122,6 +155,46 @@ export function ResearchWorkspace({
               placeholder="https://…"
               className="w-full rounded-xl border border-line bg-ink-800 px-3.5 py-3 text-[13px] text-fg placeholder:text-fg-faint focus:border-steel/50 focus:outline-none"
             />
+          ) : (
+            <div className="space-y-2">
+              <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-line bg-ink-800 px-3.5 py-6 text-center text-2xs text-fg-faint">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => onPickImages(e.target.files)}
+                />
+                {images.length
+                  ? `${images.length} image${images.length > 1 ? "s" : ""} added · tap to add more (up to 4)`
+                  : "Tap to add screenshots (up to 4) — photo, library, or paste a clipping"}
+              </label>
+              {images.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {images.map((img, i) => (
+                    <div key={i} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`data:${img.mimeType};base64,${img.data}`}
+                        alt={`screenshot ${i + 1}`}
+                        className="h-16 w-16 rounded-lg border border-line object-cover"
+                      />
+                      <button
+                        onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-line bg-ink-900 text-2xs text-fg-muted"
+                        aria-label="Remove image"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <p className="text-[10px] leading-relaxed text-fg-faint">
+                The image is read for its visible text and run through the same analysis. Long articles can span
+                several screenshots.
+              </p>
+            </div>
           )}
 
           {error ? (
@@ -137,17 +210,32 @@ export function ResearchWorkspace({
             </p>
           ) : null}
 
-          <button
-            onClick={analyze}
-            disabled={capped || loading || (mode === "text" ? text.trim().length < 200 : url.trim().length < 8)}
-            className={`w-full rounded-xl px-4 py-3 text-sm font-semibold transition ${
-              capped || loading || (mode === "text" ? text.trim().length < 200 : url.trim().length < 8)
-                ? "bg-ink-800 text-fg-faint"
-                : "bg-steel/15 text-steel active:bg-steel/25"
-            }`}
-          >
-            {loading ? "Analyzing… (~20–30s)" : capped ? "Paused until tomorrow" : "Analyze"}
-          </button>
+          {(() => {
+            const notReady =
+              mode === "text"
+                ? text.trim().length < 200
+                : mode === "url"
+                ? url.trim().length < 8
+                : images.length === 0;
+            const disabled = capped || loading || notReady;
+            return (
+              <button
+                onClick={analyze}
+                disabled={disabled}
+                className={`w-full rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                  disabled ? "bg-ink-800 text-fg-faint" : "bg-steel/15 text-steel active:bg-steel/25"
+                }`}
+              >
+                {loading
+                  ? mode === "image"
+                    ? "Reading & analyzing… (~30–40s)"
+                    : "Analyzing… (~20–30s)"
+                  : capped
+                  ? "Paused until tomorrow"
+                  : "Analyze"}
+              </button>
+            );
+          })()}
 
           {quota && !capped ? (
             <p className="text-center text-[10px] text-fg-faint">
@@ -176,9 +264,28 @@ export function ResearchWorkspace({
               })}
             </div>
             <span className="text-2xs text-fg-faint">
-              {analysis.sourceType === "url" ? "From URL" : "Pasted text"}
+              {analysis.sourceType === "url"
+                ? "From URL"
+                : analysis.sourceType === "image"
+                ? "From image"
+                : "Pasted text"}
             </span>
           </div>
+
+          {transcript ? (
+            <div className="rounded-xl border border-line bg-ink-800 px-3.5 py-2.5">
+              <button
+                onClick={() => setShowTranscript((v) => !v)}
+                className="flex w-full items-center gap-1.5 text-left text-2xs font-semibold text-steel"
+              >
+                {showTranscript ? "\u25be Hide transcribed text" : "\u2192 Transcribed text"}
+                <span className="font-normal text-fg-faint">(what was read from your image)</span>
+              </button>
+              {showTranscript ? (
+                <p className="mt-2 whitespace-pre-wrap text-[12px] leading-relaxed text-fg-muted">{transcript}</p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="rounded-xl border border-line bg-ink-800 px-4 py-3.5">
             <h3 className="text-[15px] font-semibold leading-snug text-fg">{analysis.title}</h3>
@@ -194,6 +301,8 @@ export function ResearchWorkspace({
             {analysis.mizuhoAlignment.length === 0 ? (
               <p className="mt-2 text-2xs text-fg-faint">No clean Mizuho Top-Risk match for this content.</p>
             ) : null}
+
+            <FocusBlock items={analysis.focus} />
 
             {analysis.relatedConcepts.length ? (
               <div className="mt-3">
@@ -242,6 +351,29 @@ export function ResearchWorkspace({
         </>
       )}
     </section>
+  );
+}
+
+const FOCUS_KIND: Record<FocusItem["kind"], string> = {
+  attention: "Attention",
+  conversation: "Likely conversation",
+  learning: "Learning",
+};
+
+export function FocusBlock({ items }: { items?: FocusItem[] }) {
+  if (!items || items.length === 0) return null; // allowed-empty: render nothing
+  return (
+    <div className="mt-3 rounded-xl border border-elevated/30 bg-elevated/5 px-3.5 py-3">
+      <p className="text-2xs font-semibold uppercase tracking-wide text-elevated">What should I focus on?</p>
+      <ul className="mt-1.5 space-y-1.5">
+        {items.map((f, i) => (
+          <li key={i} className="text-[13px] leading-relaxed text-fg-muted">
+            <span className="font-semibold text-elevated">{FOCUS_KIND[f.kind]} — </span>
+            {f.text}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
