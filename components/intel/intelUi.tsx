@@ -68,7 +68,7 @@ export function AnchorChip({ anchor }: { anchor?: DataAnchor }) {
 }
 
 export function MizuhoBlock({ bullets }: { bullets: string[] }) {
-  if (!bullets.length) return null;
+  if (!Array.isArray(bullets) || !bullets.length) return null;
   return (
     <div className="mt-3 border-l-2 border-mizuho/60 pl-3">
       <p className="text-2xs font-semibold uppercase tracking-wide text-mizuho">
@@ -84,7 +84,7 @@ export function MizuhoBlock({ bullets }: { bullets: string[] }) {
 }
 
 export function LensBox({ lenses }: { lenses: Lens[] }) {
-  if (!lenses.length) return null;
+  if (!Array.isArray(lenses) || !lenses.length) return null;
   return (
     <div className="mt-3 border-l-2 border-steel/60 pl-3">
       {lenses.map((l, i) => (
@@ -98,7 +98,7 @@ export function LensBox({ lenses }: { lenses: Lens[] }) {
 }
 
 export function Signals({ items }: { items: string[] }) {
-  if (!items.length) return null;
+  if (!Array.isArray(items) || !items.length) return null;
   return (
     <div className="mt-3">
       <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">Signals to watch</p>
@@ -126,7 +126,7 @@ export function LabeledLine({ label, children }: { label: string; children: Reac
 /* ── Learning-view-only blocks ── */
 
 export function QuestionsBlock({ items }: { items: string[] }) {
-  if (!items.length) return null;
+  if (!Array.isArray(items) || !items.length) return null;
   return (
     <div className="mt-3">
       <p className="text-2xs font-semibold uppercase tracking-wide text-steel">

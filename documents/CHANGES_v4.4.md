@@ -44,7 +44,7 @@ Your profile lives in `lib/focusProfile.ts` — edit the role/priorities there a
 
 ```
 npm run build
-git add . && git commit -m "V4.4: Research screenshot input + personalized focus section"
+git add . && git commit -m "V4.4a: Bug Fix + Research screenshot input + personalized focus section"
 git push
 ```
 

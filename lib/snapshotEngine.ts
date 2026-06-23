@@ -260,7 +260,22 @@ Rules:
     const anchor = anchorFromIndicators(anchorId, indicators);
     // Derived confidence: anchored + multi-source = High; single-source/no-anchor = Medium.
     const confidence = anchor && sourceCount >= 2 ? "High" : sourceCount >= 1 ? "Medium" : "Low";
-    return { ...t, anchorId, anchor, confidence: confidence as CroTheme["confidence"] };
+    // Defensive defaults — the model (esp. on the Anthropic escalation path) may omit a
+    // list/field; guarantee arrays/strings exist so the "Go deeper" UI and saves never crash.
+    return {
+      ...t,
+      lenses: Array.isArray(t.lenses) ? t.lenses : [],
+      signals: Array.isArray(t.signals) ? t.signals : [],
+      questions: Array.isArray(t.questions) ? t.questions : [],
+      mizuho: Array.isArray(t.mizuho) ? t.mizuho : [],
+      mizuhoAlignment: Array.isArray(t.mizuhoAlignment) ? t.mizuhoAlignment : [],
+      talkingPoint: t.talkingPoint ?? "",
+      followUp: t.followUp ?? "",
+      whatToUnderstand: t.whatToUnderstand ?? "",
+      anchorId,
+      anchor,
+      confidence: confidence as CroTheme["confidence"],
+    };
   });
 
   // Fall back to curated for any section the model didn't supply, so the UI stays complete.
@@ -435,6 +450,12 @@ Return ONE JSON object:
  * parallel `layman` twin per item so Learning view can swap the whole screen
  * instantly. Isolated: if it fails, Learning view falls back to the original text.
  */
+/** Coerce any value to an array — guards against the model returning a list field as a
+ *  non-array (string/object), which previously threw and skipped the whole layman step. */
+function asArray<T>(x: unknown): T[] {
+  return Array.isArray(x) ? (x as T[]) : [];
+}
+
 async function translateLayman(intel: IntelligenceLayer): Promise<void> {
   const items: { k: string; t: string }[] = [];
   const push = (k: string, t?: string) => {
@@ -446,12 +467,12 @@ async function translateLayman(intel: IntelligenceLayer): Promise<void> {
     push(`T${i}.title`, t.title);
     push(`T${i}.why`, t.whyItMatters);
     push(`T${i}.imp`, t.bankingImpact);
-    (t.mizuho ?? []).forEach((m, j) => push(`T${i}.mz${j}`, m));
+    asArray<string>(t.mizuho).forEach((m, j) => push(`T${i}.mz${j}`, m));
     push(`T${i}.tp`, t.talkingPoint);
     push(`T${i}.fu`, t.followUp);
     push(`T${i}.wtu`, t.whatToUnderstand);
-    (t.questions ?? []).forEach((q, j) => push(`T${i}.q${j}`, q));
-    (t.lenses ?? []).forEach((l, j) => push(`T${i}.lq${j}`, l.question));
+    asArray<string>(t.questions).forEach((q, j) => push(`T${i}.q${j}`, q));
+    asArray<{ question: string }>(t.lenses).forEach((l, j) => push(`T${i}.lq${j}`, l.question));
   });
   (intel.editorial ?? []).forEach((e, i) => {
     push(`E${i}.title`, e.title);
@@ -464,8 +485,8 @@ async function translateLayman(intel: IntelligenceLayer): Promise<void> {
   });
   if (intel.japanAsia) {
     push(`J.narr`, intel.japanAsia.narrative);
-    (intel.japanAsia.mizuho ?? []).forEach((m, j) => push(`J.mz${j}`, m));
-    (intel.japanAsia.questions ?? []).forEach((q, j) => push(`J.q${j}`, q));
+    asArray<string>(intel.japanAsia.mizuho).forEach((m, j) => push(`J.mz${j}`, m));
+    asArray<string>(intel.japanAsia.questions).forEach((q, j) => push(`J.q${j}`, q));
     push(`J.wtu`, intel.japanAsia.whatToUnderstand);
   }
   if (!items.length) return;
@@ -490,12 +511,12 @@ ${JSON.stringify(items)}`;
     if (map[`T${i}.title`]) L.title = map[`T${i}.title`];
     if (map[`T${i}.why`]) L.whyItMatters = map[`T${i}.why`];
     if (map[`T${i}.imp`]) L.bankingImpact = map[`T${i}.imp`];
-    L.mizuho = (t.mizuho ?? []).map((m, j) => map[`T${i}.mz${j}`] ?? m);
+    L.mizuho = asArray<string>(t.mizuho).map((m, j) => map[`T${i}.mz${j}`] ?? m);
     if (map[`T${i}.tp`]) L.talkingPoint = map[`T${i}.tp`];
     if (map[`T${i}.fu`]) L.followUp = map[`T${i}.fu`];
     if (map[`T${i}.wtu`]) L.whatToUnderstand = map[`T${i}.wtu`];
-    L.questions = (t.questions ?? []).map((q, j) => map[`T${i}.q${j}`] ?? q);
-    L.lensQuestions = (t.lenses ?? []).map((l, j) => map[`T${i}.lq${j}`] ?? l.question);
+    L.questions = asArray<string>(t.questions).map((q, j) => map[`T${i}.q${j}`] ?? q);
+    L.lensQuestions = asArray<{ question: string }>(t.lenses).map((l, j) => map[`T${i}.lq${j}`] ?? l.question);
     t.layman = L;
   });
   (intel.editorial ?? []).forEach((e, i) => {
