@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { ResearchAnalysis, BankingImpactArea, FocusItem } from "@/lib/types";
+import type { ResearchAnalysis, BankingImpactArea, FocusItem, BloombergDigest, BloombergStory } from "@/lib/types";
 import type { ImageInput } from "@/lib/llm";
 import type { SavedItem } from "@/lib/savedStore";
 import { savedFromAnalysis } from "@/lib/savedMappers";
@@ -31,6 +31,9 @@ export function ResearchWorkspace({
   const [analysis, setAnalysis] = useState<ResearchAnalysis | null>(null);
   const [learning, setLearning] = useState(false);
   const [quota, setQuota] = useState<{ used: number; cap: number; remaining: number } | null>(null);
+  const [bloomberg, setBloomberg] = useState<BloombergDigest | null>(null);
+  const [bbOpen, setBbOpen] = useState(true);
+  const [bbAnalyzed, setBbAnalyzed] = useState<Set<string>>(new Set());
 
   // Show remaining Research budget for today (cheap GET, no analysis spent).
   useEffect(() => {
@@ -41,6 +44,12 @@ export function ResearchWorkspace({
         if (alive && j?.ok && j.quota) setQuota(j.quota);
       })
       .catch(() => {});
+    fetch("/api/bloomberg")
+      .then((r) => r.json())
+      .then((j) => {
+        if (alive && j?.ok && j.digest) setBloomberg(j.digest as BloombergDigest);
+      })
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -48,15 +57,14 @@ export function ResearchWorkspace({
 
   const capped = quota ? quota.remaining <= 0 : false;
 
-  async function analyze() {
+  // Core POST — shared by manual analyze and one-tap Bloomberg-story analyze.
+  async function runAnalyze(payload: Record<string, unknown>) {
     setLoading(true);
     setError(null);
     setAnalysis(null);
     setTranscript(null);
     setShowTranscript(false);
     try {
-      const payload =
-        mode === "url" ? { mode, url } : mode === "image" ? { mode, images } : { mode, text };
       const res = await fetch("/api/research/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,16 +75,33 @@ export function ResearchWorkspace({
       if (!res.ok || !j.ok) {
         setError(j.error || "Analysis failed. Please try again.");
         if (j.fallbackToText) setMode("text");
-      } else {
-        setAnalysis(j.analysis as ResearchAnalysis);
-        if (j.transcript) setTranscript(j.transcript as string);
-        setLearning(false);
+        return false;
       }
+      setAnalysis(j.analysis as ResearchAnalysis);
+      if (j.transcript) setTranscript(j.transcript as string);
+      setLearning(false);
+      return true;
     } catch {
       setError("Couldn't reach the analyzer. Please try again.");
+      return false;
     } finally {
       setLoading(false);
     }
+  }
+
+  async function analyze() {
+    const payload =
+      mode === "url" ? { mode, url } : mode === "image" ? { mode, images } : { mode, text };
+    await runAnalyze(payload);
+  }
+
+  async function analyzeStory(story: BloombergStory) {
+    if (capped || loading) return;
+    const composed = [story.headline, story.summary].filter(Boolean).join("\n\n");
+    if (composed.trim().length < 20) return;
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    const ok = await runAnalyze({ mode: "text", text: composed });
+    if (ok) setBbAnalyzed((prev) => new Set(prev).add(story.headline));
   }
 
   async function onPickImages(files: FileList | null) {
@@ -119,6 +144,15 @@ export function ResearchWorkspace({
     <section className="rise space-y-3">
       {!analysis ? (
         <>
+          <BloombergPanel
+            digest={bloomberg}
+            open={bbOpen}
+            onToggle={() => setBbOpen((v) => !v)}
+            onAnalyze={analyzeStory}
+            analyzed={bbAnalyzed}
+            disabled={capped || loading}
+          />
+
           <p className="text-[13px] leading-relaxed text-fg-muted">
             Paste an article, speech, note or report and analyze it through the same CRO framework as the
             daily briefing. Text is the reliable path; a URL is best-effort (many premium sites block fetching).
@@ -351,6 +385,90 @@ export function ResearchWorkspace({
         </>
       )}
     </section>
+  );
+}
+
+const IMPORTANCE_DOT: Record<string, string> = {
+  high: "bg-stress",
+  medium: "bg-elevated",
+  low: "bg-fg-faint",
+};
+
+function BloombergPanel({
+  digest,
+  open,
+  onToggle,
+  onAnalyze,
+  analyzed,
+  disabled,
+}: {
+  digest: BloombergDigest | null;
+  open: boolean;
+  onToggle: () => void;
+  onAnalyze: (s: BloombergStory) => void;
+  analyzed: Set<string>;
+  disabled: boolean;
+}) {
+  const stories = digest?.today_stories ?? [];
+  if (!digest || stories.length === 0) return null;
+  const dateLabel = digest.publication_date
+    ? new Date(digest.publication_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })
+    : "";
+
+  return (
+    <div className="rounded-xl border border-elevated/30 bg-elevated/5">
+      <button onClick={onToggle} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left">
+        <span className="text-2xs font-semibold uppercase tracking-wide text-elevated">Bloomberg — today</span>
+        {dateLabel ? <span className="text-2xs text-fg-faint">{digest.edition || digest.newsletter_type} · {dateLabel}</span> : null}
+        <span className="ml-auto text-2xs text-fg-faint">
+          {stories.length} {stories.length === 1 ? "story" : "stories"} {open ? "\u25be" : "\u2192"}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="space-y-2 px-3.5 pb-3">
+          {digest.lead_editorial?.editorial_text ? (
+            <p className="rounded-lg border border-line bg-ink-800 px-3 py-2 text-[12px] leading-relaxed text-fg-muted">
+              <span className="font-semibold text-fg">Lead{digest.lead_editorial.author ? ` · ${digest.lead_editorial.author}` : ""}: </span>
+              {digest.lead_editorial.editorial_text.slice(0, 320)}
+              {digest.lead_editorial.editorial_text.length > 320 ? "…" : ""}
+            </p>
+          ) : null}
+
+          {stories.map((s, i) => {
+            const done = analyzed.has(s.headline);
+            return (
+              <div key={i} className="rounded-lg border border-line bg-ink-800 px-3 py-2.5">
+                <div className="flex items-start gap-2">
+                  <span className={`mt-1.5 h-1.5 w-1.5 flex-none rounded-full ${IMPORTANCE_DOT[s.importance ?? "low"] ?? "bg-fg-faint"}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold leading-snug text-fg">{s.headline}</p>
+                    {s.theme ? <p className="mt-0.5 text-2xs text-fg-faint">{s.theme}</p> : null}
+                    {s.summary ? <p className="mt-1 text-[12px] leading-relaxed text-fg-muted">{s.summary}</p> : null}
+                    <button
+                      onClick={() => onAnalyze(s)}
+                      disabled={disabled || done}
+                      className={`mt-2 rounded-lg px-2.5 py-1 text-2xs font-semibold transition ${
+                        done
+                          ? "bg-ink-700 text-fg-faint"
+                          : disabled
+                          ? "bg-ink-800 text-fg-faint"
+                          : "bg-steel/15 text-steel active:bg-steel/25"
+                      }`}
+                    >
+                      {done ? "✓ Analyzed" : "Analyze this →"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <p className="text-[10px] leading-relaxed text-fg-faint">
+            Each analysis runs through the same CRO framework and counts toward your daily Research budget.
+          </p>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

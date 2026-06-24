@@ -263,6 +263,31 @@ export interface FocusItem {
   text: string;
 }
 
+/**
+ * V5.0 — Bloomberg newsletter digest, produced by the standalone bloomberg-extractor
+ * microservice (pure extraction, no analysis) and written to shared KV under
+ * `bloomberg:latest` / `bloomberg:{YYYY-MM-DD}`. The dashboard reads it and lets the
+ * user analyze individual stories through the existing analyzeContent() pipeline.
+ */
+export interface BloombergStory {
+  headline: string;
+  theme?: string;
+  importance?: "high" | "medium" | "low";
+  summary?: string;
+}
+export interface BloombergDigest {
+  source: string;
+  newsletter_key?: string;
+  newsletter_type?: string;
+  edition?: string;
+  publication_date?: string;
+  subject?: string;
+  lead_editorial?: { author?: string; editorial_text?: string };
+  today_stories?: BloombergStory[];
+  tomorrow_watchlist?: { headline: string }[];
+  commute_story?: { headline?: string; summary?: string };
+}
+
 /** A single Research-workspace analysis of user-supplied content (ephemeral unless saved). */
 export interface ResearchAnalysis {
   title: string;

@@ -105,7 +105,13 @@ export async function saveWeekly(weekly: EditorialSnapshot["intelligence"]["week
   await kvSet(WEEKLY, weekly);
 }
 
-// ── V4.2 weekly Markets artifact (heat map + emerging risks + implications) ──
+// ── V5.0 Bloomberg digest (written by the external bloomberg-extractor into shared KV) ──
+export async function getBloombergLatest(): Promise<import("./types").BloombergDigest | null> {
+  return kvGet("bloomberg:latest");
+}
+export async function getBloombergByDate(date: string): Promise<import("./types").BloombergDigest | null> {
+  return kvGet(`bloomberg:${date}`);
+}
 const WEEKLY_MARKETS = "weekly:markets";
 export async function getWeeklyMarkets(): Promise<import("./types").WeeklyMarkets | null> {
   return kvGet(WEEKLY_MARKETS);
