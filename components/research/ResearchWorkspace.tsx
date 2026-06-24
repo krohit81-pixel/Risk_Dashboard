@@ -415,11 +415,28 @@ function BloombergPanel({
     ? new Date(digest.publication_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })
     : "";
 
+  // Staleness guard: if the latest digest is 2+ days old (e.g. the extractor hasn't run),
+  // don't present old stories as actionable. (KV also TTLs bloomberg:latest after ~36h —
+  // this is the belt-and-suspenders display path for the in-between window.)
+  const ageDays = digest.publication_date
+    ? Math.floor((Date.now() - new Date(`${digest.publication_date}T00:00:00`).getTime()) / 86400000)
+    : 0;
+  if (ageDays >= 2) {
+    return (
+      <div className="rounded-xl border border-line bg-ink-800 px-3.5 py-2.5">
+        <p className="text-2xs text-fg-faint">
+          Bloomberg — last digest {dateLabel || "(unknown date)"} · no newer update
+        </p>
+      </div>
+    );
+  }
+  const freshness = ageDays === 1 ? "yesterday" : "";
+
   return (
     <div className="rounded-xl border border-elevated/30 bg-elevated/5">
       <button onClick={onToggle} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left">
         <span className="text-2xs font-semibold uppercase tracking-wide text-elevated">Bloomberg — today</span>
-        {dateLabel ? <span className="text-2xs text-fg-faint">{digest.edition || digest.newsletter_type} · {dateLabel}</span> : null}
+        {dateLabel ? <span className="text-2xs text-fg-faint">{digest.edition || digest.newsletter_type} · {dateLabel}{freshness ? ` · ${freshness}` : ""}</span> : null}
         <span className="ml-auto text-2xs text-fg-faint">
           {stories.length} {stories.length === 1 ? "story" : "stories"} {open ? "\u25be" : "\u2192"}
         </span>

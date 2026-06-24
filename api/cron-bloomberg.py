@@ -32,6 +32,7 @@ MODEL_NAME = "gemini-2.5-flash"
 MAX_RETRIES = 3
 SENDER_DOMAIN = "noreply@news.bloomberg.com"
 LOOKBACK_HOURS = 24  # only consider Bloomberg mail received in the last N hours
+LATEST_TTL_HOURS = 36  # bloomberg:latest self-expires if no fresh digest arrives within this window
 
 
 # --- Helper: HTML Cleaner ---
@@ -215,7 +216,9 @@ def process_bloomberg_inbox():
 
             # 5. KV storage (same store the dashboard reads)
             redis.set(f"bloomberg:{pub_date_str}", json.dumps(extracted_data))
-            redis.set("bloomberg:latest", json.dumps(extracted_data))
+            # `latest` self-expires after LATEST_TTL_HOURS, so a stalled extractor never
+            # leaves a stale digest pinned in the Research panel indefinitely.
+            redis.setex("bloomberg:latest", LATEST_TTL_HOURS * 3600, json.dumps(extracted_data))
             redis.setex(kv_dedupe_key, 2592000, "1")  # 30-day dedupe TTL
 
             mail.store(e_id, "+FLAGS", "\\Seen")
