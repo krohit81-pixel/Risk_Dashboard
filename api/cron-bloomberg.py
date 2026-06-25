@@ -18,6 +18,7 @@ import imaplib
 import email
 from email.header import decode_header
 import json
+import re
 import time
 from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler
@@ -48,7 +49,15 @@ NEWSLETTER_TYPES = [
 
 
 def _norm(s: str) -> str:
-    return " ".join((s or "").lower().split())
+    # Normalize curly apostrophes so footer subscription matching is reliable.
+    s = (s or "").replace("\u2019", "'").replace("\u2018", "'")
+    return " ".join(s.lower().split())
+
+
+# The footer of every Bloomberg newsletter says "...subscribed to Bloomberg's
+# {NEWSLETTER NAME} newsletter." — the most reliable type signal, independent of the
+# (often creative) subject and of whether the masthead is an image.
+SUBSCRIBE_RE = re.compile(r"subscribed to bloomberg's (.{3,60}?) newsletter")
 
 
 def _log_run(redis, emails_found: int, metrics: dict, processed_types) -> dict:
@@ -75,13 +84,39 @@ def _log_run(redis, emails_found: int, metrics: dict, processed_types) -> dict:
     return run_record
 
 
-def detect_newsletter(subject: str, body_head: str):
-    """Classify the briefing from the subject first, then the start of the body.
-    Returns (key, label). Falls back to a generic 'other' bucket."""
-    hay = _norm(subject) + " || " + _norm(body_head)
+def detect_newsletter(subject: str, html_content: str, text_content: str):
+    """Classify the briefing. Priority: (1) footer subscription line — authoritative;
+    (2) subject + image alt text (masthead); (3) full body text. Runs on the RAW email
+    (not the header/footer-stripped content) so the masthead and footer survive."""
+    raw_text, alts = "", []
+    if html_content:
+        try:
+            soup = BeautifulSoup(html_content, "html.parser")
+            alts = [img.get("alt", "") for img in soup.find_all("img") if img.get("alt")]
+            raw_text = soup.get_text(separator=" ")
+        except Exception:
+            raw_text = ""
+    norm_raw = _norm(f"{raw_text} {text_content or ''}")
+
+    # 1) Footer subscription line (authoritative).
+    m = SUBSCRIBE_RE.search(norm_raw)
+    if m:
+        sub = m.group(1)
+        for nt in NEWSLETTER_TYPES:
+            if any(p in sub for p in nt["match"]):
+                return nt["key"], nt["label"]
+
+    # 2) Subject + masthead image alt text.
+    head = _norm(f"{subject} {' '.join(alts)}")
     for nt in NEWSLETTER_TYPES:
-        if any(phrase in hay for phrase in nt["match"]):
+        if any(p in head for p in nt["match"]):
             return nt["key"], nt["label"]
+
+    # 3) Full body (last resort; subscription/subject preferred above).
+    for nt in NEWSLETTER_TYPES:
+        if any(p in norm_raw for p in nt["match"]):
+            return nt["key"], nt["label"]
+
     return "bloomberg_other", "Bloomberg"
 
 
@@ -238,8 +273,8 @@ def process_bloomberg_inbox():
                 mail.store(e_id, "+FLAGS", "\\Seen")
                 continue
 
-            # Deterministic briefing classification (subject + start of body).
-            nl_key, nl_label = detect_newsletter(subject, cleaned_text[:600])
+            # Deterministic briefing classification (footer subscription line → subject/alt → body).
+            nl_key, nl_label = detect_newsletter(subject, html_content, text_content)
 
             # 4. Gemini extraction (retry)
             user_prompt = (
