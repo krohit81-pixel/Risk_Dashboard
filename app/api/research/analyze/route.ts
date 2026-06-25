@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { analyzeContent } from "@/lib/analyze";
 import { extractFromImage, type ImageInput } from "@/lib/llm";
 import { getResearchQuota, incrementResearchCount } from "@/lib/researchQuota";
+import { addBloombergAnalyzed } from "@/lib/snapshotStore";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -81,7 +82,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  let body: { mode?: string; text?: string; url?: string; images?: ImageInput[] };
+  let body: { mode?: string; text?: string; url?: string; images?: ImageInput[]; bloombergHeadline?: string };
   try {
     body = await req.json();
   } catch {
@@ -163,6 +164,7 @@ export async function POST(req: Request) {
     }
     const analysis = await analyzeContent(text, { sourceType: "text" });
     const used = await incrementResearchCount();
+    if (body.bloombergHeadline) await addBloombergAnalyzed(body.bloombergHeadline);
     return NextResponse.json({ ok: true, analysis, quota: { ...quota, used, remaining: Math.max(0, quota.cap - used) } });
   } catch (e) {
     return NextResponse.json(

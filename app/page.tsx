@@ -24,7 +24,7 @@ import { ConceptLibrary } from "@/components/learn/ConceptLibrary";
 import { RadarSection } from "@/components/intel/RadarSection";
 import { SavedList } from "@/components/saved/SavedList";
 import type { SavedItem } from "@/lib/savedStore";
-import { RunHistory } from "@/components/RunHistory";
+import { RunHistory, BloombergRunHistory } from "@/components/RunHistory";
 import type { RunRecord } from "@/lib/runStore";
 import { ResearchWorkspace } from "@/components/research/ResearchWorkspace";
 import { resolveIntelligence } from "@/lib/layman";
@@ -285,6 +285,7 @@ export default function Page() {
                     </button>
                   </div>
                   <RunHistory runs={runs} />
+                  <BloombergRunHistory runs={data.bloombergRuns} />
                 </CollapsibleSection>
               </>
             ) : null}

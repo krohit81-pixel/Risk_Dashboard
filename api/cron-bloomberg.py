@@ -32,7 +32,57 @@ MODEL_NAME = "gemini-2.5-flash"
 MAX_RETRIES = 3
 SENDER_DOMAIN = "noreply@news.bloomberg.com"
 LOOKBACK_HOURS = 24  # only consider Bloomberg mail received in the last N hours
-LATEST_TTL_HOURS = 36  # bloomberg:latest self-expires if no fresh digest arrives within this window
+LATEST_TTL_HOURS = 36  # each per-briefing digest self-expires after this if not refreshed
+RUNS_KEPT = 15  # how many ingestion runs to keep in bloomberg:runs for the Today-tab history
+
+# Fixed newsletter vocabulary. Detection is deterministic from the subject / mail start
+# (more reliable than letting the model classify). `match` phrases are normalized
+# (lowercased, whitespace-collapsed) substring checks; order = most-specific first.
+NEWSLETTER_TYPES = [
+    {"key": "evening_briefing_americas", "label": "Evening Briefing — Americas", "match": ["evening briefing americas"]},
+    {"key": "morning_briefing_americas", "label": "Morning Briefing — Americas", "match": ["morning briefing americas"]},
+    {"key": "evening_briefing_asia", "label": "Evening Briefing — Asia", "match": ["evening briefing asia"]},
+    {"key": "morning_briefing_asia", "label": "Morning Briefing — Asia", "match": ["morning briefing asia"]},
+    {"key": "markets_daily", "label": "Markets Daily", "match": ["markets daily"]},
+]
+
+
+def _norm(s: str) -> str:
+    return " ".join((s or "").lower().split())
+
+
+def _log_run(redis, emails_found: int, metrics: dict, processed_types) -> dict:
+    """Append a capped, newest-first ingestion run record for the Today-tab history."""
+    run_record = {
+        "run_time": datetime.now(timezone.utc).isoformat(),
+        "emails_found": emails_found,
+        "processed": metrics.get("processed", 0),
+        "failed": metrics.get("failed", 0),
+        "newsletter_types": sorted(processed_types) if processed_types else [],
+    }
+    try:
+        existing_raw = redis.get("bloomberg:runs")
+        runs = json.loads(existing_raw) if existing_raw else []
+        if not isinstance(runs, list):
+            runs = []
+    except Exception:
+        runs = []
+    runs.insert(0, run_record)
+    try:
+        redis.set("bloomberg:runs", json.dumps(runs[:RUNS_KEPT]))
+    except Exception:
+        pass
+    return run_record
+
+
+def detect_newsletter(subject: str, body_head: str):
+    """Classify the briefing from the subject first, then the start of the body.
+    Returns (key, label). Falls back to a generic 'other' bucket."""
+    hay = _norm(subject) + " || " + _norm(body_head)
+    for nt in NEWSLETTER_TYPES:
+        if any(phrase in hay for phrase in nt["match"]):
+            return nt["key"], nt["label"]
+    return "bloomberg_other", "Bloomberg"
 
 
 # --- Helper: HTML Cleaner ---
@@ -70,6 +120,7 @@ def process_bloomberg_inbox():
         return {"error": f"Missing required environment variable: {str(e)}"}
 
     metrics = {"processed": 0, "skipped": 0, "failed": 0}
+    processed_types = set()
 
     try:
         mail = imaplib.IMAP4_SSL("imap.aol.com")
@@ -84,6 +135,7 @@ def process_bloomberg_inbox():
     status, messages = mail.search(None, f'(UNSEEN FROM "{SENDER_DOMAIN}" SINCE {since_date})')
     if not messages[0]:
         mail.logout()
+        _log_run(redis, 0, metrics, processed_types)
         return {"status": "Complete", "metrics": metrics, "message": "No recent unread Bloomberg emails found."}
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=LOOKBACK_HOURS)
@@ -112,6 +164,7 @@ def process_bloomberg_inbox():
 
     if not candidates:
         mail.logout()
+        _log_run(redis, 0, metrics, processed_types)
         return {"status": "Complete", "metrics": metrics, "message": f"No Bloomberg mail in the last {LOOKBACK_HOURS}h."}
 
     candidates.sort(key=lambda c: c[2])  # oldest → newest
@@ -185,6 +238,9 @@ def process_bloomberg_inbox():
                 mail.store(e_id, "+FLAGS", "\\Seen")
                 continue
 
+            # Deterministic briefing classification (subject + start of body).
+            nl_key, nl_label = detect_newsletter(subject, cleaned_text[:600])
+
             # 4. Gemini extraction (retry)
             user_prompt = (
                 f"Expected Schema:\n{schema_template}\n\n"
@@ -204,8 +260,13 @@ def process_bloomberg_inbox():
                         ),
                     )
                     extracted_data = json.loads(response.text)
+                    # Override model guesses with deterministic metadata.
                     extracted_data["subject"] = subject
                     extracted_data["publication_date"] = pub_date_str
+                    extracted_data["newsletter_key"] = nl_key
+                    extracted_data["newsletter_type"] = nl_label
+                    extracted_data["edition"] = nl_label
+                    extracted_data["ingested_at"] = datetime.now(timezone.utc).isoformat()
                     break
                 except Exception as e:
                     last_err = e
@@ -214,13 +275,13 @@ def process_bloomberg_inbox():
             if not extracted_data:
                 raise RuntimeError(f"Gemini extraction failed: {str(last_err)}")
 
-            # 5. KV storage (same store the dashboard reads)
-            redis.set(f"bloomberg:{pub_date_str}", json.dumps(extracted_data))
-            # `latest` self-expires after LATEST_TTL_HOURS, so a stalled extractor never
-            # leaves a stale digest pinned in the Research panel indefinitely.
-            redis.setex("bloomberg:latest", LATEST_TTL_HOURS * 3600, json.dumps(extracted_data))
+            # 5. KV storage — ONE key PER BRIEFING, each with its own TTL. The morning and
+            # evening briefs coexist; the same briefing next day overwrites only its own key;
+            # a briefing that stops arriving expires independently after LATEST_TTL_HOURS.
+            redis.setex(f"bloomberg:type:{nl_key}", LATEST_TTL_HOURS * 3600, json.dumps(extracted_data))
             redis.setex(kv_dedupe_key, 2592000, "1")  # 30-day dedupe TTL
 
+            processed_types.add(nl_label)
             mail.store(e_id, "+FLAGS", "\\Seen")
             metrics["processed"] += 1
 
@@ -230,7 +291,8 @@ def process_bloomberg_inbox():
             continue
 
     mail.logout()
-    return {"status": "Complete", "metrics": metrics}
+    run_record = _log_run(redis, len(candidates), metrics, processed_types)
+    return {"status": "Complete", "metrics": metrics, "run": run_record}
 
 
 def _authorized(headers, path: str) -> bool:

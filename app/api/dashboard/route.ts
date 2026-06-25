@@ -19,6 +19,7 @@ import {
   getConceptSeen,
   getWeeklyMarkets,
   getWeekly,
+  getBloombergRuns,
 } from "@/lib/snapshotStore";
 import { curatedSnapshot, attachLiveDrift } from "@/lib/snapshotEngine";
 import { buildOvernight } from "@/lib/overnight";
@@ -111,6 +112,7 @@ export async function GET() {
     anyLive,
     updatedISO,
     weeklyRefreshedISO,
+    bloombergRuns: await getBloombergRuns(),
   };
 
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });

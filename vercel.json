@@ -2,7 +2,8 @@
   "crons": [
     { "path": "/api/cron/editorial?slot=morning", "schedule": "30 22 * * *" },
     { "path": "/api/cron/weekly", "schedule": "30 0 * * 6" },
-    { "path": "/api/cron-bloomberg", "schedule": "0 7 * * *" }
+    { "path": "/api/cron-bloomberg", "schedule": "0 0 * * *" },
+    { "path": "/api/cron-bloomberg", "schedule": "30 13 * * *" }
   ],
   "functions": {
     "api/cron-bloomberg.py": { "maxDuration": 300 }

@@ -51,6 +51,11 @@ export async function kvSet(key: string, value: unknown): Promise<void> {
   await cmd(["SET", key, JSON.stringify(value)]);
 }
 
+/** SET with an expiry (seconds) — used for self-clearing keys like bloomberg:analyzed. */
+export async function kvSetEx(key: string, value: unknown, ttlSeconds: number): Promise<void> {
+  await cmd(["SET", key, JSON.stringify(value), "EX", String(ttlSeconds)]);
+}
+
 // ── Keys & history ──
 const LATEST = "snapshot:latest";
 const INDEX = "snapshot:index"; // rolling list of {date, slot, generatedISO}
@@ -105,12 +110,42 @@ export async function saveWeekly(weekly: EditorialSnapshot["intelligence"]["week
   await kvSet(WEEKLY, weekly);
 }
 
-// ── V5.0 Bloomberg digest (written by the external bloomberg-extractor into shared KV) ──
-export async function getBloombergLatest(): Promise<import("./types").BloombergDigest | null> {
-  return kvGet("bloomberg:latest");
+// ── V5 Bloomberg digests (written by api/cron-bloomberg.py into shared KV) ──
+// One key per briefing: `bloomberg:type:{key}`, each with its own 36h TTL.
+export const BLOOMBERG_TYPE_KEYS = [
+  "evening_briefing_americas",
+  "morning_briefing_americas",
+  "evening_briefing_asia",
+  "morning_briefing_asia",
+  "markets_daily",
+  "bloomberg_other",
+] as const;
+
+/** Read all present per-briefing digests (expired ones return null), freshest first. */
+export async function getBloombergAll(): Promise<import("./types").BloombergDigest[]> {
+  const results = await Promise.all(
+    BLOOMBERG_TYPE_KEYS.map((k) => kvGet<import("./types").BloombergDigest>(`bloomberg:type:${k}`))
+  );
+  const present = results.filter((d): d is import("./types").BloombergDigest => Boolean(d));
+  return present.sort((a, b) => (b.ingested_at ?? "").localeCompare(a.ingested_at ?? ""));
 }
-export async function getBloombergByDate(date: string): Promise<import("./types").BloombergDigest | null> {
-  return kvGet(`bloomberg:${date}`);
+
+/** Headlines of Bloomberg stories already analyzed (persists the panel's ✓ across reloads). */
+export async function getBloombergAnalyzed(): Promise<string[]> {
+  const v = await kvGet<string[]>("bloomberg:analyzed");
+  return Array.isArray(v) ? v : [];
+}
+export async function addBloombergAnalyzed(headline: string): Promise<void> {
+  if (!headline) return;
+  const cur = await getBloombergAnalyzed();
+  if (cur.includes(headline)) return;
+  const next = [...cur, headline].slice(-200);
+  await kvSetEx("bloomberg:analyzed", next, 48 * 3600); // clears with the digest cycle
+}
+
+export async function getBloombergRuns(): Promise<import("./types").BloombergRun[]> {
+  const v = await kvGet<import("./types").BloombergRun[]>("bloomberg:runs");
+  return Array.isArray(v) ? v : [];
 }
 const WEEKLY_MARKETS = "weekly:markets";
 export async function getWeeklyMarkets(): Promise<import("./types").WeeklyMarkets | null> {

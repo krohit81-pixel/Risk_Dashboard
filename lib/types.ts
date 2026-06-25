@@ -126,6 +126,8 @@ export interface DashboardData {
   updatedISO: string;
   /** V4.2 — when the weekly Markets refresh (sections 03–05) was last generated, if any. */
   weeklyRefreshedISO?: string;
+  /** V4.5.2 — recent Bloomberg ingestion runs for the Today-tab history. */
+  bloombergRuns?: BloombergRun[];
 }
 
 /**
@@ -281,11 +283,21 @@ export interface BloombergDigest {
   newsletter_type?: string;
   edition?: string;
   publication_date?: string;
+  ingested_at?: string;
   subject?: string;
   lead_editorial?: { author?: string; editorial_text?: string };
   today_stories?: BloombergStory[];
   tomorrow_watchlist?: { headline: string }[];
   commute_story?: { headline?: string; summary?: string };
+}
+
+/** V4.5.2 — a Bloomberg ingestion run, surfaced in the Today-tab history. */
+export interface BloombergRun {
+  run_time: string;
+  emails_found: number;
+  processed: number;
+  failed: number;
+  newsletter_types: string[];
 }
 
 /** A single Research-workspace analysis of user-supplied content (ephemeral unless saved). */

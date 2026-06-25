@@ -31,7 +31,7 @@ export function ResearchWorkspace({
   const [analysis, setAnalysis] = useState<ResearchAnalysis | null>(null);
   const [learning, setLearning] = useState(false);
   const [quota, setQuota] = useState<{ used: number; cap: number; remaining: number } | null>(null);
-  const [bloomberg, setBloomberg] = useState<BloombergDigest | null>(null);
+  const [bloombergDigests, setBloombergDigests] = useState<BloombergDigest[]>([]);
   const [bbOpen, setBbOpen] = useState(true);
   const [bbAnalyzed, setBbAnalyzed] = useState<Set<string>>(new Set());
 
@@ -47,7 +47,9 @@ export function ResearchWorkspace({
     fetch("/api/bloomberg")
       .then((r) => r.json())
       .then((j) => {
-        if (alive && j?.ok && j.digest) setBloomberg(j.digest as BloombergDigest);
+        if (!alive || !j?.ok) return;
+        if (Array.isArray(j.digests)) setBloombergDigests(j.digests as BloombergDigest[]);
+        if (Array.isArray(j.analyzed)) setBbAnalyzed(new Set(j.analyzed as string[]));
       })
       .catch(() => {});
     return () => {
@@ -100,7 +102,7 @@ export function ResearchWorkspace({
     const composed = [story.headline, story.summary].filter(Boolean).join("\n\n");
     if (composed.trim().length < 20) return;
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-    const ok = await runAnalyze({ mode: "text", text: composed });
+    const ok = await runAnalyze({ mode: "text", text: composed, bloombergHeadline: story.headline });
     if (ok) setBbAnalyzed((prev) => new Set(prev).add(story.headline));
   }
 
@@ -145,7 +147,7 @@ export function ResearchWorkspace({
       {!analysis ? (
         <>
           <BloombergPanel
-            digest={bloomberg}
+            digests={bloombergDigests}
             open={bbOpen}
             onToggle={() => setBbOpen((v) => !v)}
             onAnalyze={analyzeStory}
@@ -394,92 +396,134 @@ const IMPORTANCE_DOT: Record<string, string> = {
   low: "bg-fg-faint",
 };
 
-function BloombergPanel({
+function BloombergStoryRow({
+  story,
+  done,
+  disabled,
+  onAnalyze,
+}: {
+  story: BloombergStory;
+  done: boolean;
+  disabled: boolean;
+  onAnalyze: (s: BloombergStory) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-line bg-ink-800 px-3 py-2.5">
+      <div className="flex items-start gap-2">
+        <span className={`mt-1.5 h-1.5 w-1.5 flex-none rounded-full ${IMPORTANCE_DOT[story.importance ?? "low"] ?? "bg-fg-faint"}`} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold leading-snug text-fg">{story.headline}</p>
+          {story.theme ? <p className="mt-0.5 text-2xs text-fg-faint">{story.theme}</p> : null}
+          {story.summary ? <p className="mt-1 text-[12px] leading-relaxed text-fg-muted">{story.summary}</p> : null}
+          <button
+            onClick={() => onAnalyze(story)}
+            disabled={disabled || done}
+            className={`mt-2 rounded-lg px-2.5 py-1 text-2xs font-semibold transition ${
+              done ? "bg-ink-700 text-fg-faint" : disabled ? "bg-ink-800 text-fg-faint" : "bg-steel/15 text-steel active:bg-steel/25"
+            }`}
+          >
+            {done ? "✓ Analyzed" : "Analyze this →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** One briefing's section (header + lead + its stories), with its own staleness guard. */
+function BloombergGroup({
   digest,
+  analyzed,
+  disabled,
+  onAnalyze,
+}: {
+  digest: BloombergDigest;
+  analyzed: Set<string>;
+  disabled: boolean;
+  onAnalyze: (s: BloombergStory) => void;
+}) {
+  const stories = digest.today_stories ?? [];
+  if (stories.length === 0) return null;
+  const label = digest.newsletter_type || digest.edition || "Bloomberg";
+  const dateLabel = digest.publication_date
+    ? new Date(digest.publication_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })
+    : "";
+  const ageDays = digest.publication_date
+    ? Math.floor((Date.now() - new Date(`${digest.publication_date}T00:00:00`).getTime()) / 86400000)
+    : 0;
+
+  // Per-briefing staleness guard: 2+ days old → muted note, not actionable stories.
+  if (ageDays >= 2) {
+    return (
+      <div className="rounded-lg border border-line bg-ink-800 px-3 py-2">
+        <p className="text-2xs text-fg-faint">{label} — last digest {dateLabel || "(unknown date)"} · no newer update</p>
+      </div>
+    );
+  }
+  const freshness = ageDays === 1 ? " · yesterday" : "";
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 pt-1">
+        <span className="text-2xs font-semibold uppercase tracking-wide text-elevated">{label}</span>
+        {dateLabel ? <span className="text-2xs text-fg-faint">{dateLabel}{freshness}</span> : null}
+        <span className="ml-auto text-2xs text-fg-faint">{stories.length} {stories.length === 1 ? "story" : "stories"}</span>
+      </div>
+      {digest.lead_editorial?.editorial_text ? (
+        <p className="rounded-lg border border-line bg-ink-800 px-3 py-2 text-[12px] leading-relaxed text-fg-muted">
+          <span className="font-semibold text-fg">Lead{digest.lead_editorial.author ? ` · ${digest.lead_editorial.author}` : ""}: </span>
+          {digest.lead_editorial.editorial_text.slice(0, 280)}
+          {digest.lead_editorial.editorial_text.length > 280 ? "…" : ""}
+        </p>
+      ) : null}
+      {stories.map((s, i) => (
+        <BloombergStoryRow key={i} story={s} done={analyzed.has(s.headline)} disabled={disabled} onAnalyze={onAnalyze} />
+      ))}
+    </div>
+  );
+}
+
+function BloombergPanel({
+  digests,
   open,
   onToggle,
   onAnalyze,
   analyzed,
   disabled,
 }: {
-  digest: BloombergDigest | null;
+  digests: BloombergDigest[];
   open: boolean;
   onToggle: () => void;
   onAnalyze: (s: BloombergStory) => void;
   analyzed: Set<string>;
   disabled: boolean;
 }) {
-  const stories = digest?.today_stories ?? [];
-  if (!digest || stories.length === 0) return null;
-  const dateLabel = digest.publication_date
-    ? new Date(digest.publication_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })
-    : "";
-
-  // Staleness guard: if the latest digest is 2+ days old (e.g. the extractor hasn't run),
-  // don't present old stories as actionable. (KV also TTLs bloomberg:latest after ~36h —
-  // this is the belt-and-suspenders display path for the in-between window.)
-  const ageDays = digest.publication_date
-    ? Math.floor((Date.now() - new Date(`${digest.publication_date}T00:00:00`).getTime()) / 86400000)
-    : 0;
-  if (ageDays >= 2) {
-    return (
-      <div className="rounded-xl border border-line bg-ink-800 px-3.5 py-2.5">
-        <p className="text-2xs text-fg-faint">
-          Bloomberg — last digest {dateLabel || "(unknown date)"} · no newer update
-        </p>
-      </div>
-    );
-  }
-  const freshness = ageDays === 1 ? "yesterday" : "";
+  // Only briefings with fresh stories count toward the visible panel.
+  const fresh = digests.filter((d) => (d.today_stories ?? []).length > 0);
+  if (fresh.length === 0) return null;
+  const totalStories = fresh.reduce((n, d) => n + (d.today_stories?.length ?? 0), 0);
 
   return (
     <div className="rounded-xl border border-elevated/30 bg-elevated/5">
       <button onClick={onToggle} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left">
         <span className="text-2xs font-semibold uppercase tracking-wide text-elevated">Bloomberg — today</span>
-        {dateLabel ? <span className="text-2xs text-fg-faint">{digest.edition || digest.newsletter_type} · {dateLabel}{freshness ? ` · ${freshness}` : ""}</span> : null}
+        <span className="text-2xs text-fg-faint">{fresh.length} {fresh.length === 1 ? "briefing" : "briefings"}</span>
         <span className="ml-auto text-2xs text-fg-faint">
-          {stories.length} {stories.length === 1 ? "story" : "stories"} {open ? "\u25be" : "\u2192"}
+          {totalStories} {totalStories === 1 ? "story" : "stories"} {open ? "\u25be" : "\u2192"}
         </span>
       </button>
 
       {open ? (
-        <div className="space-y-2 px-3.5 pb-3">
-          {digest.lead_editorial?.editorial_text ? (
-            <p className="rounded-lg border border-line bg-ink-800 px-3 py-2 text-[12px] leading-relaxed text-fg-muted">
-              <span className="font-semibold text-fg">Lead{digest.lead_editorial.author ? ` · ${digest.lead_editorial.author}` : ""}: </span>
-              {digest.lead_editorial.editorial_text.slice(0, 320)}
-              {digest.lead_editorial.editorial_text.length > 320 ? "…" : ""}
-            </p>
-          ) : null}
-
-          {stories.map((s, i) => {
-            const done = analyzed.has(s.headline);
-            return (
-              <div key={i} className="rounded-lg border border-line bg-ink-800 px-3 py-2.5">
-                <div className="flex items-start gap-2">
-                  <span className={`mt-1.5 h-1.5 w-1.5 flex-none rounded-full ${IMPORTANCE_DOT[s.importance ?? "low"] ?? "bg-fg-faint"}`} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-semibold leading-snug text-fg">{s.headline}</p>
-                    {s.theme ? <p className="mt-0.5 text-2xs text-fg-faint">{s.theme}</p> : null}
-                    {s.summary ? <p className="mt-1 text-[12px] leading-relaxed text-fg-muted">{s.summary}</p> : null}
-                    <button
-                      onClick={() => onAnalyze(s)}
-                      disabled={disabled || done}
-                      className={`mt-2 rounded-lg px-2.5 py-1 text-2xs font-semibold transition ${
-                        done
-                          ? "bg-ink-700 text-fg-faint"
-                          : disabled
-                          ? "bg-ink-800 text-fg-faint"
-                          : "bg-steel/15 text-steel active:bg-steel/25"
-                      }`}
-                    >
-                      {done ? "✓ Analyzed" : "Analyze this →"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="space-y-3 px-3.5 pb-3">
+          {fresh.map((d) => (
+            <BloombergGroup
+              key={d.newsletter_key || d.subject || d.ingested_at}
+              digest={d}
+              analyzed={analyzed}
+              disabled={disabled}
+              onAnalyze={onAnalyze}
+            />
+          ))}
           <p className="text-[10px] leading-relaxed text-fg-faint">
             Each analysis runs through the same CRO framework and counts toward your daily Research budget.
           </p>
@@ -488,6 +532,7 @@ function BloombergPanel({
     </div>
   );
 }
+
 
 const FOCUS_KIND: Record<FocusItem["kind"], string> = {
   attention: "Attention",
