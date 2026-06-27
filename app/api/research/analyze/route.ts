@@ -82,7 +82,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  let body: { mode?: string; text?: string; url?: string; images?: ImageInput[]; bloombergHeadline?: string };
+  let body: { mode?: string; text?: string; url?: string; images?: ImageInput[]; bloombergHeadline?: string; sourceLabel?: string };
   try {
     body = await req.json();
   } catch {
@@ -162,7 +162,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const analysis = await analyzeContent(text, { sourceType: "text" });
+    const analysis = await analyzeContent(text, { sourceType: "text", sourceLabel: body.sourceLabel });
     const used = await incrementResearchCount();
     if (body.bloombergHeadline) await addBloombergAnalyzed(body.bloombergHeadline);
     return NextResponse.json({ ok: true, analysis, quota: { ...quota, used, remaining: Math.max(0, quota.cap - used) } });

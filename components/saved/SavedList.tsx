@@ -105,13 +105,6 @@ function SavedCard({
         <span className="rounded-full border border-line bg-ink-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-fg-muted">
           {KIND_LABEL[it.kind]}
         </span>
-        <button
-          onClick={() => setCardOpen((v) => !v)}
-          aria-label={cardOpen ? "Collapse" : "Expand"}
-          className="text-2xs text-fg-faint"
-        >
-          {cardOpen ? "\u25be" : "\u25b8"}
-        </button>
         <button onClick={() => onRemove(it.id)} className="ml-auto text-2xs font-semibold text-fg-faint">
           Remove
         </button>
@@ -275,11 +268,11 @@ function SavedCard({
             </>
           ) : null}
 
-          {it.sources ? <p className="mt-2 text-2xs text-fg-faint">Source: {it.sources}</p> : null}
+          {it.sourceLabel || it.sources ? <p className="mt-2 text-2xs text-fg-faint">Source: {it.sourceLabel || it.sources}</p> : null}
 
           {it.kind === "analysis" ? (
             <p className="mt-1 text-2xs text-fg-faint">
-              {it.sourceType === "url" ? "From URL" : "Pasted text"}
+              {it.sourceLabel ? it.sourceLabel : it.sourceType === "url" ? "From URL" : "Pasted text"}
               {it.originalUrl ? (
                 <>
                   {" · "}

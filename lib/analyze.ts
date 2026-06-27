@@ -97,6 +97,7 @@ const MAX_CONTENT_CHARS = 16000; // ~4k words — cap input; label when truncate
 export interface AnalyzeMeta {
   sourceType: "text" | "url" | "image";
   originalUrl?: string;
+  sourceLabel?: string;
 }
 
 /**
@@ -216,6 +217,7 @@ JSON only.`;
       bankingImpact: laymanImpactCombined,
     },
     sourceType: meta.sourceType,
+    sourceLabel: meta.sourceLabel,
     originalUrl: meta.originalUrl,
     analyzedISO: new Date().toISOString(),
     truncated,

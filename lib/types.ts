@@ -316,6 +316,7 @@ export interface ResearchAnalysis {
     bankingImpact: string;            // combined layman string — back-compat
   };
   sourceType: "text" | "url" | "image";
+  sourceLabel?: string; // e.g. "Bloomberg · Evening Briefing — Asia"; overrides the default source line
   originalUrl?: string;
   analyzedISO: string;
   truncated?: boolean;

@@ -44,6 +44,7 @@ export interface SavedItem {
   snapshotISO?: string; // original snapshot date for timeline context
   // ── Research analyses (V4.0) — lightweight metadata so Learn stays useful over time ──
   sourceType?: "text" | "url" | "image" | "theme" | "editorial" | "japan";
+  sourceLabel?: string;
   analysisDateISO?: string; // when the analysis was generated
   originalUrl?: string;     // source URL if analysed from a link
   relatedConcepts?: string[];

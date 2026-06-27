@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DashboardData } from "@/lib/types";
 import { relativeTime } from "@/lib/format";
+import { APP_VERSION } from "@/lib/version";
 import { MorningBrief } from "@/components/MorningBrief";
 import { TopDevelopments } from "@/components/TopDevelopments";
 import { WhatChanged } from "@/components/WhatChanged";
@@ -156,7 +157,10 @@ export default function Page() {
               R
             </span>
             <div className="leading-tight">
-              <p className="text-[13px] font-semibold text-fg">Global Risk Intelligence</p>
+              <p className="text-[13px] font-semibold text-fg">
+                Global Risk Intelligence
+                <span className="ml-1.5 align-middle text-[9px] font-medium text-fg-faint">v{APP_VERSION}</span>
+              </p>
               <p className="text-2xs text-fg-faint">
                 {data ? `Updated ${relativeTime(data.updatedISO)}` : "Loading…"}
               </p>

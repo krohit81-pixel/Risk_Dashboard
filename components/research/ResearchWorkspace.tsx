@@ -97,12 +97,13 @@ export function ResearchWorkspace({
     await runAnalyze(payload);
   }
 
-  async function analyzeStory(story: BloombergStory) {
+  async function analyzeStory(story: BloombergStory, edition?: string) {
     if (capped || loading) return;
     const composed = [story.headline, story.summary].filter(Boolean).join("\n\n");
     if (composed.trim().length < 20) return;
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-    const ok = await runAnalyze({ mode: "text", text: composed, bloombergHeadline: story.headline });
+    const sourceLabel = edition ? `Bloomberg · ${edition}` : "Bloomberg";
+    const ok = await runAnalyze({ mode: "text", text: composed, bloombergHeadline: story.headline, sourceLabel });
     if (ok) setBbAnalyzed((prev) => new Set(prev).add(story.headline));
   }
 
@@ -430,17 +431,21 @@ function BloombergStoryRow({
   );
 }
 
-/** One briefing's section (header + lead + its stories), with its own staleness guard. */
+/** One briefing's section (collapsible header + lead + its stories), with its own staleness guard. */
 function BloombergGroup({
   digest,
   analyzed,
   disabled,
   onAnalyze,
+  open,
+  onToggle,
 }: {
   digest: BloombergDigest;
   analyzed: Set<string>;
   disabled: boolean;
-  onAnalyze: (s: BloombergStory) => void;
+  onAnalyze: (s: BloombergStory, edition?: string) => void;
+  open: boolean;
+  onToggle: () => void;
 }) {
   const stories = digest.today_stories ?? [];
   if (stories.length === 0) return null;
@@ -463,22 +468,35 @@ function BloombergGroup({
   const freshness = ageDays === 1 ? " · yesterday" : "";
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 pt-1">
+    <div className="rounded-lg border border-line bg-ink-800/40">
+      <button onClick={onToggle} className="flex w-full items-center gap-2 px-3 py-2 text-left">
         <span className="text-2xs font-semibold uppercase tracking-wide text-elevated">{label}</span>
         {dateLabel ? <span className="text-2xs text-fg-faint">{dateLabel}{freshness}</span> : null}
-        <span className="ml-auto text-2xs text-fg-faint">{stories.length} {stories.length === 1 ? "story" : "stories"}</span>
-      </div>
-      {digest.lead_editorial?.editorial_text ? (
-        <p className="rounded-lg border border-line bg-ink-800 px-3 py-2 text-[12px] leading-relaxed text-fg-muted">
-          <span className="font-semibold text-fg">Lead{digest.lead_editorial.author ? ` · ${digest.lead_editorial.author}` : ""}: </span>
-          {digest.lead_editorial.editorial_text.slice(0, 280)}
-          {digest.lead_editorial.editorial_text.length > 280 ? "…" : ""}
-        </p>
+        <span className="ml-auto text-2xs text-fg-faint">
+          {stories.length} {stories.length === 1 ? "story" : "stories"} {open ? "\u25be" : "\u25b8"}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="space-y-2 px-3 pb-3">
+          {digest.lead_editorial?.editorial_text ? (
+            <p className="rounded-lg border border-line bg-ink-800 px-3 py-2 text-[12px] leading-relaxed text-fg-muted">
+              <span className="font-semibold text-fg">Lead{digest.lead_editorial.author ? ` · ${digest.lead_editorial.author}` : ""}: </span>
+              {digest.lead_editorial.editorial_text.slice(0, 280)}
+              {digest.lead_editorial.editorial_text.length > 280 ? "…" : ""}
+            </p>
+          ) : null}
+          {stories.map((s, i) => (
+            <BloombergStoryRow
+              key={i}
+              story={s}
+              done={analyzed.has(s.headline)}
+              disabled={disabled}
+              onAnalyze={(story) => onAnalyze(story, label)}
+            />
+          ))}
+        </div>
       ) : null}
-      {stories.map((s, i) => (
-        <BloombergStoryRow key={i} story={s} done={analyzed.has(s.headline)} disabled={disabled} onAnalyze={onAnalyze} />
-      ))}
     </div>
   );
 }
@@ -494,14 +512,17 @@ function BloombergPanel({
   digests: BloombergDigest[];
   open: boolean;
   onToggle: () => void;
-  onAnalyze: (s: BloombergStory) => void;
+  onAnalyze: (s: BloombergStory, edition?: string) => void;
   analyzed: Set<string>;
   disabled: boolean;
 }) {
   // Only briefings with fresh stories count toward the visible panel.
   const fresh = digests.filter((d) => (d.today_stories ?? []).length > 0);
+  // Per-group collapse state (keyed by briefing). Undefined = open by default.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   if (fresh.length === 0) return null;
   const totalStories = fresh.reduce((n, d) => n + (d.today_stories?.length ?? 0), 0);
+  const keyOf = (d: BloombergDigest) => d.newsletter_key || d.subject || d.ingested_at || "bb";
 
   return (
     <div className="rounded-xl border border-elevated/30 bg-elevated/5">
@@ -514,16 +535,21 @@ function BloombergPanel({
       </button>
 
       {open ? (
-        <div className="space-y-3 px-3.5 pb-3">
-          {fresh.map((d) => (
-            <BloombergGroup
-              key={d.newsletter_key || d.subject || d.ingested_at}
-              digest={d}
-              analyzed={analyzed}
-              disabled={disabled}
-              onAnalyze={onAnalyze}
-            />
-          ))}
+        <div className="space-y-2 px-3.5 pb-3">
+          {fresh.map((d) => {
+            const k = keyOf(d);
+            return (
+              <BloombergGroup
+                key={k}
+                digest={d}
+                analyzed={analyzed}
+                disabled={disabled}
+                onAnalyze={onAnalyze}
+                open={openGroups[k] !== false}
+                onToggle={() => setOpenGroups((prev) => ({ ...prev, [k]: prev[k] === false ? true : false }))}
+              />
+            );
+          })}
           <p className="text-[10px] leading-relaxed text-fg-faint">
             Each analysis runs through the same CRO framework and counts toward your daily Research budget.
           </p>
