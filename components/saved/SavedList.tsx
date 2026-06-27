@@ -76,7 +76,7 @@ function SavedCard({
   onRemove: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [cardOpen, setCardOpen] = useState(true); // each saved item is collapsible
+  const [cardOpen, setCardOpen] = useState(false); // collapsed by default — tap the title to expand
   const show = (exec?: string, lay?: string) => (learning && lay ? lay : exec) || "";
   const showList = (exec?: string[], lay?: string[]) =>
     (learning && lay && lay.length ? lay : exec) ?? [];

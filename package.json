@@ -1,6 +1,6 @@
 {
   "name": "global-risk-dashboard",
-  "version": "4.5.5",
+  "version": "4.5.6",
   "private": true,
   "description": "Global Risk Intelligence Dashboard \u2014 a morning risk briefing for a global-bank CRO.",
   "scripts": {
