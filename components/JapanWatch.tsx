@@ -2,7 +2,7 @@
 "use client";
 
 import type { Indicator } from "@/lib/types";
-import { Card, TrendArrow, SampleTag } from "./ui";
+import { Card, TrendArrow, SampleTag, Sparkline } from "./ui";
 import { fmtValue, fmtChange } from "@/lib/format";
 
 function JapanCard({ ind }: { ind: Indicator }) {
@@ -21,11 +21,14 @@ function JapanCard({ ind }: { ind: Indicator }) {
         </span>
         {!ind.live ? <SampleTag /> : null}
       </div>
-      <div className="mt-1.5 flex items-end justify-between">
+      <div className="mt-1.5 flex items-end justify-between gap-2">
         <span className="tnum text-xl font-bold tracking-tight text-fg">
           {fmtValue(ind.value, ind)}
         </span>
-        <TrendArrow trend={ind.trend} riskUpIsBad={ind.riskUpIsBad} className="text-sm" />
+        <div className="flex items-center gap-1.5">
+          <Sparkline data={ind.history} riskUpIsBad={ind.riskUpIsBad} />
+          <TrendArrow trend={ind.trend} riskUpIsBad={ind.riskUpIsBad} className="text-sm" />
+        </div>
       </div>
       <div className="mt-0.5 flex items-center justify-between text-2xs">
         <span className="tnum text-fg-faint">prev {fmtValue(ind.previous, ind)}</span>

@@ -15,6 +15,7 @@ export function CollapsibleSection({
   hint,
   defaultOpen = true,
   lockOpen = false,
+  accent,
   children,
 }: {
   id: string;
@@ -23,6 +24,8 @@ export function CollapsibleSection({
   hint?: string;
   defaultOpen?: boolean;
   lockOpen?: boolean;
+  /** V4.6 — optional accent color (hex) for the number badge + a small tick. */
+  accent?: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -60,7 +63,13 @@ export function CollapsibleSection({
           lockOpen ? "cursor-default" : "cursor-pointer"
         }`}
       >
-        <span className="tnum text-2xs font-semibold tracking-widest text-fg-faint">{n}</span>
+        {accent ? <span className="h-3.5 w-1 flex-none rounded-full" style={{ backgroundColor: accent }} /> : null}
+        <span
+          className="tnum text-2xs font-semibold tracking-widest text-fg-faint"
+          style={accent ? { color: accent } : undefined}
+        >
+          {n}
+        </span>
         <span className="text-sm font-semibold uppercase tracking-wide text-fg-muted">{title}</span>
         {hint ? <span className="text-2xs text-fg-faint">{hint}</span> : null}
         {!lockOpen ? (

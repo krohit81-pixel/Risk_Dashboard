@@ -12,6 +12,27 @@ const KIND_LABEL: Record<SavedItem["kind"], string> = {
   analysis: "Research",
 };
 
+// V4.6 — color-code saved cards by kind (and, for Research, by source).
+const KIND_COLOR: Record<SavedItem["kind"], string> = {
+  theme: "#A78BFA", // CRO Conversation — Mizuho purple
+  editorial: "#5B8DEF", // Editorial — steel
+  japan: "#F5A524", // Japan & Asia — amber
+  analysis: "#2DD4A7", // Research — calm green
+};
+
+/** For a Research analysis, derive a short source label + its own accent color. */
+function sourceChip(it: SavedItem): { label: string; color: string } | null {
+  if (it.kind !== "analysis") return null;
+  if (it.sourceLabel?.toLowerCase().startsWith("bloomberg")) return { label: "Bloomberg", color: "#F5A524" };
+  if (it.sourceType === "url") return { label: "URL", color: "#5B8DEF" };
+  if (it.sourceType === "image") return { label: "Screenshot", color: "#A78BFA" };
+  return { label: "Pasted", color: "#8A94A6" };
+}
+
+function pillStyle(hex: string) {
+  return { borderColor: `${hex}66`, backgroundColor: `${hex}1A`, color: hex };
+}
+
 function fmt(iso?: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -102,9 +123,23 @@ function SavedCard({
   return (
     <div className="rounded-xl border border-line bg-ink-800 px-4 py-3">
       <div className="mb-1 flex items-center gap-2">
-        <span className="rounded-full border border-line bg-ink-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-fg-muted">
+        <span
+          className="rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+          style={pillStyle(KIND_COLOR[it.kind])}
+        >
           {KIND_LABEL[it.kind]}
         </span>
+        {(() => {
+          const sc = sourceChip(it);
+          return sc ? (
+            <span
+              className="rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+              style={pillStyle(sc.color)}
+            >
+              {sc.label}
+            </span>
+          ) : null;
+        })()}
         <button onClick={() => onRemove(it.id)} className="ml-auto text-2xs font-semibold text-fg-faint">
           Remove
         </button>

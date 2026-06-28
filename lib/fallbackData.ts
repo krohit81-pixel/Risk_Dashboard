@@ -33,10 +33,10 @@ export const INDICATOR_SCAFFOLD: Omit<Indicator, "trend">[] = [
   // Yield curve: a RISE (steepening) is risk-positive, so riskUpIsBad = false.
   { id: "curve2s10s", label: "Yield Curve 2s10s", group: "Rates", section: "market", value: 0.42, previous: 0.48, unit: "%", decimals: 2, cadence: "Daily", riskUpIsBad: false, live: false },
   // ── Japan group (rendered only in the Japan Watch section) ──
-  { id: "jgb10y", label: "JGB 10Y", group: "Japan", value: 2.69, previous: 2.60, unit: "%", decimals: 2, cadence: "Monthly", riskUpIsBad: true, live: false },
-  { id: "bojrate", label: "BOJ Policy Rate", group: "Japan", value: 0.50, previous: 0.50, unit: "%", decimals: 2, cadence: "Monthly", riskUpIsBad: true, live: false },
-  { id: "nikkei", label: "Nikkei 225", group: "Japan", value: 38500, previous: 39000, unit: "index", decimals: 0, cadence: "Daily", riskUpIsBad: false, live: false },
-  { id: "japancpi", label: "Japan CPI (YoY)", group: "Japan", value: 3.0, previous: 2.8, unit: "%", decimals: 1, cadence: "Monthly", riskUpIsBad: true, live: false },
+  { id: "jgb10y", label: "JGB 10Y", group: "Japan", value: 2.69, previous: 2.60, unit: "%", decimals: 2, cadence: "Monthly", riskUpIsBad: true, live: false, history: [1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.45, 2.5, 2.55, 2.6, 2.6, 2.6, 2.69] },
+  { id: "bojrate", label: "BOJ Policy Rate", group: "Japan", value: 0.50, previous: 0.50, unit: "%", decimals: 2, cadence: "Monthly", riskUpIsBad: true, live: false, history: [0.1, 0.1, 0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] },
+  { id: "nikkei", label: "Nikkei 225", group: "Japan", value: 38500, previous: 39000, unit: "index", decimals: 0, cadence: "Daily", riskUpIsBad: false, live: false, history: [37000, 37500, 38000, 39200, 38800, 40000, 39500, 38900, 39400, 39800, 39200, 39000, 38500] },
+  { id: "japancpi", label: "Japan CPI (YoY)", group: "Japan", value: 3.0, previous: 2.8, unit: "%", decimals: 1, cadence: "Monthly", riskUpIsBad: true, live: false, history: [2.2, 2.5, 2.7, 2.9, 3.3, 3.6, 3.0, 2.7, 2.5, 2.9, 2.7, 2.8, 3.0] },
 ];
 
 // A standing CRO watch-list. Editorial — tailor to your institution.

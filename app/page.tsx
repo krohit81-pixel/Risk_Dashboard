@@ -335,20 +335,20 @@ export default function Page() {
             {/* ===== LEARN ===== */}
             {tab === "learn" ? (
               <>
-                <CollapsibleSection id="analyses" n="01" title="Saved Analyses" hint={`${savedAnalyses.length} item${savedAnalyses.length === 1 ? "" : "s"}`} defaultOpen={savedAnalyses.length > 0}>
+                <CollapsibleSection id="analyses" n="01" title="Saved Analyses" accent="#2DD4A7" hint={`${savedAnalyses.length} item${savedAnalyses.length === 1 ? "" : "s"}`} defaultOpen={savedAnalyses.length > 0}>
                   <SavedList items={savedAnalyses} onRemove={removeSavedItem} />
                 </CollapsibleSection>
-                <CollapsibleSection id="saved" n="02" title="Saved for Later" hint={`${savedDaily.length} item${savedDaily.length === 1 ? "" : "s"}`} defaultOpen={savedDaily.length > 0}>
+                <CollapsibleSection id="saved" n="02" title="Saved for Later" accent="#A78BFA" hint={`${savedDaily.length} item${savedDaily.length === 1 ? "" : "s"}`} defaultOpen={savedDaily.length > 0}>
                   <SavedList items={savedDaily} onRemove={removeSavedItem} />
                 </CollapsibleSection>
-                <CollapsibleSection id="library" n="03" title="Concept Library" hint="your growing glossary" defaultOpen>
+                <CollapsibleSection id="library" n="03" title="Concept Library" accent="#5B8DEF" hint="your growing glossary" defaultOpen>
                   <ConceptLibrary
                     conceptSeen={data.conceptSeen ?? {}}
                     openId={openConceptId}
                     onConsumeOpen={() => setOpenConceptId(null)}
                   />
                 </CollapsibleSection>
-                <CollapsibleSection id="weekly" n="04" title="Weekly Learning Summary" hint="generated weekly" defaultOpen={false}>
+                <CollapsibleSection id="weekly" n="04" title="Weekly Learning Summary" accent="#F5A524" hint="generated weekly" defaultOpen={false}>
                   <WeeklyLearningSection data={data.intelligence.weekly} />
                 </CollapsibleSection>
               </>
