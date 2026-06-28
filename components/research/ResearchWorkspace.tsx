@@ -453,19 +453,23 @@ function BloombergGroup({
   const dateLabel = digest.publication_date
     ? new Date(digest.publication_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })
     : "";
-  const ageDays = digest.publication_date
-    ? Math.floor((Date.now() - new Date(`${digest.publication_date}T00:00:00`).getTime()) / 86400000)
+  // Staleness is about how long since we INGESTED it (KV TTLs at 36h), not how old the
+  // content is — weekly briefings (finews, Bloomberg Weekend) are legitimately a few days old.
+  const ingestedAgeH = digest.ingested_at
+    ? (Date.now() - new Date(digest.ingested_at).getTime()) / 3600000
     : 0;
-
-  // Per-briefing staleness guard: 2+ days old → muted note, not actionable stories.
-  if (ageDays >= 2) {
+  if (digest.ingested_at && ingestedAgeH >= 48) {
     return (
       <div className="rounded-lg border border-line bg-ink-800 px-3 py-2">
-        <p className="text-2xs text-fg-faint">{label} — last digest {dateLabel || "(unknown date)"} · no newer update</p>
+        <p className="text-2xs text-fg-faint">{label} — last refreshed {dateLabel || "(unknown)"} · no newer update</p>
       </div>
     );
   }
-  const freshness = ageDays === 1 ? " · yesterday" : "";
+  // Show the content date with a small relative hint when it's not from today.
+  const contentDays = digest.publication_date
+    ? Math.floor((Date.now() - new Date(`${digest.publication_date}T00:00:00`).getTime()) / 86400000)
+    : 0;
+  const freshness = contentDays <= 0 ? "" : contentDays === 1 ? " · yesterday" : ` · ${contentDays}d ago`;
 
   return (
     <div className="rounded-lg border border-line bg-ink-800/40">

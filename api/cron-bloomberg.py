@@ -235,7 +235,7 @@ def _decode_part(part) -> str:
 
 
 # --- Core Pipeline ---
-def process_bloomberg_inbox():
+def process_bloomberg_inbox(force: bool = False):
     try:
         redis = Redis(url=os.environ["KV_REST_API_URL"], token=os.environ["KV_REST_API_TOKEN"])
         ai_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
@@ -341,7 +341,7 @@ def process_bloomberg_inbox():
             # 1. Dedupe via KV — already-processed mail is skipped (also marked \\Seen below).
             message_id = msg.get("Message-ID", "").strip() or f"fallback_{hash(msg.get('Subject', '') + str(time.time()))}"
             kv_dedupe_key = f"processed_msg:{message_id}"
-            if redis.get(kv_dedupe_key):
+            if redis.get(kv_dedupe_key) and not force:
                 metrics["skipped"] += 1
                 mail.store(e_id, "+FLAGS", "\\Seen")
                 continue
@@ -438,7 +438,8 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"error": "unauthorized"}).encode("utf-8"))
             return
         try:
-            result = process_bloomberg_inbox()
+            force = ("force=1" in self.path) or ("force=true" in self.path.lower())
+            result = process_bloomberg_inbox(force=force)
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
