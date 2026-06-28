@@ -20,11 +20,35 @@ const KIND_COLOR: Record<SavedItem["kind"], string> = {
   analysis: "#2DD4A7", // Research — calm green
 };
 
+/** Friendly site name from a URL host, e.g. cnbc.com → "CNBC". */
+const SITE_NAMES: Record<string, string> = {
+  cnbc: "CNBC", reuters: "Reuters", bloomberg: "Bloomberg", ft: "FT", wsj: "WSJ",
+  nytimes: "NYT", waPo: "WaPo", washingtonpost: "WaPo", economist: "Economist",
+  bbc: "BBC", cnn: "CNN", apnews: "AP", marketwatch: "MarketWatch", barrons: "Barron's",
+  nikkei: "Nikkei", scmp: "SCMP", guardian: "Guardian", politico: "Politico",
+  axios: "Axios", forbes: "Forbes", businessinsider: "BI", yahoo: "Yahoo",
+};
+function siteName(url?: string): string | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    const core = (host.split(".").slice(-2, -1)[0] || host).toLowerCase();
+    return SITE_NAMES[core] || core.charAt(0).toUpperCase() + core.slice(1);
+  } catch {
+    return null;
+  }
+}
+
 /** For a Research analysis, derive a short source label + its own accent color. */
 function sourceChip(it: SavedItem): { label: string; color: string } | null {
   if (it.kind !== "analysis") return null;
-  if (it.sourceLabel?.toLowerCase().startsWith("bloomberg")) return { label: "Bloomberg", color: "#F5A524" };
-  if (it.sourceType === "url") return { label: "URL", color: "#5B8DEF" };
+  // Check both sourceLabel and the older `sources` field so pre-4.6 Bloomberg saves relabel too.
+  const label = (it.sourceLabel || it.sources || "").toLowerCase();
+  if (label.startsWith("bloomberg")) return { label: "Bloomberg", color: "#F5A524" };
+  if (it.sourceType === "url") {
+    const site = siteName(it.originalUrl);
+    return { label: site ? `${site} URL` : "URL", color: "#5B8DEF" };
+  }
   if (it.sourceType === "image") return { label: "Screenshot", color: "#A78BFA" };
   return { label: "Pasted", color: "#8A94A6" };
 }

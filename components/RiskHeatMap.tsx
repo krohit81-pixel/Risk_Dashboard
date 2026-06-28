@@ -30,7 +30,14 @@ function Region({ r }: { r: RegionHeat }) {
         </span>
       </button>
       {open ? (
-        <p className="mt-2 text-[13px] leading-relaxed text-fg-muted">{r.reason}</p>
+        <>
+          <p className="mt-2 text-[13px] leading-relaxed text-fg-muted">{r.reason}</p>
+          {r.reviewedISO ? (
+            <p className="mt-2 text-[10px] text-fg-faint">
+              Reviewed {new Date(r.reviewedISO).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </p>
+          ) : null}
+        </>
       ) : null}
     </Card>
   );

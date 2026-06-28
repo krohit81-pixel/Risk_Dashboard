@@ -31,8 +31,22 @@ from upstash_redis import Redis
 # --- Configuration ---
 MODEL_NAME = "gemini-2.5-flash"
 MAX_RETRIES = 3
-SENDER_DOMAIN = "noreply@news.bloomberg.com"
-LOOKBACK_HOURS = 24  # only consider Bloomberg mail received in the last N hours
+# Transient errors (503 high-demand, 429, 5xx) are worth waiting out with real backoff —
+# a 2s gap just lands in the same spike. Seconds to wait BETWEEN attempts.
+TRANSIENT_BACKOFF = [15, 35]
+TRANSIENT_MARKERS = (
+    "503", "429", "500", "502", "504",
+    "unavailable", "resource_exhausted", "overloaded", "high demand", "try again",
+)
+# ── Configurable ingestion (V4.7) ──
+# IMAP host + credentials. IMAP_EMAIL/IMAP_PASSWORD preferred; AOL_* kept for back-compat.
+IMAP_HOST = os.environ.get("IMAP_HOST", "imap.aol.com")
+# Which senders to ingest (comma-separated From-header substrings). Add CNBC, Reuters, etc.
+INGEST_SENDERS = [s.strip() for s in os.environ.get(
+    "INGEST_SENDERS", "noreply@news.bloomberg.com"
+).split(",") if s.strip()]
+SENDER_DOMAIN = INGEST_SENDERS[0] if INGEST_SENDERS else "noreply@news.bloomberg.com"
+LOOKBACK_HOURS = 24  # only consider mail received in the last N hours
 LATEST_TTL_HOURS = 36  # each per-briefing digest self-expires after this if not refreshed
 RUNS_KEPT = 15  # how many ingestion runs to keep in bloomberg:runs for the Today-tab history
 
@@ -46,6 +60,40 @@ NEWSLETTER_TYPES = [
     {"key": "morning_briefing_asia", "label": "Morning Briefing — Asia", "match": ["morning briefing asia"]},
     {"key": "markets_daily", "label": "Markets Daily", "match": ["markets daily"]},
 ]
+
+# Extra classification entries via env, so new sources/briefings (Bloomberg Weekend, CNBC, …)
+# can be added without a code change. Two accepted formats in EXTRA_NEWSLETTERS:
+#   JSON:    [{"key":"cnbc","label":"CNBC","match":["cnbc"]}, ...]
+#   compact: "CNBC=cnbc;Bloomberg Weekend=bloomberg weekend|weekend reading"
+# (compact: Label=phrase1|phrase2 ; key auto-slugged from the label).
+def _load_extra_newsletters():
+    raw = os.environ.get("EXTRA_NEWSLETTERS", "").strip()
+    if not raw:
+        return []
+    try:
+        if raw.startswith("["):
+            data = json.loads(raw)
+            return [
+                {"key": e["key"], "label": e["label"], "match": [m.lower() for m in e.get("match", [])]}
+                for e in data if e.get("key") and e.get("label")
+            ]
+    except Exception as ex:
+        print(f"[config] EXTRA_NEWSLETTERS JSON parse failed: {ex}")
+        return []
+    out = []
+    for chunk in raw.split(";"):
+        if "=" not in chunk:
+            continue
+        label, phrases = chunk.split("=", 1)
+        label = label.strip()
+        match = [p.strip().lower() for p in phrases.split("|") if p.strip()]
+        if label and match:
+            key = "".join(c if c.isalnum() else "_" for c in label.lower()).strip("_")
+            out.append({"key": key, "label": label, "match": match})
+    return out
+
+
+NEWSLETTER_TYPES = NEWSLETTER_TYPES + _load_extra_newsletters()
 
 
 def _norm(s: str) -> str:
@@ -62,6 +110,13 @@ SUBSCRIBE_RE = re.compile(r"subscribed to bloomberg's (.{3,60}?) newsletter")
 
 def _log_run(redis, emails_found: int, metrics: dict, processed_types) -> dict:
     """Append a capped, newest-first ingestion run record for the Today-tab history."""
+    # Publish the current set of known briefing keys so the dashboard can render
+    # env-added types (CNBC, Bloomberg Weekend, …) without a code change.
+    try:
+        keys = [nt["key"] for nt in NEWSLETTER_TYPES] + ["bloomberg_other"]
+        redis.set("bloomberg:type_index", json.dumps(sorted(set(keys))))
+    except Exception:
+        pass
     run_record = {
         "run_time": datetime.now(timezone.utc).isoformat(),
         "emails_found": emails_found,
@@ -82,6 +137,39 @@ def _log_run(redis, emails_found: int, metrics: dict, processed_types) -> dict:
     except Exception:
         pass
     return run_record
+
+
+def _is_transient(err) -> bool:
+    msg = str(err).lower()
+    return any(m in msg for m in TRANSIENT_MARKERS)
+
+
+def _extract_with_retry(ai_client, system_prompt: str, user_prompt: str) -> dict:
+    """Gemini JSON extraction with transient-aware backoff. Retries 503/429/5xx with real
+    waits (so a high-demand spike clears); fails fast on permanent errors. Raises on give-up
+    — the caller then leaves the email unread so the NEXT cron run retries it."""
+    last_err = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = ai_client.models.generate_content(
+                model=MODEL_NAME,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    response_mime_type="application/json",
+                    temperature=0.1,
+                ),
+            )
+            return json.loads(response.text)
+        except Exception as e:
+            last_err = e
+            if not _is_transient(e):
+                break  # permanent (e.g. bad request) — don't burn the remaining attempts
+            if attempt < MAX_RETRIES - 1:
+                wait = TRANSIENT_BACKOFF[min(attempt, len(TRANSIENT_BACKOFF) - 1)]
+                print(f"Gemini transient ({str(e)[:80]}) — backing off {wait}s")
+                time.sleep(wait)
+    raise RuntimeError(f"Gemini extraction failed: {str(last_err)}")
 
 
 def detect_newsletter(subject: str, html_content: str, text_content: str):
@@ -158,17 +246,28 @@ def process_bloomberg_inbox():
     processed_types = set()
 
     try:
-        mail = imaplib.IMAP4_SSL("imap.aol.com")
-        mail.login(os.environ["AOL_EMAIL"], os.environ["AOL_APP_PASSWORD"])
+        mail = imaplib.IMAP4_SSL(IMAP_HOST)
+        mail.login(
+            os.environ.get("IMAP_EMAIL") or os.environ["AOL_EMAIL"],
+            os.environ.get("IMAP_PASSWORD") or os.environ["AOL_APP_PASSWORD"],
+        )
         mail.select("inbox")
     except Exception as e:
         return {"error": f"IMAP connection failed: {str(e)}"}
 
     # Coarse IMAP filter (SINCE is date-granular) — go back one calendar day so we never
     # miss anything inside the 24h window, then filter precisely by timestamp below.
+    # Union across all configured senders (Bloomberg, CNBC, …).
     since_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%d-%b-%Y")
-    status, messages = mail.search(None, f'(UNSEEN FROM "{SENDER_DOMAIN}" SINCE {since_date})')
-    if not messages[0]:
+    e_ids: list = []
+    seen_ids = set()
+    for sender in INGEST_SENDERS:
+        status, messages = mail.search(None, f'(UNSEEN FROM "{sender}" SINCE {since_date})')
+        for eid in (messages[0].split() if messages and messages[0] else []):
+            if eid not in seen_ids:
+                seen_ids.add(eid)
+                e_ids.append(eid)
+    if not e_ids:
         mail.logout()
         _log_run(redis, 0, metrics, processed_types)
         return {"status": "Complete", "metrics": metrics, "message": "No recent unread Bloomberg emails found."}
@@ -178,7 +277,7 @@ def process_bloomberg_inbox():
     # Fetch candidates, parse their dates, keep only those within the lookback window,
     # and sort ascending so the NEWEST email is processed last → bloomberg:latest = newest.
     candidates = []
-    for e_id in messages[0].split():
+    for e_id in e_ids:
         try:
             status, res = mail.fetch(e_id, "(RFC822)")
             raw_email_bytes = next(r[1] for r in res if isinstance(r, tuple))
@@ -276,39 +375,20 @@ def process_bloomberg_inbox():
             # Deterministic briefing classification (footer subscription line → subject/alt → body).
             nl_key, nl_label = detect_newsletter(subject, html_content, text_content)
 
-            # 4. Gemini extraction (retry)
+            # 4. Gemini extraction with transient-aware backoff.
             user_prompt = (
                 f"Expected Schema:\n{schema_template}\n\n"
                 f"Subject: {subject}\nDate: {pub_date_str}\n\n"
                 f"Newsletter Content:\n{cleaned_text}"
             )
-            extracted_data, last_err = None, None
-            for _ in range(MAX_RETRIES):
-                try:
-                    response = ai_client.models.generate_content(
-                        model=MODEL_NAME,
-                        contents=user_prompt,
-                        config=types.GenerateContentConfig(
-                            system_instruction=system_prompt,
-                            response_mime_type="application/json",
-                            temperature=0.1,
-                        ),
-                    )
-                    extracted_data = json.loads(response.text)
-                    # Override model guesses with deterministic metadata.
-                    extracted_data["subject"] = subject
-                    extracted_data["publication_date"] = pub_date_str
-                    extracted_data["newsletter_key"] = nl_key
-                    extracted_data["newsletter_type"] = nl_label
-                    extracted_data["edition"] = nl_label
-                    extracted_data["ingested_at"] = datetime.now(timezone.utc).isoformat()
-                    break
-                except Exception as e:
-                    last_err = e
-                    time.sleep(2)
-
-            if not extracted_data:
-                raise RuntimeError(f"Gemini extraction failed: {str(last_err)}")
+            extracted_data = _extract_with_retry(ai_client, system_prompt, user_prompt)
+            # Override model guesses with deterministic metadata.
+            extracted_data["subject"] = subject
+            extracted_data["publication_date"] = pub_date_str
+            extracted_data["newsletter_key"] = nl_key
+            extracted_data["newsletter_type"] = nl_label
+            extracted_data["edition"] = nl_label
+            extracted_data["ingested_at"] = datetime.now(timezone.utc).isoformat()
 
             # 5. KV storage — ONE key PER BRIEFING, each with its own TTL. The morning and
             # evening briefs coexist; the same briefing next day overwrites only its own key;

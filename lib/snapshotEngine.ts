@@ -196,13 +196,14 @@ const JP_TERMS = /japan|boj|jgb|yen|nikkei|tokyo/i;
 async function interpretClusters(
   clusters: Cluster[],
   indicators: Indicator[],
-  opts: { forceProvider?: "anthropic" } = {}
+  opts: { forceProvider?: "anthropic"; sharpen?: boolean } = {}
 ): Promise<{ intel: IntelligenceLayer | null; provider: "gemini" | "anthropic" | "none"; reason: LlmReason }> {
   const payload = clusters.slice(0, 5).map((c) => ({
     topic: c.topic,
     sources: [...new Set(c.stories.map((s) => s.source))],
     stories: c.stories.slice(0, 3).map((s) => ({ title: s.title, summary: s.summary })),
   }));
+  const clusterCount = payload.length;
 
   const JP = ["japan", "boj", "jgb", "yen", "nikkei", "tokyo"];
   const hasJapanNews = clusters.some((c) =>
@@ -216,7 +217,7 @@ async function interpretClusters(
     ? `,\n  "japanAsia": { "horizon", "narrative", "mizuho" (3 strings), "lens": {"kind","question"}, "signals" (3-5 strings), "questions" (3 strings), "whatToUnderstand", "source", "confidence", "interpretation": true }`
     : "";
 
-  const user = `Story clusters (interpret ONLY these — do not add facts):
+  const user = `${opts.sharpen ? `IMPORTANT: a previous attempt under-produced. You have ${clusterCount} clusters — return ONE theme per cluster (${clusterCount} themes, all expanded). Do NOT collapse multiple clusters into a single theme.\n\n` : ""}Story clusters (interpret ONLY these — do not add facts):
 ${JSON.stringify(payload, null, 2)}
 
 Return ONE JSON object with this exact shape (no prose outside the JSON):
@@ -225,8 +226,9 @@ Return ONE JSON object with this exact shape (no prose outside the JSON):
   "editorial": [ { "id", "category", "severity", "horizon", "title", "whatHappened", "whyItMatters", "firstOrder", "secondOrder", "bankRiskKind", "bankRisk", "keyTakeaway", "whatToUnderstand", "source", "confidence" } ]${japanSchema}
 }
 Rules:
-- 3-5 themes (all expanded), 1-2 editorial cards${hasJapanNews ? ", one japanAsia object built ONLY from Japan/BOJ/yen/JGB/Nikkei stories" : ""}.
-- Each story cluster may anchor only ONE output item. Do NOT repeat the same development across a theme and an editorial card — editorial cards MUST cover different stories than the themes.
+- You have ${clusterCount} story clusters. Produce ONE theme per cluster — target ${clusterCount} themes, all expanded${hasJapanNews ? ", plus one japanAsia object built ONLY from Japan/BOJ/yen/JGB/Nikkei stories" : ""}.
+- Editorial cards are OPTIONAL. ${clusterCount > 3 ? "You MAY add 1-2 editorial cards, drawn ONLY from clusters NOT already used by a theme." : `With ${clusterCount} clusters, return an EMPTY editorial array ([]) and use every cluster as a theme — do not hold clusters back.`}
+- Each story cluster may anchor only ONE output item (a theme OR an editorial card), never both. Do NOT repeat the same development across a theme and an editorial card.
 - PRIORITISATION: the reader is onboarding with Mizuho **Americas**. Rank US-relevant developments FIRST — Federal Reserve / FOMC, the Treasury market and funding (issuance, repo/SOFR, liquidity), US credit (IG/HY spreads, private credit, leveraged loans/CLOs), the US banking sector (regional-bank stress, CRE, deposits, capital — SLR / Basel III endgame), US capital markets and US regulation (Fed/OCC/FDIC). Favour US banking/credit/regulatory specificity over generic US macro headlines. Keep Japan/BOJ/JGB/USDJPY developments as important secondary context (they also surface in the dedicated Japan section). Europe/EMEA is tertiary for now.
 - Rank by CRO relevance, not popularity. Keep each field concise. JSON only.`;
 
@@ -575,10 +577,16 @@ export async function generateSnapshot(
   } else if (clusters.length > 0) {
     let interp = await interpretClusters(clusters, indicators);
     console.log(`[gen] llm provider=${interp.provider} reason=${interp.reason}`);
-    // Retry once on invalid/unusable JSON — ESCALATE to Anthropic rather than re-trying
-    // Gemini (which just under-produced). Gives the backup a real chance before last-good.
+    // On under-production from Gemini, first RE-ASK Gemini once with a sharpened instruction
+    // (it usually just collapsed clusters into too few themes). Only if that still fails do we
+    // escalate to Anthropic — keeping the morning run on the primary provider where possible.
+    if (!interp.intel && interp.reason === "invalid_json" && interp.provider === "gemini") {
+      console.log("[gen] under-production → re-asking Gemini once (sharpened)");
+      interp = await interpretClusters(clusters, indicators, { sharpen: true });
+      console.log(`[gen] gemini re-ask provider=${interp.provider} reason=${interp.reason}`);
+    }
     if (!interp.intel && interp.reason === "invalid_json") {
-      console.log("[gen] invalid/unusable JSON → retrying once on Anthropic");
+      console.log("[gen] still unusable → escalating to Anthropic");
       interp = await interpretClusters(clusters, indicators, { forceProvider: "anthropic" });
       console.log(`[gen] retry provider=${interp.provider} reason=${interp.reason}`);
     }

@@ -58,6 +58,8 @@ export interface EmergingRisk {
   trend: Trend;
   note: string;
   noteLayman?: string;
+  /** V4.7 — when the weekly job last reviewed this risk (ISO). */
+  reviewedISO?: string;
 }
 
 export interface RegionHeat {
@@ -65,6 +67,8 @@ export interface RegionHeat {
   flag: string;
   heat: Heat;
   reason: string;
+  /** V4.7 — when the weekly job last reviewed this region (ISO). */
+  reviewedISO?: string;
 }
 
 export interface BankImplication {

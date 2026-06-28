@@ -4,6 +4,12 @@
 import type { EmergingRisk } from "@/lib/types";
 import { Card, TrendArrow } from "./ui";
 
+/** Short "reviewed" date, e.g. "Jun 27". */
+function fmtReviewed(iso: string): string {
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 const PROB_COLOR: Record<EmergingRisk["probability"], string> = {
   Low: "text-calm",
   Medium: "text-elevated",
@@ -44,6 +50,9 @@ export function EmergingRisks({ risks }: { risks: EmergingRisk[] }) {
                 color={r.trend === "up" ? "text-stress" : r.trend === "down" ? "text-calm" : "text-fg-muted"}
               />
             </div>
+            {r.reviewedISO ? (
+              <p className="mt-2.5 text-[10px] text-fg-faint">Reviewed {fmtReviewed(r.reviewedISO)}</p>
+            ) : null}
           </Card>
         ))}
       </div>

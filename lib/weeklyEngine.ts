@@ -49,10 +49,20 @@ async function buildWeekContext(): Promise<{ ctx: string; indicators: Awaited<Re
     .slice(0, 16)
     .join("\n");
 
+  const fmtD = (n: number, dec: number) => (n >= 0 ? "+" : "") + n.toFixed(dec);
   const indLines = indicators
-    .filter((i) => i.live)
-    .slice(0, 14)
-    .map((i) => `- ${i.label}: ${i.value ?? "n/a"}${i.unit ? " " + i.unit : ""} (trend ${i.trend})`)
+    .filter((i) => i.live && i.value != null)
+    .slice(0, 16)
+    .map((i) => {
+      const dec = i.decimals ?? 2;
+      const parts = [`${i.label}: ${i.value}${i.unit ? " " + i.unit : ""}`];
+      if (i.previous != null) parts.push(`prev ${i.previous}, \u0394 ${fmtD((i.value as number) - i.previous, dec)}`);
+      if (Array.isArray(i.history) && i.history.length >= 6 && i.cadence === "Daily") {
+        parts.push(`w/w ${fmtD((i.value as number) - i.history[i.history.length - 6], dec)}`);
+      }
+      parts.push(`trend ${i.trend}`);
+      return `- ${parts.join("; ")}`;
+    })
     .join("\n");
 
   const ctx = `THIS WEEK'S RISK THEMES (from daily snapshots):\n${themeLines || "- (no themes captured)"}\n\nCURRENT MARKET INDICATORS:\n${indLines || "- (no live indicators)"}`;
@@ -85,9 +95,9 @@ async function reRateMarkets(ctx: string): Promise<{
   };
 
   const system =
-    "You are a global-bank CRO updating a weekly risk dashboard. You RE-RATE an existing curated framework against this week's evidence. " +
+    "You are a global-bank CRO updating a weekly risk dashboard. You RE-RATE an existing curated framework against THIS WEEK'S evidence, which includes week-over-week indicator moves (deltas). " +
     "You MUST NOT invent new regions, new risk ids, or new implication developments — keep every region/id/development EXACTLY as given. " +
-    "Only update the ratings and the one-line reads to reflect the week. Be measured; do not over-react to a single data point.";
+    "The ratings shown in the spine are LAST WEEK'S — re-evaluate each from this week's evidence rather than defaulting to them. Move a rating up or down when the week's moves support it (a notable widening in spreads, a jump in vol, a shift in the inflation print); hold it only when the evidence genuinely hasn't shifted. Avoid BOTH over-reacting to a single data point AND rubber-stamping last week. Always rewrite each one-line read to reflect this week's specifics.";
 
   const user = `Here is the current curated spine (JSON):
 ${JSON.stringify(spine)}
@@ -143,12 +153,13 @@ JSON only.`;
 
 /** Merge re-rated values onto the curated spine, preserving labels and rejecting junk. */
 function mergeMarkets(rr: NonNullable<Awaited<ReturnType<typeof reRateMarkets>>>): WeeklyMarkets {
+  const reviewedISO = new Date().toISOString(); // every region/risk is reviewed this run
   const heatByRegion = new Map((rr.heatMap ?? []).map((h) => [h.region, h]));
   const heatMap: RegionHeat[] = HEAT_MAP_BASE.map((base) => {
     const u = heatByRegion.get(base.region);
     const heat = u && (HEATS as string[]).includes(u.heat) ? (u.heat as Heat) : base.heat;
     const reason = u && typeof u.reason === "string" && u.reason.trim() ? u.reason.trim() : base.reason;
-    return { ...base, heat, reason };
+    return { ...base, heat, reason, reviewedISO };
   });
 
   const riskById = new Map((rr.emergingRisks ?? []).map((r) => [r.id, r]));
@@ -161,6 +172,7 @@ function mergeMarkets(rr: NonNullable<Awaited<ReturnType<typeof reRateMarkets>>>
       impact: (IMPACTS as string[]).includes(u.impact) ? (u.impact as EmergingRisk["impact"]) : base.impact,
       trend: (TRENDS as string[]).includes(u.trend) ? (u.trend as Trend) : base.trend,
       note: typeof u.note === "string" && u.note.trim() ? u.note.trim() : base.note,
+      reviewedISO,
     };
   });
 

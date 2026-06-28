@@ -123,8 +123,11 @@ export const BLOOMBERG_TYPE_KEYS = [
 
 /** Read all present per-briefing digests (expired ones return null), freshest first. */
 export async function getBloombergAll(): Promise<import("./types").BloombergDigest[]> {
+  // Prefer the extractor-published index (covers env-added types like CNBC); fall back to the static list.
+  const idx = await kvGet<string[]>("bloomberg:type_index");
+  const keys = Array.isArray(idx) && idx.length ? idx : (BLOOMBERG_TYPE_KEYS as readonly string[]);
   const results = await Promise.all(
-    BLOOMBERG_TYPE_KEYS.map((k) => kvGet<import("./types").BloombergDigest>(`bloomberg:type:${k}`))
+    keys.map((k) => kvGet<import("./types").BloombergDigest>(`bloomberg:type:${k}`))
   );
   const present = results.filter((d): d is import("./types").BloombergDigest => Boolean(d));
   return present.sort((a, b) => (b.ingested_at ?? "").localeCompare(a.ingested_at ?? ""));

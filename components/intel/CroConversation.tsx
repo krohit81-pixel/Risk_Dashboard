@@ -49,66 +49,78 @@ function ThemeCard({ theme: t, raw, learning, onOpenConcept, savedIds, onToggleS
   // themes lose the executive original when the Learning view is active).
   const savedItem: SavedItem = savedFromTheme(raw ?? t, snapshotISO);
   const [open, setOpen] = useState(learning);
+  const [cardOpen, setCardOpen] = useState(false); // V4.7 — collapsed by default; tap title to expand
   return (
     <Card className="px-4 py-3.5">
       <div className="mb-1.5 flex flex-wrap items-center gap-2">
         <Chip>{t.category}</Chip>
         <SeverityPill severity={t.severity} />
         <HorizonPill horizon={t.horizon} />
-        <span className="ml-auto">
-          <PersistenceBadge theme={t} />
-        </span>
+        <PersistenceBadge theme={t} />
       </div>
-      <h3 className="text-[15px] font-semibold leading-snug text-fg">{t.title}</h3>
-      {t.whatsNew ? (
-        <p className="mt-2 rounded-lg border border-calm/30 bg-calm/5 px-2.5 py-1.5 text-2xs leading-relaxed text-calm">
-          <span className="font-semibold">What&rsquo;s new: </span>
-          {t.whatsNew}
-        </p>
-      ) : null}
-      {t.anchor ? (
-        <div className="mt-2">
-          <AnchorChip anchor={t.anchor} />
-        </div>
-      ) : null}
-
-      <LabeledLine label="Why it matters">{t.whyItMatters}</LabeledLine>
-      <LabeledLine label="Banking impact">
-        <Linkify text={t.bankingImpact} onOpen={onOpenConcept} />
-      </LabeledLine>
-      <MizuhoBlock bullets={t.mizuho} />
-      <MizuhoAlignmentBlock items={t.mizuhoAlignment} learning={learning} />
-
-      {/* Go deeper — mechanics/teaching layer */}
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="mt-3 flex w-full items-center gap-1.5 text-left text-xs font-semibold text-steel"
+        onClick={() => setCardOpen((v) => !v)}
+        className="flex w-full items-start gap-2 text-left"
+        aria-expanded={cardOpen}
       >
-        {open ? "\u25be Hide detail" : "\u2192 Go deeper"}
-        <span className="font-normal text-fg-faint">{open ? "" : "\u2014 lenses, signals, talking points"}</span>
+        <h3 className="flex-1 text-[15px] font-semibold leading-snug text-fg">{t.title}</h3>
+        <span className="mt-0.5 flex-none text-xs text-fg-faint">{cardOpen ? "\u25be" : "\u25b8"}</span>
       </button>
 
-      {open ? (
-        <div className="mt-2">
-          <LensBox lenses={t.lenses} />
-          <Signals items={t.signals} />
-          <QuestionsBlock items={t.questions} />
-          <MeetingBlock talkingPoint={t.talkingPoint} followUp={t.followUp} />
-          <UnderstandBlock text={t.whatToUnderstand} />
-        </div>
-      ) : null}
+      {cardOpen ? (
+        <>
+          {t.whatsNew ? (
+            <p className="mt-2 rounded-lg border border-calm/30 bg-calm/5 px-2.5 py-1.5 text-2xs leading-relaxed text-calm">
+              <span className="font-semibold">What&rsquo;s new: </span>
+              {t.whatsNew}
+            </p>
+          ) : null}
+          {t.anchor ? (
+            <div className="mt-2">
+              <AnchorChip anchor={t.anchor} />
+            </div>
+          ) : null}
 
-      <ItemFooter>
-        <SourceLink source={t.source} />
-        <ConfidenceChip confidence={t.confidence} />
-        {t.interpretation ? <InterpretationTag /> : null}
-        {onToggleSave ? (
-          <span className="ml-auto">
-            <SaveButton item={savedItem} saved={Boolean(savedIds?.has(savedItem.id))} onToggle={onToggleSave} />
-          </span>
-        ) : null}
-      </ItemFooter>
+          <LabeledLine label="Why it matters">{t.whyItMatters}</LabeledLine>
+          <LabeledLine label="Banking impact">
+            <Linkify text={t.bankingImpact} onOpen={onOpenConcept} />
+          </LabeledLine>
+          <MizuhoBlock bullets={t.mizuho} />
+          <MizuhoAlignmentBlock items={t.mizuhoAlignment} learning={learning} />
+
+          {/* Go deeper — mechanics/teaching layer */}
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="mt-3 flex w-full items-center gap-1.5 text-left text-xs font-semibold text-steel"
+          >
+            {open ? "\u25be Hide detail" : "\u2192 Go deeper"}
+            <span className="font-normal text-fg-faint">{open ? "" : "\u2014 lenses, signals, talking points"}</span>
+          </button>
+
+          {open ? (
+            <div className="mt-2">
+              <LensBox lenses={t.lenses} />
+              <Signals items={t.signals} />
+              <QuestionsBlock items={t.questions} />
+              <MeetingBlock talkingPoint={t.talkingPoint} followUp={t.followUp} />
+              <UnderstandBlock text={t.whatToUnderstand} />
+            </div>
+          ) : null}
+
+          <ItemFooter>
+            <SourceLink source={t.source} />
+            <ConfidenceChip confidence={t.confidence} />
+            {t.interpretation ? <InterpretationTag /> : null}
+            {onToggleSave ? (
+              <span className="ml-auto">
+                <SaveButton item={savedItem} saved={Boolean(savedIds?.has(savedItem.id))} onToggle={onToggleSave} />
+              </span>
+            ) : null}
+          </ItemFooter>
+        </>
+      ) : null}
     </Card>
   );
 }
