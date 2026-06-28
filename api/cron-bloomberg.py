@@ -273,13 +273,17 @@ def process_bloomberg_inbox():
         return {"status": "Complete", "metrics": metrics, "message": "No recent unread Bloomberg emails found."}
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=LOOKBACK_HOURS)
+    print(f"[bloomberg] {len(e_ids)} unread candidate(s) from {INGEST_SENDERS}; lookback={LOOKBACK_HOURS}h")
 
     # Fetch candidates, parse their dates, keep only those within the lookback window,
-    # and sort ascending so the NEWEST email is processed last → bloomberg:latest = newest.
+    # and sort ascending so the NEWEST email is processed last → newest digest wins.
+    # IMPORTANT: BODY.PEEK[] fetches WITHOUT setting \Seen — so an email we then skip as
+    # too-old is NOT consumed (RFC822 would have marked it read before we even checked).
     candidates = []
+    too_old = 0
     for e_id in e_ids:
         try:
-            status, res = mail.fetch(e_id, "(RFC822)")
+            status, res = mail.fetch(e_id, "(BODY.PEEK[])")
             raw_email_bytes = next(r[1] for r in res if isinstance(r, tuple))
             msg = email.message_from_bytes(raw_email_bytes)
             try:
@@ -289,12 +293,15 @@ def process_bloomberg_inbox():
             except Exception:
                 msg_dt = datetime.now(timezone.utc)
             if msg_dt < cutoff:
-                continue  # older than the 24h window — leave it untouched
+                too_old += 1
+                continue  # older than the lookback window — left UNREAD (peek didn't consume it)
             candidates.append((e_id, msg, msg_dt))
         except Exception as e:
             print(f"Failed to fetch email ID {e_id}: {str(e)}")
             metrics["failed"] += 1
             continue
+    if too_old:
+        print(f"[bloomberg] skipped {too_old} email(s) older than {LOOKBACK_HOURS}h — widen LOOKBACK_HOURS to include them")
 
     if not candidates:
         mail.logout()
