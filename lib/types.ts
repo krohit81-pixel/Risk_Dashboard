@@ -19,17 +19,25 @@ export interface Indicator {
   id: string;
   label: string;
   group: "Macro" | "Markets" | "Rates" | "Credit" | "Volatility" | "FX" | "Commodities" | "Japan";
+  /** V4.6 — top-level split on the Markets page. Daily quotes vs scheduled economic releases. */
+  section?: "market" | "release";
   value: number | null;
   previous: number | null;
   unit: "%" | "pts" | "index" | "usd" | "yen" | "ratio";
   /** Whole-number decimals to display. */
   decimals: number;
   /** Cadence of the "change" figure. */
-  cadence: "Daily" | "Monthly";
+  cadence: "Daily" | "Monthly" | "Quarterly";
   /** Whether a rise in this indicator generally signals MORE risk. */
   riskUpIsBad: boolean;
   trend: Trend;
   live: boolean;
+  /** V4.6 — sparkline series (oldest → newest). */
+  history?: number[];
+  /** V4.6 — true publication date for economic releases (ISO YYYY-MM-DD). */
+  releaseDateISO?: string;
+  /** V4.6 — latest observation's reference period (ISO), fallback label when no release date. */
+  observationDate?: string;
 }
 
 export interface Development {

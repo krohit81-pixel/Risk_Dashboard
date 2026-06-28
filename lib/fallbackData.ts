@@ -14,21 +14,24 @@ import type {
 // Indicator scaffolding. value/previous here are SAMPLE placeholders;
 // the route overwrites them with live readings where available.
 export const INDICATOR_SCAFFOLD: Omit<Indicator, "trend">[] = [
-  { id: "cpi", label: "US CPI (YoY)", group: "Macro", value: 3.1, previous: 3.0, unit: "%", decimals: 1, cadence: "Monthly", riskUpIsBad: true, live: false },
-  { id: "unrate", label: "US Unemployment", group: "Macro", value: 4.1, previous: 4.0, unit: "%", decimals: 1, cadence: "Monthly", riskUpIsBad: true, live: false },
-  { id: "fedfunds", label: "Fed Funds Rate", group: "Macro", value: 4.33, previous: 4.58, unit: "%", decimals: 2, cadence: "Monthly", riskUpIsBad: true, live: false },
-  { id: "sp500", label: "S&P 500", group: "Markets", value: 5970, previous: 5930, unit: "index", decimals: 0, cadence: "Daily", riskUpIsBad: false, live: false },
-  { id: "nasdaq", label: "Nasdaq Composite", group: "Markets", value: 19400, previous: 19250, unit: "index", decimals: 0, cadence: "Daily", riskUpIsBad: false, live: false },
-  { id: "ust10y", label: "US 10Y Treasury", group: "Rates", value: 4.42, previous: 4.36, unit: "%", decimals: 2, cadence: "Daily", riskUpIsBad: true, live: false },
-  { id: "hyspread", label: "US High-Yield Spread", group: "Credit", value: 3.15, previous: 3.10, unit: "%", decimals: 2, cadence: "Daily", riskUpIsBad: true, live: false },
-  { id: "vix", label: "VIX", group: "Volatility", value: 15.8, previous: 14.9, unit: "pts", decimals: 1, cadence: "Daily", riskUpIsBad: true, live: false },
-  { id: "usdjpy", label: "USD / JPY", group: "FX", value: 156.2, previous: 155.4, unit: "yen", decimals: 1, cadence: "Daily", riskUpIsBad: true, live: false },
-  { id: "brent", label: "Brent Crude", group: "Commodities", value: 78.4, previous: 76.9, unit: "usd", decimals: 1, cadence: "Daily", riskUpIsBad: true, live: false },
+  // ── Economic Releases (scheduled: monthly / quarterly) ──
+  { id: "cpi", label: "US CPI (YoY)", group: "Macro", section: "release", value: 3.1, previous: 3.0, unit: "%", decimals: 1, cadence: "Monthly", riskUpIsBad: true, live: false, history: [3.4, 3.3, 3.5, 3.4, 3.3, 3.2, 3.0, 2.9, 3.1, 3.2, 3.0, 3.0, 3.1] },
+  { id: "corepce", label: "Core PCE (YoY)", group: "Macro", section: "release", value: 2.8, previous: 2.7, unit: "%", decimals: 1, cadence: "Monthly", riskUpIsBad: true, live: false, history: [3.0, 2.9, 2.9, 2.8, 2.8, 2.7, 2.7, 2.6, 2.7, 2.8, 2.7, 2.7, 2.8] },
+  { id: "unrate", label: "US Unemployment", group: "Macro", section: "release", value: 4.1, previous: 4.0, unit: "%", decimals: 1, cadence: "Monthly", riskUpIsBad: true, live: false, history: [3.9, 3.9, 4.0, 4.0, 4.1, 4.0, 4.1, 4.2, 4.1, 4.0, 4.1, 4.0, 4.1] },
+  { id: "fedfunds", label: "Fed Funds Rate", group: "Macro", section: "release", value: 4.33, previous: 4.58, unit: "%", decimals: 2, cadence: "Monthly", riskUpIsBad: true, live: false, history: [5.33, 5.33, 5.33, 5.08, 4.83, 4.58, 4.58, 4.33, 4.33, 4.33, 4.33, 4.58, 4.33] },
+  // ── Market Indicators (real-time / daily) ──
+  { id: "sp500", label: "S&P 500", group: "Markets", section: "market", value: 5970, previous: 5930, unit: "index", decimals: 0, cadence: "Daily", riskUpIsBad: false, live: false },
+  { id: "nasdaq", label: "Nasdaq Composite", group: "Markets", section: "market", value: 19400, previous: 19250, unit: "index", decimals: 0, cadence: "Daily", riskUpIsBad: false, live: false },
+  { id: "ust10y", label: "US 10Y Treasury", group: "Rates", section: "market", value: 4.42, previous: 4.36, unit: "%", decimals: 2, cadence: "Daily", riskUpIsBad: true, live: false },
+  { id: "hyspread", label: "US High-Yield Spread", group: "Credit", section: "market", value: 3.15, previous: 3.10, unit: "%", decimals: 2, cadence: "Daily", riskUpIsBad: true, live: false },
+  { id: "vix", label: "VIX", group: "Volatility", section: "market", value: 15.8, previous: 14.9, unit: "pts", decimals: 1, cadence: "Daily", riskUpIsBad: true, live: false },
+  { id: "usdjpy", label: "USD / JPY", group: "FX", section: "market", value: 156.2, previous: 155.4, unit: "yen", decimals: 1, cadence: "Daily", riskUpIsBad: true, live: false },
+  { id: "brent", label: "Brent Crude", group: "Commodities", section: "market", value: 78.4, previous: 76.9, unit: "usd", decimals: 1, cadence: "Daily", riskUpIsBad: true, live: false },
   // ── V2 additions ──
-  { id: "gold", label: "Gold (spot)", group: "Commodities", value: 4090, previous: 4133, unit: "usd", decimals: 0, cadence: "Daily", riskUpIsBad: true, live: false },
-  { id: "move", label: "MOVE Index", group: "Volatility", value: 95.0, previous: 88.0, unit: "pts", decimals: 0, cadence: "Daily", riskUpIsBad: true, live: false },
+  { id: "gold", label: "Gold (spot)", group: "Commodities", section: "market", value: 4090, previous: 4133, unit: "usd", decimals: 0, cadence: "Daily", riskUpIsBad: true, live: false },
+  { id: "move", label: "MOVE Index", group: "Volatility", section: "market", value: 95.0, previous: 88.0, unit: "pts", decimals: 0, cadence: "Daily", riskUpIsBad: true, live: false },
   // Yield curve: a RISE (steepening) is risk-positive, so riskUpIsBad = false.
-  { id: "curve2s10s", label: "Yield Curve 2s10s", group: "Rates", value: 0.42, previous: 0.48, unit: "%", decimals: 2, cadence: "Daily", riskUpIsBad: false, live: false },
+  { id: "curve2s10s", label: "Yield Curve 2s10s", group: "Rates", section: "market", value: 0.42, previous: 0.48, unit: "%", decimals: 2, cadence: "Daily", riskUpIsBad: false, live: false },
   // ── Japan group (rendered only in the Japan Watch section) ──
   { id: "jgb10y", label: "JGB 10Y", group: "Japan", value: 2.69, previous: 2.60, unit: "%", decimals: 2, cadence: "Monthly", riskUpIsBad: true, live: false },
   { id: "bojrate", label: "BOJ Policy Rate", group: "Japan", value: 0.50, previous: 0.50, unit: "%", decimals: 2, cadence: "Monthly", riskUpIsBad: true, live: false },

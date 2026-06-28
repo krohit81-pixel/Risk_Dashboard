@@ -116,3 +116,36 @@ export function SampleTag() {
     </span>
   );
 }
+
+/** V4.6 — tiny inline SVG sparkline (no chart lib). `up` colors by risk direction. */
+export function Sparkline({
+  data,
+  riskUpIsBad = false,
+  className = "",
+}: {
+  data?: number[];
+  riskUpIsBad?: boolean;
+  className?: string;
+}) {
+  if (!data || data.length < 3) return null;
+  const w = 56;
+  const h = 18;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const span = max - min || 1;
+  const pts = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * w;
+      const y = h - ((v - min) / span) * h;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const rising = data[data.length - 1] >= data[0];
+  // Color the line by whether the recent move is risk-positive or risk-negative.
+  const stroke = rising === riskUpIsBad ? "#F2545B" : "#2DD4A7";
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className={className} aria-hidden preserveAspectRatio="none">
+      <polyline points={pts} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
+    </svg>
+  );
+}

@@ -7,6 +7,7 @@ const YF_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
 export interface Quote {
   value: number;
   previous: number;
+  history?: number[]; // recent daily closes, oldest → newest
 }
 
 /**
@@ -14,7 +15,7 @@ export interface Quote {
  * symbol examples: "^GSPC", "^IXIC", "^VIX", "JPY=X", "BZ=F"
  */
 export async function quote(symbol: string): Promise<Quote | null> {
-  const url = `${YF_BASE}/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
+  const url = `${YF_BASE}/${encodeURIComponent(symbol)}?range=1mo&interval=1d`;
   try {
     const res = await fetch(url, {
       headers: {
@@ -53,7 +54,7 @@ export async function quote(symbol: string): Promise<Quote | null> {
     }
 
     if (typeof value !== "number" || typeof previous !== "number") return null;
-    return { value, previous };
+    return { value, previous, history: clean.slice(-22) };
   } catch {
     return null;
   }
