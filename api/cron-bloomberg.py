@@ -46,7 +46,7 @@ INGEST_SENDERS = [s.strip() for s in os.environ.get(
     "INGEST_SENDERS", "noreply@news.bloomberg.com"
 ).split(",") if s.strip()]
 SENDER_DOMAIN = INGEST_SENDERS[0] if INGEST_SENDERS else "noreply@news.bloomberg.com"
-LOOKBACK_HOURS = 24  # only consider mail received in the last N hours
+LOOKBACK_HOURS = int(os.environ.get("LOOKBACK_HOURS", "24"))  # only consider mail from the last N hours
 LATEST_TTL_HOURS = 36  # each per-briefing digest self-expires after this if not refreshed
 RUNS_KEPT = 15  # how many ingestion runs to keep in bloomberg:runs for the Today-tab history
 
@@ -81,7 +81,7 @@ def _load_extra_newsletters():
         print(f"[config] EXTRA_NEWSLETTERS JSON parse failed: {ex}")
         return []
     out = []
-    for chunk in raw.split(";"):
+    for chunk in re.split(r"[;,]", raw):  # accept both ';' and ',' as entry separators
         if "=" not in chunk:
             continue
         label, phrases = chunk.split("=", 1)
@@ -258,7 +258,7 @@ def process_bloomberg_inbox():
     # Coarse IMAP filter (SINCE is date-granular) — go back one calendar day so we never
     # miss anything inside the 24h window, then filter precisely by timestamp below.
     # Union across all configured senders (Bloomberg, CNBC, …).
-    since_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%d-%b-%Y")
+    since_date = (datetime.now(timezone.utc) - timedelta(hours=LOOKBACK_HOURS + 24)).strftime("%d-%b-%Y")
     e_ids: list = []
     seen_ids = set()
     for sender in INGEST_SENDERS:

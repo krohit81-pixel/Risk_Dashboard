@@ -20,9 +20,9 @@ const HORIZON: Record<RiskHorizon, string> = {
   Structural: "text-steel",
 };
 
-export function HorizonPill({ horizon }: { horizon: RiskHorizon }) {
+export function HorizonPill({ horizon, inline = false }: { horizon: RiskHorizon; inline?: boolean }) {
   return (
-    <span className="ml-auto inline-flex items-center gap-1.5 text-2xs">
+    <span className={`inline-flex items-center gap-1.5 text-2xs ${inline ? "" : "ml-auto"}`}>
       <span className={`font-semibold ${HORIZON[horizon]}`}>{horizon}</span>
       <span className="text-fg-faint">risk horizon</span>
     </span>
