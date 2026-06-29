@@ -30,6 +30,8 @@ from upstash_redis import Redis
 
 # --- Configuration ---
 MODEL_NAME = "gemini-2.5-flash"
+# Fallback provider for when Gemini is down for the whole retry window (recurring 503 spikes).
+ANTHROPIC_MODEL = os.environ.get("LLM_MODEL", "claude-haiku-4-5-20251001")
 MAX_RETRIES = 3
 # Transient errors (503 high-demand, 429, 5xx) are worth waiting out with real backoff —
 # a 2s gap just lands in the same spike. Seconds to wait BETWEEN attempts.
@@ -144,10 +146,28 @@ def _is_transient(err) -> bool:
     return any(m in msg for m in TRANSIENT_MARKERS)
 
 
-def _extract_with_retry(ai_client, system_prompt: str, user_prompt: str) -> dict:
+def _extract_with_anthropic(anth_client, system_prompt: str, user_prompt: str) -> dict:
+    """Fallback JSON extraction via Anthropic (claude-haiku) when Gemini is unavailable."""
+    resp = anth_client.messages.create(
+        model=ANTHROPIC_MODEL,
+        max_tokens=4096,
+        temperature=0.1,
+        system=system_prompt + "\nReturn ONLY the JSON object — no markdown fences, no prose.",
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    text = "".join(getattr(b, "text", "") for b in resp.content).strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text[:4].lower() == "json":
+            text = text[4:]
+    return json.loads(text.strip())
+
+
+def _extract_with_retry(ai_client, system_prompt: str, user_prompt: str, anth_client=None) -> dict:
     """Gemini JSON extraction with transient-aware backoff. Retries 503/429/5xx with real
-    waits (so a high-demand spike clears); fails fast on permanent errors. Raises on give-up
-    — the caller then leaves the email unread so the NEXT cron run retries it."""
+    waits (so a high-demand spike clears); fails fast on permanent errors. If Gemini still
+    fails AND an Anthropic client is available, falls back to it once before giving up.
+    Raises on give-up — the caller then leaves the email unread so the NEXT cron run retries."""
     last_err = None
     for attempt in range(MAX_RETRIES):
         try:
@@ -169,7 +189,15 @@ def _extract_with_retry(ai_client, system_prompt: str, user_prompt: str) -> dict
                 wait = TRANSIENT_BACKOFF[min(attempt, len(TRANSIENT_BACKOFF) - 1)]
                 print(f"Gemini transient ({str(e)[:80]}) — backing off {wait}s")
                 time.sleep(wait)
-    raise RuntimeError(f"Gemini extraction failed: {str(last_err)}")
+    # Gemini exhausted (transient spike or permanent error) — try Anthropic once if we have it.
+    if anth_client is not None:
+        try:
+            print(f"Gemini failed ({str(last_err)[:80]}) — falling back to Anthropic")
+            return _extract_with_anthropic(anth_client, system_prompt, user_prompt)
+        except Exception as ae:
+            print(f"Anthropic fallback also failed: {str(ae)[:120]}")
+            last_err = ae
+    raise RuntimeError(f"Extraction failed: {str(last_err)}")
 
 
 def detect_newsletter(subject: str, html_content: str, text_content: str):
@@ -242,6 +270,16 @@ def process_bloomberg_inbox(force: bool = False):
     except KeyError as e:
         return {"error": f"Missing required environment variable: {str(e)}"}
 
+    # Optional Anthropic fallback for when Gemini is down for a whole run. Degrades gracefully
+    # (no fallback) if the package or key is absent — same behaviour as before.
+    anth_client = None
+    try:
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            import anthropic
+            anth_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    except Exception as e:
+        print(f"[config] Anthropic fallback unavailable: {str(e)[:120]}")
+
     metrics = {"processed": 0, "skipped": 0, "failed": 0}
     processed_types = set()
 
@@ -311,11 +349,14 @@ def process_bloomberg_inbox(force: bool = False):
     candidates.sort(key=lambda c: c[2])  # oldest → newest
 
     system_prompt = (
-        "You are a Bloomberg Newsletter Extraction Agent.\n"
-        "Transform Bloomberg newsletters into structured JSON for downstream processing by a Risk Dashboard.\n"
+        "You are a Financial Newsletter Extraction Agent.\n"
+        "Transform financial newsletters (Bloomberg, finews, and similar) into structured JSON for a Risk Dashboard.\n"
         "Do NOT perform risk analysis, market analysis, Mizuho-specific interpretation, or investment recommendations. "
         "Extraction and normalization only.\n"
-        "Ignore newsletter promotions, 'More from Bloomberg', social media links, and unsubscribe text.\n"
+        "Populate today_stories with the newsletter's MAIN featured stories, in order of prominence (typically 5-10). "
+        "Include every substantive article in the body even if its own date differs from the send date — many newsletters "
+        "(e.g. finews) bundle several days of articles into one edition; capture them all. Do not collapse to a single story.\n"
+        "Ignore promotions, advertisements ('ANZEIGE'/'ADVERTORIAL'), 'More from Bloomberg', social links, and unsubscribe text.\n"
         "Return valid JSON matching the requested schema exactly. No markdown. No explanations."
     )
 
@@ -388,7 +429,7 @@ def process_bloomberg_inbox(force: bool = False):
                 f"Subject: {subject}\nDate: {pub_date_str}\n\n"
                 f"Newsletter Content:\n{cleaned_text}"
             )
-            extracted_data = _extract_with_retry(ai_client, system_prompt, user_prompt)
+            extracted_data = _extract_with_retry(ai_client, system_prompt, user_prompt, anth_client=anth_client)
             # Override model guesses with deterministic metadata.
             extracted_data["subject"] = subject
             extracted_data["publication_date"] = pub_date_str

@@ -1,3 +1,4 @@
 google-genai
 beautifulsoup4
 upstash-redis
+anthropic

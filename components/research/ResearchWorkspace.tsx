@@ -531,7 +531,7 @@ function BloombergPanel({
   return (
     <div className="rounded-xl border border-elevated/30 bg-elevated/5">
       <button onClick={onToggle} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left">
-        <span className="text-2xs font-semibold uppercase tracking-wide text-elevated">Bloomberg — today</span>
+        <span className="text-2xs font-semibold uppercase tracking-wide text-elevated">Newsletters — today</span>
         <span className="text-2xs text-fg-faint">{fresh.length} {fresh.length === 1 ? "briefing" : "briefings"}</span>
         <span className="ml-auto text-2xs text-fg-faint">
           {totalStories} {totalStories === 1 ? "story" : "stories"} {open ? "\u25be" : "\u2192"}
