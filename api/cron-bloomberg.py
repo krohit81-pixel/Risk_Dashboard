@@ -287,6 +287,10 @@ def extract_article_links(html_content: str):
         if len(out) >= 40:
             break
     return out
+
+
+def _decode_part(part) -> str:
+    """Safely decode an email part body to text (decode=True is the correct get_payload kwarg)."""
     payload = part.get_payload(decode=True)
     if payload is None:
         return ""
