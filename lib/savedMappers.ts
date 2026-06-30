@@ -14,13 +14,13 @@ const mizuhoLine = (m: { riskName: string; scenarioLabel: string }) =>
 
 /** Research analysis → SavedItem. The analysis already carries both variants. */
 export function savedFromAnalysis(a: ResearchAnalysis): SavedItem {
+  const L = a.layman;
   return {
     id: `analysis-${a.analyzedISO}`,
     kind: "analysis",
     title: a.title,
     interpretation: a.whyItMatters,
-    bankingImpact: a.bankingImpact,
-    bankingImpactAreas: a.bankingImpactAreas,
+    bankingImpact: a.bankRisk || a.bankingImpact, // single bank-risk line, like editorial
     whatHappened: a.whatHappened,
     whyMizuho: (a.mizuhoAlignment ?? []).map(mizuhoLine),
     sources: a.sourceLabel || a.originalUrl || "Pasted text",
@@ -32,9 +32,16 @@ export function savedFromAnalysis(a: ResearchAnalysis): SavedItem {
     relatedConcepts: a.relatedConcepts,
     focus: a.focus,
     layman: {
-      whatHappened: a.layman?.whatHappened,
-      interpretation: a.layman?.whyItMatters,
-      bankingImpact: a.layman?.bankingImpact,
+      whatHappened: L?.whatHappened,
+      interpretation: L?.whyItMatters,
+      bankingImpact: L?.bankingImpact,
+    },
+    // V4.8.1 — carry the editorial-style fields so the saved card matches the live Research card.
+    detail: {
+      firstOrder: a.firstOrder,
+      secondOrder: a.secondOrder,
+      keyTakeaway: a.keyTakeaway,
+      whatToUnderstand: a.whatToUnderstand,
     },
   };
 }

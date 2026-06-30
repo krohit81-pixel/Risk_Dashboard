@@ -13,6 +13,13 @@ import { HorizonPill, UnderstandBlock } from "@/components/intel/intelUi";
 
 const conceptTerm = (id: string) => CONCEPTS.find((c) => c.id === id)?.term ?? id;
 
+/** Trim a newsletter label for the header: "Evening Briefing — Americas" → "Americas — Eve". */
+function shortLabel(label: string): string {
+  const m = label.match(/(morning|evening)\s+briefing\s*[—–-]\s*(.+)/i);
+  if (m) return `${m[2].trim()} — ${m[1].toLowerCase() === "evening" ? "Eve" : "Morn"}`;
+  return label;
+}
+
 export function ResearchWorkspace({
   onOpenConcept,
   onToggleSave,
@@ -509,6 +516,7 @@ function BloombergGroup({
   const stories = digest.today_stories ?? [];
   if (stories.length === 0) return null;
   const label = digest.newsletter_type || digest.edition || "Bloomberg";
+  const displayLabel = shortLabel(label); // trimmed for the header; full `label` still used as source
   const dateLabel = digest.publication_date
     ? new Date(digest.publication_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })
     : "";
@@ -520,21 +528,16 @@ function BloombergGroup({
   if (digest.ingested_at && ingestedAgeH >= 48) {
     return (
       <div className="rounded-lg border border-line bg-ink-800 px-3 py-2">
-        <p className="text-2xs text-fg-faint">{label} — last refreshed {dateLabel || "(unknown)"} · no newer update</p>
+        <p className="text-2xs text-fg-faint">{displayLabel} — last refreshed {dateLabel || "(unknown)"} · no newer update</p>
       </div>
     );
   }
-  // Show the content date with a small relative hint when it's not from today.
-  const contentDays = digest.publication_date
-    ? Math.floor((Date.now() - new Date(`${digest.publication_date}T00:00:00`).getTime()) / 86400000)
-    : 0;
-  const freshness = contentDays <= 0 ? "" : contentDays === 1 ? " · yesterday" : ` · ${contentDays}d ago`;
 
   return (
     <div className="rounded-lg border border-line bg-ink-800/40">
       <button onClick={onToggle} className="flex w-full items-center gap-2 px-3 py-2 text-left">
-        <span className="text-2xs font-semibold uppercase tracking-wide text-elevated">{label}</span>
-        {dateLabel ? <span className="text-2xs text-fg-faint">{dateLabel}{freshness}</span> : null}
+        <span className="text-2xs font-semibold uppercase tracking-wide text-elevated">{displayLabel}</span>
+        {dateLabel ? <span className="text-2xs text-fg-faint">{dateLabel}</span> : null}
         <span className="ml-auto text-2xs text-fg-faint">
           {stories.length} {stories.length === 1 ? "story" : "stories"} {open ? "\u25be" : "\u25b8"}
         </span>

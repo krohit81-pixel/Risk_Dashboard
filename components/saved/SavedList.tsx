@@ -341,8 +341,6 @@ function SavedCard({
                 </>
               ) : null}
               {it.analysisDateISO ? ` · analyzed ${fmt(it.analysisDateISO)}` : ""}
-              {" · saved "}
-              {fmt(it.savedAtISO)}
             </p>
           ) : (
             <p className="mt-1 text-2xs text-fg-faint">
