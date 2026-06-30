@@ -28,7 +28,7 @@ export function BloombergRunHistory({ runs }: { runs?: BloombergRun[] }) {
                 bloomberg
               </span>
               <span className="ml-auto text-fg-faint">
-                {r.processed}/{r.emails_found} processed{r.failed ? ` · ${r.failed} failed` : ""}
+                {r.processed}/{r.emails_found} processed{r.skipped ? ` · ${r.skipped} skipped` : ""}{r.failed ? ` · ${r.failed} failed` : ""}
               </span>
             </div>
           );

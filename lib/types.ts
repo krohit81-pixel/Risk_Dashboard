@@ -309,6 +309,7 @@ export interface BloombergRun {
   run_time: string;
   emails_found: number;
   processed: number;
+  skipped?: number; // V4.8.2 — already-processed / empty-body skips
   failed: number;
   newsletter_types: string[];
 }

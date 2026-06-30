@@ -123,6 +123,7 @@ def _log_run(redis, emails_found: int, metrics: dict, processed_types) -> dict:
         "run_time": datetime.now(timezone.utc).isoformat(),
         "emails_found": emails_found,
         "processed": metrics.get("processed", 0),
+        "skipped": metrics.get("skipped", 0),
         "failed": metrics.get("failed", 0),
         "newsletter_types": sorted(processed_types) if processed_types else [],
     }
@@ -410,10 +411,12 @@ def process_bloomberg_inbox(force: bool = False):
     for e_id, msg, msg_dt in candidates:
         try:
             # 1. Dedupe via KV — already-processed mail is skipped (also marked \\Seen below).
+            raw_subject = (msg.get("Subject", "") or "").replace("\n", " ")[:60]
             message_id = msg.get("Message-ID", "").strip() or f"fallback_{hash(msg.get('Subject', '') + str(time.time()))}"
             kv_dedupe_key = f"processed_msg:{message_id}"
             if redis.get(kv_dedupe_key) and not force:
                 metrics["skipped"] += 1
+                print(f"[bloomberg] skip — already processed (use ?force=true to redo): \"{raw_subject}\" [{message_id[:48]}]")
                 mail.store(e_id, "+FLAGS", "\\Seen")
                 continue
 
@@ -447,11 +450,13 @@ def process_bloomberg_inbox(force: bool = False):
             cleaned_text = clean_html(html_content) if html_content else text_content
             if not cleaned_text.strip():
                 metrics["skipped"] += 1
+                print(f"[bloomberg] skip — empty body after cleaning: \"{raw_subject}\"")
                 mail.store(e_id, "+FLAGS", "\\Seen")
                 continue
 
             # Deterministic briefing classification (footer subscription line → subject/alt → body).
             nl_key, nl_label = detect_newsletter(subject, html_content, text_content)
+            print(f"[bloomberg] extracting \"{raw_subject}\" → {nl_label}")
 
             # Per-article links so the model can attach a URL to each story (V4.8).
             article_links = extract_article_links(html_content)
@@ -495,6 +500,10 @@ def process_bloomberg_inbox(force: bool = False):
             continue
 
     mail.logout()
+    print(
+        f"[bloomberg] run done: processed={metrics['processed']} "
+        f"skipped={metrics['skipped']} failed={metrics['failed']} (force={force})"
+    )
     run_record = _log_run(redis, len(candidates), metrics, processed_types)
     return {"status": "Complete", "metrics": metrics, "run": run_record}
 
