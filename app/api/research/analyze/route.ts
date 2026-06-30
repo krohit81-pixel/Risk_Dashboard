@@ -15,6 +15,15 @@ export const maxDuration = 60;
 
 const MIN_USABLE_CHARS = 400;
 
+/** Pull the first http(s) URL from near the start of pasted text (first ~600 chars). */
+function extractLeadingUrl(text: string): string | undefined {
+  const head = text.slice(0, 600);
+  const m = head.match(/https?:\/\/[^\s<>"')\]]+/i);
+  if (!m) return undefined;
+  // Trim trailing punctuation that often clings to a pasted link.
+  return m[0].replace(/[.,;:)\]]+$/, "");
+}
+
 /** Strip HTML to readable-ish text. Lightweight — no readability dependency. */
 function htmlToText(html: string): string {
   return html
@@ -162,7 +171,14 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const analysis = await analyzeContent(text, { sourceType: "text", sourceLabel: body.sourceLabel });
+    // If the user pasted a URL at the top (or anywhere near the start), capture it so the
+    // saved analysis can link back to it. Missing → ignored.
+    const leadingUrl = extractLeadingUrl(text);
+    const analysis = await analyzeContent(text, {
+      sourceType: "text",
+      sourceLabel: body.sourceLabel,
+      originalUrl: leadingUrl,
+    });
     const used = await incrementResearchCount();
     if (body.bloombergHeadline) await addBloombergAnalyzed(body.bloombergHeadline);
     return NextResponse.json({ ok: true, analysis, quota: { ...quota, used, remaining: Math.max(0, quota.cap - used) } });

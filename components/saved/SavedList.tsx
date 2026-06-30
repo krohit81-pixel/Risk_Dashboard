@@ -45,7 +45,7 @@ function sourceChip(it: SavedItem): { label: string; color: string } | null {
   // Check both sourceLabel and the older `sources` field so pre-4.6 Bloomberg saves relabel too.
   const label = (it.sourceLabel || it.sources || "").toLowerCase();
   if (label.startsWith("bloomberg")) return { label: "Bloomberg", color: "#F5A524" };
-  if (it.sourceType === "url") {
+  if (it.originalUrl || it.sourceType === "url") {
     const site = siteName(it.originalUrl);
     return { label: site ? `${site} URL` : "URL", color: "#5B8DEF" };
   }
@@ -175,6 +175,17 @@ function SavedCard({
 
       {cardOpen ? (
         <>
+          {it.originalUrl ? (
+            <a
+              href={it.originalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1.5 inline-flex rounded-lg border border-line px-2.5 py-1 text-2xs font-semibold text-fg-muted active:bg-ink-700"
+            >
+              Read article ↗
+            </a>
+          ) : null}
+
           {show(it.whatHappened, it.layman?.whatHappened) ? (
             <Line label="What happened">{show(it.whatHappened, it.layman?.whatHappened)}</Line>
           ) : null}
@@ -332,14 +343,6 @@ function SavedCard({
           {it.kind === "analysis" ? (
             <p className="mt-1 text-2xs text-fg-faint">
               {it.sourceLabel ? it.sourceLabel : it.sourceType === "url" ? "From URL" : "Pasted text"}
-              {it.originalUrl ? (
-                <>
-                  {" · "}
-                  <a href={it.originalUrl} target="_blank" rel="noopener noreferrer" className="text-steel underline">
-                    open link
-                  </a>
-                </>
-              ) : null}
               {it.analysisDateISO ? ` · analyzed ${fmt(it.analysisDateISO)}` : ""}
             </p>
           ) : (

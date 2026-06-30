@@ -42,6 +42,7 @@ export function ResearchWorkspace({
   const [quota, setQuota] = useState<{ used: number; cap: number; remaining: number } | null>(null);
   const [bloombergDigests, setBloombergDigests] = useState<BloombergDigest[]>([]);
   const [bbOpen, setBbOpen] = useState(true);
+  const [wsOpen, setWsOpen] = useState(false); // V4.8.3 — workspace input collapsed by default
   const [bbAnalyzed, setBbAnalyzed] = useState<Set<string>>(new Set());
 
   // Show remaining Research budget for today (cheap GET, no analysis spent).
@@ -165,10 +166,21 @@ export function ResearchWorkspace({
             disabled={capped || loading}
           />
 
-          <p className="text-[13px] leading-relaxed text-fg-muted">
-            Paste an article, speech, note or report and analyze it through the same CRO framework as the
-            daily briefing. Text is the reliable path; a URL is best-effort (many premium sites block fetching).
-          </p>
+          <button
+            onClick={() => setWsOpen((v) => !v)}
+            className="flex w-full items-center gap-2 rounded-xl border border-line bg-ink-800 px-3.5 py-2.5 text-left"
+          >
+            <span className="text-2xs font-semibold uppercase tracking-wide text-steel">Analyze your own content</span>
+            <span className="ml-auto text-xs text-fg-faint">{wsOpen ? "\u25be" : "\u25b8"}</span>
+          </button>
+
+          {wsOpen ? (
+            <>
+              <p className="text-[13px] leading-relaxed text-fg-muted">
+                Paste an article, speech, note or report and analyze it through the same CRO framework as the
+                daily briefing. Text is the reliable path; a URL is best-effort (many premium sites block fetching).
+                Pasting a link at the top keeps it for &ldquo;Read article&rdquo;.
+              </p>
 
           <div className="flex gap-1.5">
             {(["text", "url", "image"] as const).map((m) => (
@@ -287,6 +299,8 @@ export function ResearchWorkspace({
             <p className="text-center text-[10px] text-fg-faint">
               {quota.remaining} of {quota.cap} analyses left today
             </p>
+          ) : null}
+            </>
           ) : null}
         </>
       ) : (
