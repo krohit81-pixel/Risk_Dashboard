@@ -344,6 +344,7 @@ export interface ResearchAnalysis {
   sourceLabel?: string; // e.g. "Bloomberg · Evening Briefing — Asia"; overrides the default source line
   originalUrl?: string;
   analyzedISO: string;
+  articleDate?: string;   // V4.8.4 — when the source article was published (from URL/text/image); falls back to analyzedISO in UI
   truncated?: boolean;
   provider?: string;
 }

@@ -41,8 +41,8 @@ export function ResearchWorkspace({
   const [learning, setLearning] = useState(false);
   const [quota, setQuota] = useState<{ used: number; cap: number; remaining: number } | null>(null);
   const [bloombergDigests, setBloombergDigests] = useState<BloombergDigest[]>([]);
-  const [bbOpen, setBbOpen] = useState(true);
-  const [wsOpen, setWsOpen] = useState(false); // V4.8.3 — workspace input collapsed by default
+  const [bbOpen, setBbOpen] = useState(false); // V4.8.4 — Newsletters collapsed by default
+  const [wsOpen, setWsOpen] = useState(true); // V4.8.4 — workspace open by default
   const [bbAnalyzed, setBbAnalyzed] = useState<Set<string>>(new Set());
 
   // Show remaining Research budget for today (cheap GET, no analysis spent).
@@ -354,6 +354,11 @@ export function ResearchWorkspace({
               {analysis.horizon ? <HorizonPill horizon={analysis.horizon} inline /> : null}
             </div>
             <h3 className="text-[15px] font-semibold leading-snug text-fg">{analysis.title}</h3>
+            <p className="mt-1 text-2xs text-fg-faint">
+              {analysis.articleDate
+                ? `Published ${new Date(analysis.articleDate).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`
+                : `Analyzed ${new Date(analysis.analyzedISO).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`}
+            </p>
             {analysis.truncated ? (
               <p className="mt-1 text-[10px] text-elevated">Long content — analyzed the first ~4,000 words.</p>
             ) : null}

@@ -28,6 +28,7 @@ export function savedFromAnalysis(a: ResearchAnalysis): SavedItem {
     sourceType: a.sourceType,
     sourceLabel: a.sourceLabel,
     analysisDateISO: a.analyzedISO,
+    articleDate: a.articleDate,
     originalUrl: a.originalUrl,
     relatedConcepts: a.relatedConcepts,
     focus: a.focus,

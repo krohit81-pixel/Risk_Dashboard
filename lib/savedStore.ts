@@ -46,6 +46,7 @@ export interface SavedItem {
   sourceType?: "text" | "url" | "image" | "theme" | "editorial" | "japan";
   sourceLabel?: string;
   analysisDateISO?: string; // when the analysis was generated
+  articleDate?: string; // V4.8.4 — source article publication date (falls back to analysisDateISO in UI)
   originalUrl?: string;     // source URL if analysed from a link
   relatedConcepts?: string[];
   focus?: FocusItem[];      // V4.4 — personalized focus (Research analyses)

@@ -175,6 +175,15 @@ function SavedCard({
 
       {cardOpen ? (
         <>
+          {it.kind === "analysis" ? (
+            <p className="mt-1 text-2xs text-fg-faint">
+              {it.articleDate
+                ? `Published ${fmt(it.articleDate)}`
+                : it.analysisDateISO
+                ? `Analyzed ${fmt(it.analysisDateISO)}`
+                : ""}
+            </p>
+          ) : null}
           {it.originalUrl ? (
             <a
               href={it.originalUrl}

@@ -46,6 +46,30 @@ function canonRiskKind(k: string): string {
   return BANK_RISK_KINDS.includes(k) ? k : "Market";
 }
 
+/** Normalize a model-supplied date string to an ISO date (YYYY-MM-DD); undefined if unparseable. */
+function normalizeDate(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  const s = raw.trim();
+  if (!s || s.length < 6 || /^\d+$/.test(s) || /^(n\/?a|none|unknown|null)$/i.test(s)) return undefined;
+  const t = Date.parse(s);
+  if (Number.isNaN(t)) return undefined;
+  const d = new Date(t);
+  // Guard against absurd parses (e.g. a bare number) — require a plausible recent year.
+  const y = d.getUTCFullYear();
+  if (y < 2000 || y > 2100) return undefined;
+  return d.toISOString().slice(0, 10);
+}
+
+/** Pull a publication date from a URL path like /2026/06/30/ when present. */
+function dateFromUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  const m = url.match(/\/(20\d{2})\/(\d{1,2})\/(\d{1,2})(?:\/|$)/);
+  if (!m) return undefined;
+  const [, y, mo, da] = m;
+  const iso = `${y}-${mo.padStart(2, "0")}-${da.padStart(2, "0")}`;
+  return normalizeDate(iso);
+}
+
 export interface AlignInput {
   title: string;
   why: string;
@@ -147,6 +171,7 @@ ${text}
 Return ONE JSON object (no prose outside it):
 {
   "title": "<concise headline for this content>",
+  "articleDate": "<the date the article/source was published, if stated anywhere in the content (dateline, byline, timestamp) — ISO YYYY-MM-DD; empty string if not present>",
   "category": "<short risk category, e.g. Monetary Policy | Credit Risk | Market Risk | Operational Risk & Resilience | Geopolitics | Regulation>",
   "severity": "Low|Moderate|Elevated|High",
   "horizon": "Immediate|Medium-term|Structural",
@@ -167,6 +192,7 @@ Return ONE JSON object (no prose outside it):
 
   const { data, provider, reason } = await interpretWithProvider<{
     title: string;
+    articleDate: string;
     category: string;
     severity: string;
     horizon: string;
@@ -215,6 +241,7 @@ Return ONE JSON object (no prose outside it):
 
   return {
     title: data.title || "Untitled analysis",
+    articleDate: normalizeDate(data.articleDate) || dateFromUrl(meta.originalUrl),
     category: (data.category || "").trim() || "Risk",
     severity: normalizeSeverity(data.severity),
     horizon: normalizeHorizon(data.horizon),
