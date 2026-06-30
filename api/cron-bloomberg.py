@@ -253,9 +253,39 @@ def clean_html(html_body: str) -> str:
     return "\n".join(lines)
 
 
-def _decode_part(part) -> str:
-    """Safely decode an email part body to text. (Fixes the get_payload kwarg bug —
-    the correct keyword is decode=True, not decode_bytes=True.)"""
+# Hosts/paths that are never article links — skip them so the model only sees real stories.
+_LINK_SOCIAL_HOSTS = ("twitter.com", "x.com", "facebook.com", "linkedin.com", "instagram.com",
+                      "youtube.com", "reddit.com", "bsky.app", "t.me", "whatsapp.com")
+_LINK_JUNK = ("unsubscribe", "/preferences", "privacy", "list-manage", "mailto:", "/profile", "addbook")
+
+
+def extract_article_links(html_content: str):
+    """Return [(anchor_text, url)] for plausible article links, so the model can attach a
+    URL to each extracted story. Filters social/unsubscribe/icon links and short anchors."""
+    if not html_content:
+        return []
+    try:
+        soup = BeautifulSoup(html_content, "html.parser")
+    except Exception:
+        return []
+    out, seen = [], set()
+    for a in soup.find_all("a", href=True):
+        href = (a.get("href") or "").strip()
+        text = " ".join((a.get_text(separator=" ") or "").split())
+        low = href.lower()
+        if not low.startswith("http"):
+            continue
+        if any(h in low for h in _LINK_SOCIAL_HOSTS) or any(w in low for w in _LINK_JUNK):
+            continue
+        if len(text) < 12:  # icons / "click here" / "read more" — headlines are longer
+            continue
+        if href in seen:
+            continue
+        seen.add(href)
+        out.append((text, href))
+        if len(out) >= 40:
+            break
+    return out
     payload = part.get_payload(decode=True)
     if payload is None:
         return ""
@@ -370,7 +400,7 @@ def process_bloomberg_inbox(force: bool = False):
         '  "subject": "",\n'
         '  "lead_editorial": { "author": "", "editorial_text": "" },\n'
         '  "today_stories": [\n'
-        '    { "headline": "", "theme": "", "importance": "high|medium|low", "summary": "" }\n'
+        '    { "headline": "", "theme": "", "importance": "high|medium|low", "summary": "", "url": "" }\n'
         "  ],\n"
         '  "tomorrow_watchlist": [ { "headline": "" } ],\n'
         '  "commute_story": { "headline": "", "summary": "" }\n'
@@ -423,11 +453,22 @@ def process_bloomberg_inbox(force: bool = False):
             # Deterministic briefing classification (footer subscription line → subject/alt → body).
             nl_key, nl_label = detect_newsletter(subject, html_content, text_content)
 
+            # Per-article links so the model can attach a URL to each story (V4.8).
+            article_links = extract_article_links(html_content)
+            links_block = ""
+            if article_links:
+                links_block = (
+                    "\n\nArticle links — set each story's \"url\" to the matching link by headline "
+                    "(use the exact URL; if no clear match, use \"\"):\n"
+                    + "\n".join(f"- {t} => {u}" for t, u in article_links)
+                )
+
             # 4. Gemini extraction with transient-aware backoff.
             user_prompt = (
                 f"Expected Schema:\n{schema_template}\n\n"
                 f"Subject: {subject}\nDate: {pub_date_str}\n\n"
                 f"Newsletter Content:\n{cleaned_text}"
+                f"{links_block}"
             )
             extracted_data = _extract_with_retry(ai_client, system_prompt, user_prompt, anth_client=anth_client)
             # Override model guesses with deterministic metadata.

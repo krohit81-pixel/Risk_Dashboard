@@ -15,13 +15,35 @@ import {
   scenarioById,
   topRiskById,
 } from "./mizuhoTopRisks";
-import type { MizuhoAlignment, Confidence, ResearchAnalysis } from "./types";
+import type { MizuhoAlignment, Confidence, Severity, RiskHorizon, ResearchAnalysis } from "./types";
 
 function normalizeConfidence(c: string): Confidence {
   const v = (c || "").toLowerCase();
   if (v.startsWith("h")) return "High";
   if (v.startsWith("l")) return "Low";
   return "Medium";
+}
+
+const SEVERITIES: Severity[] = ["Low", "Moderate", "Elevated", "High"];
+const HORIZONS: RiskHorizon[] = ["Immediate", "Medium-term", "Structural"];
+function normalizeSeverity(s: string): Severity {
+  const m = SEVERITIES.find((x) => x.toLowerCase() === (s || "").toLowerCase());
+  return m ?? "Moderate";
+}
+function normalizeHorizon(h: string): RiskHorizon {
+  const m = HORIZONS.find((x) => x.toLowerCase() === (h || "").toLowerCase());
+  return m ?? "Medium-term";
+}
+const BANK_RISK_KINDS = ["Credit", "Market", "Liquidity & funding", "Capital", "Operational", "Strategic"];
+function canonRiskKind(k: string): string {
+  const v = (k || "").toLowerCase();
+  if (v.startsWith("credit")) return "Credit";
+  if (v.startsWith("market")) return "Market";
+  if (v.startsWith("liquid") || v.includes("funding")) return "Liquidity & funding";
+  if (v.startsWith("capital")) return "Capital";
+  if (v.startsWith("oper")) return "Operational";
+  if (v.startsWith("strat")) return "Strategic";
+  return BANK_RISK_KINDS.includes(k) ? k : "Market";
 }
 
 export interface AlignInput {
@@ -113,7 +135,8 @@ export async function analyzeContent(content: string, meta: AnalyzeMeta): Promis
   const system =
     "You are a risk-intelligence analyst. Interpret ONLY the supplied content through a CRO lens for " +
     "the incoming Head of Risk at Mizuho (a Japanese global bank), onboarding via Mizuho Americas. " +
-    "Never invent facts, numbers or quotes not present in the content. If the content is not risk/finance " +
+    "Never invent facts, numbers or quotes not present in the content. Cleanly separate SOURCED facts " +
+    "(whatHappened) from your INTERPRETATION (everything else). If the content is not risk/finance " +
     "relevant, say so plainly in whatHappened and keep the other fields brief. JSON only.";
 
   const user = `Content to analyze${meta.originalUrl ? ` (from ${meta.originalUrl})` : ""}:
@@ -124,26 +147,38 @@ ${text}
 Return ONE JSON object (no prose outside it):
 {
   "title": "<concise headline for this content>",
-  "whatHappened": "<2-3 sentence factual summary of the content>",
-  "whyItMatters": "<macro / market significance>",
-  "bankingImpact": [
-    { "area": "<one of: Credit risk | Market risk | Liquidity & funding | Capital | Operational risk>",
-      "impact": "<the implication for THIS area, executive risk language, grounded in the content>",
-      "layman": "<the same point in plain English, minimal jargon>" }
-  ],
-  "laymanWhatHappened": "<same as whatHappened, plain English, minimal jargon>",
-  "laymanWhyItMatters": "<same as whyItMatters, plain English>"
+  "category": "<short risk category, e.g. Monetary Policy | Credit Risk | Market Risk | Operational Risk & Resilience | Geopolitics | Regulation>",
+  "severity": "Low|Moderate|Elevated|High",
+  "horizon": "Immediate|Medium-term|Structural",
+  "confidence": "Low|Medium|High",
+  "whatHappened": "<2-3 sentence FACTUAL summary, grounded strictly in the content — sourced>",
+  "whyItMatters": "<macro / market / risk significance — your interpretation>",
+  "firstOrder": "<the immediate, direct consequence>",
+  "secondOrder": "<the knock-on / downstream consequence>",
+  "bankRiskKind": "<one of: Credit | Market | Liquidity & funding | Capital | Operational | Strategic>",
+  "bankRisk": "<the specific implication for a global bank, executive risk language, grounded in the content>",
+  "keyTakeaway": "<one-sentence bottom line>",
+  "whatToUnderstand": "<teaching note: the mechanism or concept a non-expert should grasp to follow this>",
+  "laymanWhatHappened": "<whatHappened in plain English, minimal jargon>",
+  "laymanWhyItMatters": "<whyItMatters in plain English>"
 }
-- bankingImpact is an ARRAY. Include ONLY the areas that genuinely apply to this content — omit the rest, do NOT pad with "N/A" or "none".
-- Use ONLY these area labels: "Credit risk", "Market risk", "Liquidity & funding", "Capital", "Operational risk". At most one entry per area.
-- Every area MUST include both "impact" and "layman".
-JSON only.`;
+- Keep each field concise. whatHappened must be sourced (no added facts); the rest is interpretation.
+- Pick exactly one bankRiskKind from the list. JSON only.`;
 
   const { data, provider, reason } = await interpretWithProvider<{
     title: string;
+    category: string;
+    severity: string;
+    horizon: string;
+    confidence: string;
     whatHappened: string;
     whyItMatters: string;
-    bankingImpact: { area: string; impact: string; layman: string }[] | string;
+    firstOrder: string;
+    secondOrder: string;
+    bankRiskKind: string;
+    bankRisk: string;
+    keyTakeaway: string;
+    whatToUnderstand: string;
     laymanWhatHappened: string;
     laymanWhyItMatters: string;
   }>(system, user);
@@ -152,36 +187,12 @@ JSON only.`;
     throw new Error(`analysis failed (reason=${reason})`);
   }
 
-  // Normalise banking impact into bulleted areas. Defensive: the model may
-  // occasionally return a string (old shape) instead of the array — wrap it.
-  const ALLOWED = ["Credit risk", "Market risk", "Liquidity & funding", "Capital", "Operational risk"];
-  const canon = (a: string): string => {
-    const v = (a || "").toLowerCase();
-    if (v.startsWith("credit")) return "Credit risk";
-    if (v.startsWith("market")) return "Market risk";
-    if (v.startsWith("liquid") || v.includes("funding")) return "Liquidity & funding";
-    if (v.startsWith("capital")) return "Capital";
-    if (v.startsWith("oper")) return "Operational risk";
-    return a || "";
-  };
-  let areas: { area: string; impact: string; layman: string }[] = [];
-  if (Array.isArray(data.bankingImpact)) {
-    const seen = new Set<string>();
-    for (const it of data.bankingImpact) {
-      const area = canon(it?.area || "");
-      const impact = (it?.impact || "").trim();
-      if (!ALLOWED.includes(area) || !impact || seen.has(area)) continue;
-      seen.add(area);
-      areas.push({ area, impact, layman: (it?.layman || impact).trim() });
-    }
-  } else if (typeof data.bankingImpact === "string" && data.bankingImpact.trim()) {
-    // Back-compat fallback — single blended string with no per-area split.
-    areas = [{ area: "Banking impact", impact: data.bankingImpact.trim(), layman: data.bankingImpact.trim() }];
-  }
-
-  // Combined strings for back-compat consumers (savedStore, alignment input, fallback render).
-  const impactCombined = areas.map((a) => `${a.area}: ${a.impact}`).join(" ");
-  const laymanImpactCombined = areas.map((a) => `${a.area}: ${a.layman}`).join(" ");
+  const bankRiskKind = canonRiskKind(data.bankRiskKind || "");
+  const bankRisk = (data.bankRisk || "").trim();
+  // Combined string for back-compat consumers (savedStore, alignment input, fallback render).
+  const impactCombined = bankRisk ? `${bankRiskKind}: ${bankRisk}` : "";
+  // One-entry areas list keeps the saved-item / old-render shape valid.
+  const areas = bankRisk ? [{ area: bankRiskKind, impact: bankRisk, layman: bankRisk }] : [];
 
   // Dedicated alignment (shared with editorial) for this single item.
   const [alignment] = await alignToMizuho([
@@ -199,13 +210,23 @@ JSON only.`;
 
   // Related concepts: link ONLY to existing curated concepts (never auto-create).
   const relatedConcepts = detectConcepts(
-    `${data.title} ${data.whatHappened} ${data.whyItMatters} ${impactCombined}`
+    `${data.title} ${data.whatHappened} ${data.whyItMatters} ${impactCombined} ${data.firstOrder || ""} ${data.secondOrder || ""}`
   );
 
   return {
     title: data.title || "Untitled analysis",
+    category: (data.category || "").trim() || "Risk",
+    severity: normalizeSeverity(data.severity),
+    horizon: normalizeHorizon(data.horizon),
+    confidence: normalizeConfidence(data.confidence),
     whatHappened: data.whatHappened,
     whyItMatters: data.whyItMatters || "",
+    firstOrder: (data.firstOrder || "").trim(),
+    secondOrder: (data.secondOrder || "").trim(),
+    bankRiskKind,
+    bankRisk,
+    keyTakeaway: (data.keyTakeaway || "").trim(),
+    whatToUnderstand: (data.whatToUnderstand || "").trim(),
     bankingImpact: impactCombined,
     bankingImpactAreas: areas,
     mizuhoAlignment: alignment ?? [],
@@ -214,7 +235,7 @@ JSON only.`;
     layman: {
       whatHappened: data.laymanWhatHappened || data.whatHappened,
       whyItMatters: data.laymanWhyItMatters || data.whyItMatters || "",
-      bankingImpact: laymanImpactCombined,
+      bankingImpact: impactCombined,
     },
     sourceType: meta.sourceType,
     sourceLabel: meta.sourceLabel,

@@ -2,12 +2,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { ResearchAnalysis, BankingImpactArea, FocusItem, BloombergDigest, BloombergStory } from "@/lib/types";
+import type { ResearchAnalysis, FocusItem, BloombergDigest, BloombergStory } from "@/lib/types";
 import type { ImageInput } from "@/lib/llm";
 import type { SavedItem } from "@/lib/savedStore";
 import { savedFromAnalysis } from "@/lib/savedMappers";
 import { CONCEPTS } from "@/lib/concepts";
 import { MizuhoAlignmentBlock } from "@/components/intel/MizuhoAlignment";
+import { Card, SeverityPill, Chip } from "@/components/ui";
+import { HorizonPill, UnderstandBlock } from "@/components/intel/intelUi";
 
 const conceptTerm = (id: string) => CONCEPTS.find((c) => c.id === id)?.term ?? id;
 
@@ -325,21 +327,66 @@ export function ResearchWorkspace({
           ) : null}
 
           <div className="rounded-xl border border-line bg-ink-800 px-4 py-3.5">
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              {analysis.category ? <Chip>{analysis.category}</Chip> : null}
+              {analysis.severity ? <SeverityPill severity={analysis.severity} /> : null}
+              {analysis.horizon ? <HorizonPill horizon={analysis.horizon} inline /> : null}
+            </div>
             <h3 className="text-[15px] font-semibold leading-snug text-fg">{analysis.title}</h3>
             {analysis.truncated ? (
               <p className="mt-1 text-[10px] text-elevated">Long content — analyzed the first ~4,000 words.</p>
             ) : null}
 
-            <FieldBlock label="What happened" text={show(analysis.whatHappened, analysis.layman?.whatHappened)} />
-            <FieldBlock label="Why it matters" text={show(analysis.whyItMatters, analysis.layman?.whyItMatters)} />
-            <ImpactBlock areas={analysis.bankingImpactAreas} fallback={show(analysis.bankingImpact, analysis.layman?.bankingImpact)} learning={learning} />
+            <p className="mt-2 text-[13px] leading-relaxed text-fg-muted">
+              <span className="text-2xs font-semibold uppercase tracking-wide text-steel">What happened </span>
+              <span className="text-steel">· sourced — </span>
+              {show(analysis.whatHappened, analysis.layman?.whatHappened)}
+            </p>
+            <p className="mt-2 text-[13px] leading-relaxed text-fg-muted">
+              <span className="text-2xs font-semibold uppercase tracking-wide text-elevated">Why it matters </span>
+              <span className="text-elevated">· interpretation — </span>
+              {show(analysis.whyItMatters, analysis.layman?.whyItMatters)}
+            </p>
 
+            {analysis.firstOrder || analysis.secondOrder ? (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-2xs font-semibold uppercase tracking-wide text-steel">First-order</p>
+                  <p className="mt-0.5 text-[13px] leading-relaxed text-fg-muted">{analysis.firstOrder}</p>
+                </div>
+                <div>
+                  <p className="text-2xs font-semibold uppercase tracking-wide text-steel">Second-order</p>
+                  <p className="mt-0.5 text-[13px] leading-relaxed text-fg-muted">{analysis.secondOrder}</p>
+                </div>
+              </div>
+            ) : null}
+
+            {analysis.bankRisk ? (
+              <p className="mt-3 text-[13px] leading-relaxed text-fg-muted">
+                <span className="text-2xs font-semibold uppercase tracking-wide text-steel">
+                  Bank risk · {analysis.bankRiskKind} —{" "}
+                </span>
+                {analysis.bankRisk}
+              </p>
+            ) : null}
+
+            {analysis.keyTakeaway ? (
+              <div className="mt-3 rounded-lg border border-line-soft bg-ink-850 px-3 py-2">
+                <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">Key takeaway</p>
+                <p className="mt-0.5 text-[13px] leading-relaxed text-fg">{analysis.keyTakeaway}</p>
+              </div>
+            ) : null}
+
+            {learning && analysis.whatToUnderstand ? <UnderstandBlock text={analysis.whatToUnderstand} /> : null}
+
+            {/* What should I focus on (reuses the v4.4 personalized focus capability) */}
+            <FocusBlock items={analysis.focus} />
+
+            {/* Mizuho alignment — kept below the editorial fields */}
             <MizuhoAlignmentBlock items={analysis.mizuhoAlignment} learning={learning} />
             {analysis.mizuhoAlignment.length === 0 ? (
               <p className="mt-2 text-2xs text-fg-faint">No clean Mizuho Top-Risk match for this content.</p>
             ) : null}
-
-            <FocusBlock items={analysis.focus} />
 
             {analysis.relatedConcepts.length ? (
               <div className="mt-3">
@@ -416,15 +463,27 @@ function BloombergStoryRow({
           <p className="text-[13px] font-semibold leading-snug text-fg">{story.headline}</p>
           {story.theme ? <p className="mt-0.5 text-2xs text-fg-faint">{story.theme}</p> : null}
           {story.summary ? <p className="mt-1 text-[12px] leading-relaxed text-fg-muted">{story.summary}</p> : null}
-          <button
-            onClick={() => onAnalyze(story)}
-            disabled={disabled || done}
-            className={`mt-2 rounded-lg px-2.5 py-1 text-2xs font-semibold transition ${
-              done ? "bg-ink-700 text-fg-faint" : disabled ? "bg-ink-800 text-fg-faint" : "bg-steel/15 text-steel active:bg-steel/25"
-            }`}
-          >
-            {done ? "✓ Analyzed" : "Analyze this →"}
-          </button>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={() => onAnalyze(story)}
+              disabled={disabled || done}
+              className={`rounded-lg px-2.5 py-1 text-2xs font-semibold transition ${
+                done ? "bg-ink-700 text-fg-faint" : disabled ? "bg-ink-800 text-fg-faint" : "bg-steel/15 text-steel active:bg-steel/25"
+              }`}
+            >
+              {done ? "✓ Analyzed" : "Analyze this →"}
+            </button>
+            {story.url ? (
+              <a
+                href={story.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg border border-line px-2.5 py-1 text-2xs font-semibold text-fg-muted active:bg-ink-700"
+              >
+                Read article ↗
+              </a>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
@@ -522,7 +581,7 @@ function BloombergPanel({
 }) {
   // Only briefings with fresh stories count toward the visible panel.
   const fresh = digests.filter((d) => (d.today_stories ?? []).length > 0);
-  // Per-group collapse state (keyed by briefing). Undefined = open by default.
+  // Per-group collapse state (keyed by briefing). Collapsed by default (V4.8).
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   if (fresh.length === 0) return null;
   const totalStories = fresh.reduce((n, d) => n + (d.today_stories?.length ?? 0), 0);
@@ -549,8 +608,8 @@ function BloombergPanel({
                 analyzed={analyzed}
                 disabled={disabled}
                 onAnalyze={onAnalyze}
-                open={openGroups[k] !== false}
-                onToggle={() => setOpenGroups((prev) => ({ ...prev, [k]: prev[k] === false ? true : false }))}
+                open={openGroups[k] === true}
+                onToggle={() => setOpenGroups((prev) => ({ ...prev, [k]: prev[k] === true ? false : true }))}
               />
             );
           })}
@@ -580,47 +639,6 @@ export function FocusBlock({ items }: { items?: FocusItem[] }) {
           <li key={i} className="text-[13px] leading-relaxed text-fg-muted">
             <span className="font-semibold text-elevated">{FOCUS_KIND[f.kind]} — </span>
             {f.text}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function FieldBlock({ label, text }: { label: string; text: string }) {
-  if (!text) return null;
-  return (
-    <p className="mt-2.5 text-[13.5px] leading-relaxed text-fg-muted">
-      <span className="font-semibold uppercase tracking-wide text-steel text-2xs">{label}</span>{" "}
-      <span className="align-middle">{text}</span>
-    </p>
-  );
-}
-
-function ImpactBlock({
-  areas,
-  fallback,
-  learning,
-}: {
-  areas?: BankingImpactArea[];
-  fallback: string;
-  learning: boolean;
-}) {
-  // No structured areas (older analysis or single blended string) → render as before.
-  if (!areas || areas.length === 0) {
-    return <FieldBlock label="Banking impact" text={fallback} />;
-  }
-  return (
-    <div className="mt-2.5">
-      <p className="font-semibold uppercase tracking-wide text-steel text-2xs">Banking impact</p>
-      <ul className="mt-1 space-y-1.5">
-        {areas.map((a, i) => (
-          <li key={i} className="flex gap-2 text-[13.5px] leading-relaxed text-fg-muted">
-            <span aria-hidden className="mt-[2px] text-steel">•</span>
-            <span>
-              <span className="font-semibold text-fg">{a.area}.</span>{" "}
-              {learning ? a.layman || a.impact : a.impact}
-            </span>
           </li>
         ))}
       </ul>

@@ -288,6 +288,7 @@ export interface BloombergStory {
   theme?: string;
   importance?: "high" | "medium" | "low";
   summary?: string;
+  url?: string; // V4.8 — link to the original article, extracted from the email
 }
 export interface BloombergDigest {
   source: string;
@@ -315,6 +316,17 @@ export interface BloombergRun {
 /** A single Research-workspace analysis of user-supplied content (ephemeral unless saved). */
 export interface ResearchAnalysis {
   title: string;
+  // V4.8 — editorial-style card fields (mirrors EditorialCard)
+  category?: string;
+  severity?: Severity;
+  horizon?: RiskHorizon;
+  confidence?: Confidence;
+  firstOrder?: string;
+  secondOrder?: string;
+  bankRiskKind?: string;
+  bankRisk?: string;
+  keyTakeaway?: string;
+  whatToUnderstand?: string;           // learning layer
   whatHappened: string;
   whyItMatters: string;
   bankingImpact: string;               // combined string — back-compat (savedStore, alignment input)

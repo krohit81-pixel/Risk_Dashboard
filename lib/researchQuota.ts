@@ -23,10 +23,10 @@
 
 import { kvGet, kvSet, storeAvailable, istDateKey } from "./snapshotStore";
 
-/** Daily Research analysis cap. Env-configurable; defaults to 5 for free-tier (20 RPD). */
+/** Daily Research analysis cap. Env-configurable; defaults to 20 (paid Tier 1 headroom). */
 export const RESEARCH_DAILY_CAP = (() => {
-  const n = parseInt(process.env.RESEARCH_DAILY_CAP || "5", 10);
-  return Number.isFinite(n) && n >= 0 ? n : 5;
+  const n = parseInt(process.env.RESEARCH_DAILY_CAP || "20", 10);
+  return Number.isFinite(n) && n >= 0 ? n : 20;
 })();
 
 const key = (date: string) => `research:count:${date}`;
