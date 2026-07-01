@@ -112,7 +112,7 @@ export function ResearchWorkspace({
     const composed = [story.headline, story.summary].filter(Boolean).join("\n\n");
     if (composed.trim().length < 20) return;
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-    const sourceLabel = edition ? `Bloomberg · ${edition}` : "Bloomberg";
+    const sourceLabel = edition ? `Newsletter · ${edition}` : "Newsletter";
     const ok = await runAnalyze({ mode: "text", text: composed, bloombergHeadline: story.headline, sourceLabel });
     if (ok) setBbAnalyzed((prev) => new Set(prev).add(story.headline));
   }

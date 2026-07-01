@@ -151,7 +151,7 @@ def _extract_with_anthropic(anth_client, system_prompt: str, user_prompt: str) -
     """Fallback JSON extraction via Anthropic (claude-haiku) when Gemini is unavailable."""
     resp = anth_client.messages.create(
         model=ANTHROPIC_MODEL,
-        max_tokens=4096,
+        max_tokens=8192,  # dense JSON is ~2 chars/token; 4096 truncated big Bloomberg briefings mid-string
         temperature=0.1,
         system=system_prompt + "\nReturn ONLY the JSON object — no markdown fences, no prose.",
         messages=[{"role": "user", "content": user_prompt}],

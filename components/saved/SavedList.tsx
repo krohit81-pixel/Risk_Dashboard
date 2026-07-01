@@ -40,11 +40,25 @@ function siteName(url?: string): string | null {
 }
 
 /** For a Research analysis, derive a short source label + its own accent color. */
+/** Short publisher chip for a newsletter edition/label. */
+function newsletterPublisher(edition: string): string {
+  const e = edition.toLowerCase();
+  if (/briefing|markets daily|bloomberg/.test(e)) return "Bloomberg";
+  if (e.includes("finews")) return "finews";
+  if (e.includes("daily upside")) return "Daily Upside";
+  return edition.trim();
+}
+
 function sourceChip(it: SavedItem): { label: string; color: string } | null {
   if (it.kind !== "analysis") return null;
-  // Check both sourceLabel and the older `sources` field so pre-4.6 Bloomberg saves relabel too.
-  const label = (it.sourceLabel || it.sources || "").toLowerCase();
-  if (label.startsWith("bloomberg")) return { label: "Bloomberg", color: "#F5A524" };
+  const raw = it.sourceLabel || it.sources || "";
+  // Newsletter-sourced saves: "Newsletter · <edition>" (v4.9) or legacy "Bloomberg · <edition>".
+  // Derive the real publisher from the edition rather than assuming Bloomberg.
+  const m = raw.match(/^\s*(?:newsletter|bloomberg)\s*·\s*(.+)$/i);
+  if (m) return { label: newsletterPublisher(m[1]), color: "#F5A524" };
+  const label = raw.toLowerCase();
+  if (label.startsWith("bloomberg")) return { label: "Bloomberg", color: "#F5A524" }; // legacy plain "Bloomberg"
+  if (label.startsWith("newsletter")) return { label: "Newsletter", color: "#F5A524" };
   if (it.originalUrl || it.sourceType === "url") {
     const site = siteName(it.originalUrl);
     return { label: site ? `${site} URL` : "URL", color: "#5B8DEF" };
