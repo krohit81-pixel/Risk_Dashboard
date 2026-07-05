@@ -34,6 +34,9 @@ export async function POST(req: Request) {
       bankingImpactAreas: Array.isArray(body.bankingImpactAreas) ? body.bankingImpactAreas : undefined,
       layman: body.layman && typeof body.layman === "object" ? body.layman : undefined,
       detail: body.detail && typeof body.detail === "object" ? body.detail : undefined,
+      // ── V5.1.1 — these were being dropped by the whitelist on persist ──
+      articleDate: body.articleDate ? String(body.articleDate) : undefined,
+      mizuhoLens: body.mizuhoLens && typeof body.mizuhoLens === "object" ? body.mizuhoLens : undefined,
     };
     const items = await addSaved(item);
     return NextResponse.json({ ok: true, items });
