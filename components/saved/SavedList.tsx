@@ -4,6 +4,7 @@
 import { useState } from "react";
 import type { SavedItem } from "@/lib/savedStore";
 import { FocusBlock } from "@/components/research/ResearchWorkspace";
+import { MizuhoLensBlock } from "@/components/intel/MizuhoLensBlock";
 
 const KIND_LABEL: Record<SavedItem["kind"], string> = {
   theme: "CRO Conversation",
@@ -248,6 +249,8 @@ function SavedCard({
           ) : null}
 
           <FocusBlock items={it.focus} />
+
+          <MizuhoLensBlock lens={it.mizuhoLens} />
 
           {hasDetail ? (
             <>

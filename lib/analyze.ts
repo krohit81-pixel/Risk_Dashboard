@@ -10,6 +10,7 @@
 import { interpretWithProvider } from "./llm";
 import { generateFocus } from "./focus";
 import { detectConcepts } from "./concepts";
+import { interpretThroughMizuho } from "./mizuhoKnowledge";
 import {
   topRisksForPrompt,
   scenarioById,
@@ -239,6 +240,19 @@ Return ONE JSON object (no prose outside it):
     `${data.title} ${data.whatHappened} ${data.whyItMatters} ${impactCombined} ${data.firstOrder || ""} ${data.secondOrder || ""}`
   );
 
+  // V5.0 — interpret through Mizuho's disclosed repository (dedicated call; non-fatal).
+  let mizuhoLens: import("./mizuhoKnowledge").MizuhoLens | undefined;
+  try {
+    mizuhoLens =
+      (await interpretThroughMizuho({
+        title: data.title || "",
+        whatHappened: data.whatHappened,
+        whyItMatters: data.whyItMatters || "",
+      })) ?? undefined;
+  } catch {
+    mizuhoLens = undefined;
+  }
+
   return {
     title: data.title || "Untitled analysis",
     articleDate: normalizeDate(data.articleDate) || dateFromUrl(meta.originalUrl),
@@ -268,6 +282,7 @@ Return ONE JSON object (no prose outside it):
     sourceLabel: meta.sourceLabel,
     originalUrl: meta.originalUrl,
     analyzedISO: new Date().toISOString(),
+    mizuhoLens,
     truncated,
     provider,
   };

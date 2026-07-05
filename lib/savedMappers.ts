@@ -29,6 +29,7 @@ export function savedFromAnalysis(a: ResearchAnalysis): SavedItem {
     sourceLabel: a.sourceLabel,
     analysisDateISO: a.analyzedISO,
     articleDate: a.articleDate,
+    mizuhoLens: a.mizuhoLens,
     originalUrl: a.originalUrl,
     relatedConcepts: a.relatedConcepts,
     focus: a.focus,

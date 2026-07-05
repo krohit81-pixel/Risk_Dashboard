@@ -1,8 +1,8 @@
-# Global Risk Intelligence Dashboard — Engineering Reference (v4.8.4)
+# Global Risk Intelligence Dashboard — Engineering Reference (v4.9.0)
 
-> Technical companion to `risk-dashboard-master-context-v4_8_4.md`. File-by-file map, data flows, KV schema, env vars, the Python extractor, the validation workflow, and gotchas. Written so a fresh session can modify the codebase safely without re-reading chat history. Supersedes the v4.7.4 pair.
+> Technical companion to `risk-dashboard-master-context-v4_8_4.md`. File-by-file map, data flows, KV schema, env vars, the Python extractor, the validation workflow, and gotchas. Written so a fresh session can modify the codebase safely without re-reading chat history. Supersedes the v4.8.4 pair.
 
-Repo: `github.com/krohit81-pixel/Risk_Dashboard` (public). Stack: Next.js 14 App Router · TypeScript · Tailwind · Vercel KV (Upstash) · recharts. Deploy: GitHub push → Vercel Pro. Version single-sourced in `lib/version.ts` (`APP_VERSION`) + `package.json`, shown in the Today header. Current: **4.8.4**.
+Repo: `github.com/krohit81-pixel/Risk_Dashboard` (public). Stack: Next.js 14 App Router · TypeScript · Tailwind · Vercel KV (Upstash) · recharts. Deploy: GitHub push → Vercel Pro. Version single-sourced in `lib/version.ts` (`APP_VERSION`) + `package.json`, shown in the Today header. Current: **4.9.0**.
 
 ---
 
@@ -99,8 +99,8 @@ Single Gemini/Anthropic call returns the **editorial-shaped** object, then dedic
   - Two collapse states: `bbOpen` (Newsletters panel, **default false** v4.8.4), `wsOpen` ("Analyze your own content" workspace, **default true** v4.8.4).
   - Analysis result rendered in the **Editorial card format** + source/published date line at top (`articleDate ? "Published …" : "Analyzed …"`) + "What should I focus on" (`FocusBlock`) + Mizuho alignment below + disclaimer.
   - `BloombergPanel` header "Newsletters — today"; `BloombergGroup` per-briefing collapsible (default collapsed), `shortLabel()` trims briefing names ("Evening Briefing — Americas" → "Americas — Eve"), staleness keyed off `ingested_at` (≥48h muted), date-only label.
-  - `BloombergStoryRow` shows "Analyze this →" + "Read article ↗" when `story.url` present.
-- **`saved/SavedList.tsx`** — `sourceChip()`: Bloomberg (from `sourceLabel`||`sources`) → site-name URL tag when `originalUrl` present (covers pasted-with-URL) → Screenshot → Pasted. Saved analysis renders editorial format (via `detail`), a "Read article ↗" link + source/published date line; footer shows only the analyzed date.
+  - `BloombergStoryRow` shows "Analyze this →" + "Read article ↗" when `story.url` present. `analyzeStory` labels a newsletter story `Newsletter · <edition>` (v4.9.0).
+- **`saved/SavedList.tsx`** — `sourceChip()` (v4.9.0): newsletter saves are labelled `Newsletter · <edition>` (was hardcoded `Bloomberg · …`); the chip derives the real publisher from the edition via `newsletterPublisher()` — Bloomberg editions (briefing/markets daily/weekend) → "Bloomberg", finews → "finews", The Daily Upside → "Daily Upside" — and retroactively corrects legacy `Bloomberg · <edition>` saves. Then site-name URL tag when `originalUrl` present → Screenshot → Pasted. Saved analysis renders editorial format (via `detail`), a "Read article ↗" link + source/published date line; footer shows only the analyzed date.
 - **`RunHistory.tsx`** — `BloombergRunHistory`: heading **"Newsletter ingestion"**, badge **"newsletter"**, line shows `processed/found · N skipped · N failed`.
 
 ---
@@ -111,7 +111,7 @@ Single Gemini/Anthropic call returns the **editorial-shaped** object, then dedic
 
 - **Classification** (`detect_newsletter`, 3-tier on RAW email): footer subscription line `subscribed to bloomberg's (.+?) newsletter` → subject+image alt → body. `NEWSLETTER_TYPES` = 5 built-in Bloomberg keys + env extras + `bloomberg_other`.
 - **Extraction prompt** (source-agnostic "Financial Newsletter Extraction Agent"): main featured stories 5-10, include articles dated before send date (finews bundles a week), drop ads. Story schema includes **`url`** (v4.8.0); `links_block` of `(anchor_text → href)` from `extract_article_links` is appended so the model attaches each story's URL.
-- **`_extract_with_retry(ai_client, system, user, anth_client=None)`**: Gemini (`gemini-2.5-flash`, JSON) with `TRANSIENT_BACKOFF=[15,35]`s on 503/429/5xx; fail-fast on permanent; **Anthropic fallback** (`_extract_with_anthropic`, `ANTHROPIC_MODEL`) once if Gemini exhausts; on total give-up raises → email left unread → next run retries. Anthropic client init is guarded (needs `ANTHROPIC_API_KEY` + `anthropic` package).
+- **`_extract_with_retry(ai_client, system, user, anth_client=None)`**: Gemini (`gemini-2.5-flash`, JSON) with `TRANSIENT_BACKOFF=[15,35]`s on 503/429/5xx; fail-fast on permanent; **Anthropic fallback** (`_extract_with_anthropic`, `ANTHROPIC_MODEL`, `max_tokens=8192` — 4096 truncated big briefings' dense JSON mid-string, v4.9.0) once if Gemini exhausts; on total give-up raises → email left unread → next run retries. Anthropic client init is guarded (needs `ANTHROPIC_API_KEY` + `anthropic` package).
 - **Config / flags:** `?force=true` bypasses dedupe (backfills). `EXTRA_NEWSLETTERS` parser accepts `,` or `;` separators (`Label=phrase|phrase`) or JSON. Extractor publishes its key set to `bloomberg:type_index`.
 - **Logging (v4.8.2):** `[bloomberg] N unread candidate(s) … lookback=Xh`; per-candidate `skip — already processed (use ?force=true)` / `skip — empty body` / `extracting "<subject>" → <label>`; `run done: processed=X skipped=Y failed=Z`. Run record includes `processed`, `skipped`, `failed`, `newsletter_types`.
 
@@ -157,9 +157,21 @@ Single Gemini/Anthropic call returns the **editorial-shaped** object, then dedic
 - **UI anti-patterns:** per-card repeated caveats; accidental affordances near common controls; empty/N/A sections; redundant expand/collapse; **double `ml-auto`** in a flex row (floats the middle element — caused the risk-horizon mis-align).
 - **Date parsing** (`normalizeDate`): reject bare numbers / <6-char / junk so a stray token can't masquerade as a publication date.
 - **Python deps in ROOT `requirements.txt`** only.
+- **`py_compile` is not enough when an edit borders a `def`.** A str_replace that swallows a function header leaves the body as valid *unreachable* code, so compile passes but the name is undefined at runtime (hit twice: the `_decode_part` `NameError` in v4.8.5, and the `api/requirements.txt` clobber in v4.8.0). After such edits, run an AST check that every expected helper is defined.
+- **Anthropic JSON output is token-dense (~2 chars/token).** Set `max_tokens` generously on the extractor fallback (8192) or big briefings truncate mid-string → `json.loads` "Unterminated string".
 
 ---
 
 ## 10. Version history (since v4.5.3)
 
-4.5.4 transient backoff · 4.5.5 edition labels/collapsible groups · 4.5.6 saved collapsed · **4.6.0** live CPI+Core PCE / Markets-Releases split / sparklines · 4.6.1 Japan sparkline + Learn colours · **4.7.0** weekly deltas + reviewed dates + CRO collapse/align + source labels + configurable ingest + fewer escalations · 4.7.1 horizon inline + comma parsing + configurable lookback · 4.7.2 `BODY.PEEK` · 4.7.3 ingestion-based staleness + `force` · 4.7.4 "Newsletters — today" + multi-story extraction + extractor Anthropic fallback · **4.8.0** newsletter per-article URLs + collapse + quota 20 + **Research → Editorial format** · 4.8.1 saved research keeps editorial format + trimmed headers + footer date · 4.8.2 dedupe/empty skip logging + skipped count · 4.8.3 pasted-URL capture (Read article + tag) + workspace collapse · **4.8.4** collapse defaults + "Newsletter ingestion" rename + **article source date**.
+4.5.4 transient backoff · 4.5.5 edition labels/collapsible groups · 4.5.6 saved collapsed · **4.6.0** live CPI+Core PCE / Markets-Releases split / sparklines · 4.6.1 Japan sparkline + Learn colours · **4.7.0** weekly deltas + reviewed dates + CRO collapse/align + source labels + configurable ingest + fewer escalations · 4.7.1 horizon inline + comma parsing + configurable lookback · 4.7.2 `BODY.PEEK` · 4.7.3 ingestion-based staleness + `force` · 4.7.4 "Newsletters — today" + multi-story extraction + extractor Anthropic fallback · **4.8.0** newsletter per-article URLs + collapse + quota 20 + **Research → Editorial format** · 4.8.1 saved research keeps editorial format + trimmed headers + footer date · 4.8.2 dedupe/empty skip logging + skipped count · 4.8.3 pasted-URL capture (Read article + tag) + workspace collapse · **4.8.4** collapse defaults + "Newsletter ingestion" rename + **article source date** · 4.8.5 hotfix restore `_decode_part` · **4.9.0** Anthropic fallback `max_tokens`→8192 (fix truncated JSON) + correct newsletter publisher labels.
+
+---
+
+## 11. Backlog (queued; not built)
+
+Check this list on a cold start. Items are proposals with a recommended approach; confirm with Rohit before building (recommend → approve → build).
+
+- **Generation history — drop the redundant "newsletter" capsule.** Under the "Newsletter ingestion" heading the per-run "newsletter" badge is redundant. Either remove it (one span in `RunHistory.tsx`) or replace with a **manual vs scheduled** indicator. Manual/scheduled needs the extractor to stamp `trigger` on the run record (infer: scheduled cron authorizes via `Authorization: Bearer`; manual triggers use `?secret=` in the URL, and `?force=true` is always manual) → thread through `BloombergRun` type + render. Pure removal is trivial; the indicator is a small Python + type + UI change.
+
+- **Research analyses — "Questions leadership will ask"** (mirror the CRO Conversation). Themes already generate a `questions` field (`QuestionsBlock`). Add `leadershipQuestions` (3 strings) to `ResearchAnalysis`, generated in the same `analyzeContent` call, rendered on the analysis card (below "What should I focus on") and threaded through `savedFromAnalysis`. Prompt specifically for what leadership/the board would probe (challenge, exposure, "what's our number here"), not generic "questions to consider".

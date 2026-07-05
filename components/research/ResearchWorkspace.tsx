@@ -10,6 +10,7 @@ import { CONCEPTS } from "@/lib/concepts";
 import { MizuhoAlignmentBlock } from "@/components/intel/MizuhoAlignment";
 import { Card, SeverityPill, Chip } from "@/components/ui";
 import { HorizonPill, UnderstandBlock } from "@/components/intel/intelUi";
+import { MizuhoLensBlock } from "@/components/intel/MizuhoLensBlock";
 
 const conceptTerm = (id: string) => CONCEPTS.find((c) => c.id === id)?.term ?? id;
 
@@ -413,6 +414,9 @@ export function ResearchWorkspace({
             {analysis.mizuhoAlignment.length === 0 ? (
               <p className="mt-2 text-2xs text-fg-faint">No clean Mizuho Top-Risk match for this content.</p>
             ) : null}
+
+            {/* V5.0 — interpretation through Mizuho's disclosed repository */}
+            <MizuhoLensBlock lens={analysis.mizuhoLens} />
 
             {analysis.relatedConcepts.length ? (
               <div className="mt-3">
