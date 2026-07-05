@@ -349,7 +349,7 @@ export default function Page() {
                     onConsumeOpen={() => setOpenConceptId(null)}
                   />
                 </CollapsibleSection>
-                <CollapsibleSection id="weekly" n="04" title="Weekly Learning Summary" accent="#F5A524" hint="generated weekly" defaultOpen={false}>
+                <CollapsibleSection id="weekly" n="04" title="Weekly Summary" accent="#F5A524" hint="generated weekly" defaultOpen={false}>
                   <WeeklyLearningSection data={data.intelligence.weekly} />
                 </CollapsibleSection>
                 <CollapsibleSection id="mizuhoref" n="05" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
