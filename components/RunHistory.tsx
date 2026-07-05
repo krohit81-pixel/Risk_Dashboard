@@ -24,9 +24,6 @@ export function BloombergRunHistory({ runs }: { runs?: BloombergRun[] }) {
             <div key={i} className="flex items-center gap-2.5 rounded-lg border border-line bg-ink-800 px-3 py-2 text-2xs">
               <span className={`h-1.5 w-1.5 flex-none rounded-full ${ok ? "bg-calm" : "bg-stress"}`} />
               <span className="text-fg-muted">{fmt(r.run_time)}</span>
-              <span className="rounded-full border border-elevated/30 bg-elevated/10 px-1.5 py-0.5 font-semibold uppercase tracking-wide text-elevated">
-                newsletter
-              </span>
               <span className="ml-auto text-fg-faint">
                 {r.processed}/{r.emails_found} processed{r.skipped ? ` · ${r.skipped} skipped` : ""}{r.failed ? ` · ${r.failed} failed` : ""}
               </span>

@@ -47,7 +47,7 @@ export interface SavedItem {
   sourceLabel?: string;
   analysisDateISO?: string; // when the analysis was generated
   articleDate?: string; // V4.8.4 — source article publication date (falls back to analysisDateISO in UI)
-  mizuhoLens?: import("./mizuhoKnowledge").MizuhoLens; // V5.0 — Mizuho-repository interpretation
+  mizuhoLens?: import("./mizuhoKnowledgeData").MizuhoLens; // V5.0 — Mizuho-repository interpretation
   originalUrl?: string;     // source URL if analysed from a link
   relatedConcepts?: string[];
   focus?: FocusItem[];      // V4.4 — personalized focus (Research analyses)

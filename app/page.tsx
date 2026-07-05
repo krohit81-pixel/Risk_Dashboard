@@ -22,6 +22,7 @@ import { StaleBanner } from "@/components/intel/StaleBanner";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { WhatChangedOvernight } from "@/components/WhatChangedOvernight";
 import { ConceptLibrary } from "@/components/learn/ConceptLibrary";
+import { MizuhoReference } from "@/components/learn/MizuhoReference";
 import { RadarSection } from "@/components/intel/RadarSection";
 import { SavedList } from "@/components/saved/SavedList";
 import type { SavedItem } from "@/lib/savedStore";
@@ -350,6 +351,9 @@ export default function Page() {
                 </CollapsibleSection>
                 <CollapsibleSection id="weekly" n="04" title="Weekly Learning Summary" accent="#F5A524" hint="generated weekly" defaultOpen={false}>
                   <WeeklyLearningSection data={data.intelligence.weekly} />
+                </CollapsibleSection>
+                <CollapsibleSection id="mizuhoref" n="05" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
+                  <MizuhoReference />
                 </CollapsibleSection>
               </>
             ) : null}

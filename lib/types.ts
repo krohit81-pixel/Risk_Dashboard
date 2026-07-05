@@ -345,7 +345,7 @@ export interface ResearchAnalysis {
   originalUrl?: string;
   analyzedISO: string;
   articleDate?: string;   // V4.8.4 — when the source article was published (from URL/text/image); falls back to analyzedISO in UI
-  mizuhoLens?: import("./mizuhoKnowledge").MizuhoLens; // V5.0 — interpretation through Mizuho's disclosed repository
+  mizuhoLens?: import("./mizuhoKnowledgeData").MizuhoLens; // V5.0 — interpretation through Mizuho's disclosed repository
   truncated?: boolean;
   provider?: string;
 }
