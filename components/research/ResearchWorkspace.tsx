@@ -11,6 +11,7 @@ import { MizuhoAlignmentBlock } from "@/components/intel/MizuhoAlignment";
 import { Card, SeverityPill, Chip } from "@/components/ui";
 import { HorizonPill, UnderstandBlock } from "@/components/intel/intelUi";
 import { MizuhoLensBlock } from "@/components/intel/MizuhoLensBlock";
+import { ProgressRing } from "@/components/shared/ProgressRing";
 
 const conceptTerm = (id: string) => CONCEPTS.find((c) => c.id === id)?.term ?? id;
 
@@ -278,21 +279,34 @@ export function ResearchWorkspace({
                 : images.length === 0;
             const disabled = capped || loading || notReady;
             return (
-              <button
-                onClick={analyze}
-                disabled={disabled}
-                className={`w-full rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                  disabled ? "bg-ink-800 text-fg-faint" : "bg-steel/15 text-steel active:bg-steel/25"
-                }`}
-              >
-                {loading
-                  ? mode === "image"
-                    ? "Reading & analyzing… (~30–40s)"
-                    : "Analyzing… (~20–30s)"
-                  : capped
-                  ? "Paused until tomorrow"
-                  : "Analyze"}
-              </button>
+              <>
+                {loading ? (
+                  <ProgressRing
+                    active={loading}
+                    estimateSeconds={mode === "image" ? 34 : 24}
+                    stages={
+                      mode === "image"
+                        ? ["Reading the image…", "Interpreting through the CRO lens…", "Aligning to Mizuho Top Risks…", "Checking the Mizuho repository…"]
+                        : undefined
+                    }
+                  />
+                ) : null}
+                <button
+                  onClick={analyze}
+                  disabled={disabled}
+                  className={`w-full rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                    disabled ? "bg-ink-800 text-fg-faint" : "bg-steel/15 text-steel active:bg-steel/25"
+                  }`}
+                >
+                  {loading
+                    ? mode === "image"
+                      ? "Reading & analyzing…"
+                      : "Analyzing…"
+                    : capped
+                    ? "Paused until tomorrow"
+                    : "Analyze"}
+                </button>
+              </>
             );
           })()}
 
