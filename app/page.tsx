@@ -24,6 +24,7 @@ import { WhatChangedOvernight } from "@/components/WhatChangedOvernight";
 import { ConceptLibrary } from "@/components/learn/ConceptLibrary";
 import { MizuhoReference } from "@/components/learn/MizuhoReference";
 import { BriefingBooks } from "@/components/learn/BriefingBooks";
+import { AppearanceToggle } from "@/components/learn/AppearanceToggle";
 import { RadarSection } from "@/components/intel/RadarSection";
 import { SavedList } from "@/components/saved/SavedList";
 import type { SavedItem } from "@/lib/savedStore";
@@ -359,6 +360,9 @@ export default function Page() {
                 </CollapsibleSection>
                 <CollapsibleSection id="briefingbooks" n="06" title="Briefing Books" accent="#2DD4A7" hint="print / PDF" defaultOpen={false}>
                   <BriefingBooks />
+                </CollapsibleSection>
+                <CollapsibleSection id="appearance" n="07" title="Appearance" accent="#5B8DEF" hint="dark / light" defaultOpen={false}>
+                  <AppearanceToggle />
                 </CollapsibleSection>
               </>
             ) : null}

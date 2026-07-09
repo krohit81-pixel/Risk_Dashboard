@@ -42,14 +42,14 @@ export function MizuhoLensBlock({ lens }: { lens?: MizuhoLens | null }) {
   const hasContent = lens.context || lens.interpretation || lens.businesses.length || lens.riskStripes.length;
 
   return (
-    <div className="mt-4 rounded-xl border border-[#2a2140] bg-[#161226] px-3.5 py-3">
+    <div className="mt-4 rounded-xl border border-mizuho/25 bg-mizuho/10 px-3.5 py-3">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-2 text-left"
         aria-expanded={open}
       >
-        <span className="text-2xs font-semibold uppercase tracking-wide text-[#b79bff]">Through Mizuho&rsquo;s lens</span>
+        <span className="text-2xs font-semibold uppercase tracking-wide text-mizuho">Through Mizuho&rsquo;s lens</span>
         <span className="ml-auto flex-none whitespace-nowrap text-[10px] text-fg-faint">{repoTag(lens)}</span>
         <span className="flex-none text-xs text-fg-faint">{open ? "\u25be" : "\u25b8"}</span>
       </button>
@@ -61,7 +61,7 @@ export function MizuhoLensBlock({ lens }: { lens?: MizuhoLens | null }) {
           <div className="mt-2">
             {lens.context ? (
               <p className="text-[13px] leading-relaxed text-fg-muted">
-                <span className="text-2xs font-semibold uppercase tracking-wide text-[#b79bff]">Mizuho context · repository — </span>
+                <span className="text-2xs font-semibold uppercase tracking-wide text-mizuho">Mizuho context · repository — </span>
                 {lens.context}
               </p>
             ) : null}

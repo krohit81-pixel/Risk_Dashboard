@@ -440,7 +440,7 @@ export function ResearchWorkspace({
                     <button
                       key={id}
                       onClick={() => onOpenConcept?.(id)}
-                      className="rounded-full border border-[#1f4036] bg-[#0f211c] px-2.5 py-0.5 text-2xs font-medium text-calm active:bg-[#143029]"
+                      className="rounded-full border border-calm/25 bg-calm/10 px-2.5 py-0.5 text-2xs font-medium text-calm active:bg-calm/20"
                     >
                       {conceptTerm(id)}
                     </button>

@@ -4,9 +4,9 @@
 import type { RadarItem } from "@/lib/types";
 
 const LENS_LABEL: Record<string, { label: string; cls: string }> = {
-  us: { label: "US", cls: "text-steel border-[#26405a] bg-[#10202f]" },
-  japan: { label: "Japan", cls: "text-mizuho border-[#3a3060] bg-[#1a1530]" },
-  europe: { label: "EU", cls: "text-calm border-[#1f4036] bg-[#0f211c]" },
+  us: { label: "US", cls: "text-steel border-steel/25 bg-steel/10" },
+  japan: { label: "Japan", cls: "text-mizuho border-mizuho/25 bg-mizuho/10" },
+  europe: { label: "EU", cls: "text-calm border-calm/25 bg-calm/10" },
   macro: { label: "Macro", cls: "text-fg-muted border-line bg-ink-800" },
 };
 

@@ -20,7 +20,7 @@ export function Linkify({
             key={i}
             type="button"
             onClick={() => onOpen(s.id!)}
-            className="border-b border-dotted border-mizuho font-semibold text-[#bdb0f0]"
+            className="border-b border-dotted border-mizuho font-semibold text-mizuho"
           >
             {s.t}
           </button>

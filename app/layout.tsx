@@ -1,6 +1,7 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ThemeProvider } from "@/components/shared/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "Global Risk Intelligence",
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0e14",
+  themeColor: "#0b0e14", // matches defaultTheme="dark"; see V5.4 note in CHANGES re: light-mode status bar
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -28,9 +29,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="bg-ink-900 text-fg font-sans antialiased">
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

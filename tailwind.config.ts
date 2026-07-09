@@ -1,35 +1,41 @@
 import type { Config } from "tailwindcss";
 
+// V5.4 — colors reference CSS custom properties (defined per-theme in globals.css) instead of
+// fixed hex, so the same utility classes (bg-ink-800, text-fg-faint, ...) work under both
+// dark and light mode. RGB-triplet format (not hex strings) is required for Tailwind's
+// opacity-modifier syntax (bg-steel/15, border-elevated/30, ...) — used extensively across
+// the app — to keep working with variable-based colors.
+function themeColor(varName: string) {
+  return `rgb(var(${varName}) / <alpha-value>)`;
+}
+
 const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
   ],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        // Institutional dark surfaces
         ink: {
-          950: "#0A0D13",
-          900: "#0B0E14",
-          850: "#10141D",
-          800: "#141925",
-          700: "#1B2230",
+          950: themeColor("--ink-950"),
+          900: themeColor("--ink-900"),
+          850: themeColor("--ink-850"),
+          800: themeColor("--ink-800"),
+          700: themeColor("--ink-700"),
         },
-        line: "#222B3A",
-        "line-soft": "#1A2130",
-        // Text
-        fg: "#E6EAF2",
-        "fg-muted": "#8A94A6",
-        "fg-faint": "#5C6678",
-        // Functional risk semantics (meaning, not decoration)
-        calm: "#2DD4A7",
-        elevated: "#F5A524",
-        stress: "#F2545B",
-        // Restrained brand accent
-        steel: "#5B8DEF",
-        // Phase 3 semantics: purple = Mizuho strategic context
-        mizuho: "#A78BFA",
+        line: themeColor("--line"),
+        "line-soft": themeColor("--line-soft"),
+        fg: themeColor("--fg"),
+        "fg-muted": themeColor("--fg-muted"),
+        "fg-faint": themeColor("--fg-faint"),
+        calm: themeColor("--calm"),
+        elevated: themeColor("--elevated"),
+        stress: themeColor("--stress"),
+        steel: themeColor("--steel"),
+        mizuho: themeColor("--mizuho"),
+        amber: themeColor("--amber"),
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],

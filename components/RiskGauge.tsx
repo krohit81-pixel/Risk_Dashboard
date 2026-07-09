@@ -5,10 +5,10 @@ import { RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";
 import type { RiskStatus } from "@/lib/types";
 
 const COLORS: Record<RiskStatus, string> = {
-  Calm: "#2DD4A7",
-  Moderate: "#5B8DEF",
-  Elevated: "#F5A524",
-  High: "#F2545B",
+  Calm: "rgb(var(--calm))",
+  Moderate: "rgb(var(--steel))",
+  Elevated: "rgb(var(--elevated))",
+  High: "rgb(var(--stress))",
 };
 
 /**
@@ -42,7 +42,7 @@ export function RiskGauge({
       >
         <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
         <RadialBar
-          background={{ fill: "#1B2230" }}
+          background={{ fill: "rgb(var(--ink-700))" }}
           dataKey="value"
           cornerRadius={8}
           angleAxisId={0}

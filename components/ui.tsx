@@ -142,7 +142,7 @@ export function Sparkline({
     .join(" ");
   const rising = data[data.length - 1] >= data[0];
   // Color the line by whether the recent move is risk-positive or risk-negative.
-  const stroke = rising === riskUpIsBad ? "#F2545B" : "#2DD4A7";
+  const stroke = rising === riskUpIsBad ? "rgb(var(--stress))" : "rgb(var(--calm))";
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className={className} aria-hidden preserveAspectRatio="none">
       <polyline points={pts} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />

@@ -42,9 +42,9 @@ function VisualChain({ steps }: { steps: ConceptVisualStep[] }) {
           <span
             className={`flex min-w-[78px] items-center rounded-lg border px-2.5 py-2 text-center text-[11.5px] font-semibold ${
               s.kind === "bad"
-                ? "border-[#5a2a28] bg-ink-800 text-[#ec8a83]"
+                ? "border-stress/30 bg-ink-800 text-stress"
                 : s.kind === "start"
-                ? "border-[#26405a] bg-ink-800 text-[#8fc1ea]"
+                ? "border-steel/30 bg-ink-800 text-steel"
                 : "border-line bg-ink-800 text-fg-muted"
             }`}
           >
@@ -194,7 +194,7 @@ export function ConceptLibrary({
             <button
               key={c.id}
               onClick={() => setSelected(c.id)}
-              className="rounded-lg border border-[#5a4a26] bg-[#241d10] px-2.5 py-1.5 text-xs font-semibold text-amber"
+              className="rounded-lg border border-elevated/30 bg-elevated/10 px-2.5 py-1.5 text-xs font-semibold text-amber"
             >
               ★ {c.term}
             </button>

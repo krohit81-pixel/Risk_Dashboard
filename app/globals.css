@@ -2,15 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
+/* V5.4 — theme variables. RGB TRIPLETS (space-separated, no commas, no #) — required for
+   Tailwind's bg-x/50-style opacity modifiers to work with CSS-variable-based colors.
+   Two blocks: .dark (default, matches the app's original look exactly) and .light (new).
+   next-themes toggles the class on <html>; see components/shared/ThemeProvider.tsx. */
+
 :root {
-  color-scheme: dark;
-  /* Inter-like system stack — no network/Google Fonts dependency (proxy-safe). */
   --font-inter: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.dark {
+  color-scheme: dark;
+  --ink-950: 10 13 19;
+  --ink-900: 11 14 20;
+  --ink-850: 16 20 29;
+  --ink-800: 20 25 37;
+  --ink-700: 27 34 48;
+  --line: 34 43 58;
+  --line-soft: 26 33 48;
+  --fg: 230 234 242;
+  --fg-muted: 138 148 166;
+  --fg-faint: 92 102 120;
+  --calm: 45 212 167;
+  --elevated: 245 165 36;
+  --stress: 242 84 91;
+  --steel: 91 141 239;
+  --mizuho: 167 139 250;
+  --amber: 245 165 36;
+}
+
+.light {
+  color-scheme: light;
+  /* Surfaces: role-preserving, not a mechanical hex inversion. In dark mode each step
+     (900→800→700) gets progressively LIGHTER (card raised above page, pressed state
+     lighter still) because there's headroom below white. In light mode there's no headroom
+     above white, so the card is white (the lightest surface, still "raised" above the page)
+     and the pressed state instead goes slightly gray — standard light-UI press convention,
+     same INTENT (press = a visible, subtle state change) via the only direction available. */
+  --ink-950: 245 246 248;
+  --ink-900: 245 246 248;  /* page bg + header/nav chrome */
+  --ink-850: 250 251 252;
+  --ink-800: 255 255 255; /* card surface — lightest, "raised" */
+  --ink-700: 237 238 242; /* active/pressed — subtle gray, not lighter-than-white */
+  --line: 224 227 233;
+  --line-soft: 237 239 243;
+  --fg: 17 24 39;         /* primary text — dark slate, not pure black */
+  --fg-muted: 91 100 114;
+  --fg-faint: 136 144 160;
+  /* Status/accent hues kept recognizable but deepened where the dark-mode value is too
+     light to read as text on a white surface (amber and mizuho-purple needed the most
+     adjustment; steel/calm/stress needed less). First pass — flagged for visual QA. */
+  --calm: 18 165 131;
+  --elevated: 180 95 6;
+  --stress: 220 38 38;
+  --steel: 59 111 209;
+  --mizuho: 124 92 240;
+  --amber: 180 95 6;
 }
 
 html,
 body {
-  background-color: #0b0e14;
+  background-color: rgb(var(--ink-900));
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
