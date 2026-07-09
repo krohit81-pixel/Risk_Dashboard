@@ -153,7 +153,7 @@ export async function getSavedById(id: string): Promise<SavedItem | null> {
   const { data, error } = await table(sb).select("payload").eq("id", id).maybeSingle();
   if (error) {
     console.error("[savedStore] getSavedById failed:", error.message);
-    return null;
+    throw new Error(`Lookup failed: ${error.message}`); // distinct from a genuine "no such id"
   }
   return data ? rowToItem(data) : null;
 }
