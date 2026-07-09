@@ -16,11 +16,15 @@ export function ProgressRing({
   estimateSeconds = 24,
   stages,
   size = 64,
+  theme = "dark",
 }: {
   active: boolean;
   estimateSeconds?: number;
   stages?: string[];
   size?: number;
+  /** "light" for use on white backgrounds (e.g. the print/PDF views) — "dark" (default)
+   *  matches the app's persistent dark theme. */
+  theme?: "dark" | "light";
 }) {
   const [pct, setPct] = useState(0);
   const [stageIdx, setStageIdx] = useState(0);
@@ -56,12 +60,15 @@ export function ProgressRing({
   const r = (size - 8) / 2;
   const c = 2 * Math.PI * r;
   const offset = c * (1 - pct / 100);
+  const trackColor = theme === "light" ? "text-neutral-200" : "text-ink-700";
+  const pctColor = theme === "light" ? "text-neutral-900" : "text-fg";
+  const labelColor = theme === "light" ? "text-neutral-500" : "text-fg-faint";
 
   return (
     <div className="flex flex-col items-center gap-2 py-1">
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={4} className="text-ink-700" />
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={4} className={trackColor} />
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -75,11 +82,11 @@ export function ProgressRing({
             className="text-steel transition-[stroke-dashoffset] duration-150 ease-linear"
           />
         </svg>
-        <div className="absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-fg">
+        <div className={`absolute inset-0 flex items-center justify-center text-[13px] font-semibold ${pctColor}`}>
           {Math.round(pct)}%
         </div>
       </div>
-      <p className="text-2xs text-fg-faint">{labels[stageIdx]}</p>
+      <p className={`text-2xs ${labelColor}`}>{labels[stageIdx]}</p>
     </div>
   );
 }

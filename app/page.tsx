@@ -23,6 +23,7 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { WhatChangedOvernight } from "@/components/WhatChangedOvernight";
 import { ConceptLibrary } from "@/components/learn/ConceptLibrary";
 import { MizuhoReference } from "@/components/learn/MizuhoReference";
+import { BriefingBooks } from "@/components/learn/BriefingBooks";
 import { RadarSection } from "@/components/intel/RadarSection";
 import { SavedList } from "@/components/saved/SavedList";
 import type { SavedItem } from "@/lib/savedStore";
@@ -30,6 +31,7 @@ import { RunHistory, BloombergRunHistory } from "@/components/RunHistory";
 import type { RunRecord } from "@/lib/runStore";
 import { ResearchWorkspace } from "@/components/research/ResearchWorkspace";
 import { resolveIntelligence } from "@/lib/layman";
+import { AppFooter } from "@/components/shared/AppFooter";
 
 export default function Page() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -355,17 +357,13 @@ export default function Page() {
                 <CollapsibleSection id="mizuhoref" n="05" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
                   <MizuhoReference />
                 </CollapsibleSection>
+                <CollapsibleSection id="briefingbooks" n="06" title="Briefing Books" accent="#2DD4A7" hint="print / PDF" defaultOpen={false}>
+                  <BriefingBooks />
+                </CollapsibleSection>
               </>
             ) : null}
 
-            <footer className="pt-2 text-center">
-              <p className="text-2xs leading-relaxed text-fg-faint">
-                <span className="font-semibold text-fg-muted">Prepared by Rohit Kohli</span>
-                <br />
-                Macro: FRED · Markets: Yahoo Finance · News: Finnhub, Marketaux, NewsData.
-                Personal decision-support and learning tool — not investment advice, not Mizuho output.
-              </p>
-            </footer>
+            <AppFooter />
           </>
         ) : null}
       </div>

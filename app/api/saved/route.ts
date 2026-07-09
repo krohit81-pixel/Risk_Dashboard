@@ -5,11 +5,16 @@
 // shape validation only; savedStore.itemToRow derives the structured/queryable columns.
 
 import { NextResponse } from "next/server";
-import { getSaved, addSaved, removeSaved, type SavedItem } from "@/lib/savedStore";
+import { getSaved, getSavedById, addSaved, removeSaved, type SavedItem } from "@/lib/savedStore";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const id = new URL(req.url).searchParams.get("id");
+  if (id) {
+    const item = await getSavedById(id);
+    return NextResponse.json({ item });
+  }
   return NextResponse.json({ items: await getSaved() });
 }
 

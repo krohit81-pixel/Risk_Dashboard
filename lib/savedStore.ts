@@ -146,6 +146,36 @@ export async function removeSaved(id: string): Promise<SavedItem[]> {
   return getSaved();
 }
 
+/** Single item by id — for the print/PDF view (avoids fetching the whole list). */
+export async function getSavedById(id: string): Promise<SavedItem | null> {
+  const sb = getSupabase();
+  if (!sb) return mem.list.find((x) => x.id === id) ?? null;
+  const { data, error } = await table(sb).select("payload").eq("id", id).maybeSingle();
+  if (error) {
+    console.error("[savedStore] getSavedById failed:", error.message);
+    return null;
+  }
+  return data ? rowToItem(data) : null;
+}
+
+/** V5.3 — items saved within [fromISO, toISO), for Monthly/Quarterly briefing books.
+ *  Uses the indexed `saved_at` column (landed in v5.2) rather than filtering client-side. */
+export async function getSavedInRange(fromISO: string, toISO: string): Promise<SavedItem[]> {
+  const sb = getSupabase();
+  if (!sb) return mem.list.filter((x) => x.savedAtISO >= fromISO && x.savedAtISO < toISO);
+  const { data, error } = await table(sb)
+    .select("payload")
+    .gte("saved_at", fromISO)
+    .lt("saved_at", toISO)
+    .order("saved_at", { ascending: true })
+    .limit(SAFETY_CAP);
+  if (error) {
+    console.error("[savedStore] getSavedInRange failed:", error.message);
+    return [];
+  }
+  return (data ?? []).map(rowToItem);
+}
+
 /** For the admin/migrate-saved route and diagnostics only. */
 export function savedStoreBackend(): "supabase" | "memory" {
   return supabaseAvailable() ? "supabase" : "memory";

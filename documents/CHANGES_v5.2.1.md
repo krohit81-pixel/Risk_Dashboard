@@ -30,6 +30,8 @@ git push
 Then **re-seed KV** so the live lens uses the new cards (same as any repository content update):
 ```
 https://<your-app>/api/admin/seed-mizuho?secret=<CRON_SECRET>
+https://global-risk-dashboard.vercel.app/api/admin/seed-mizuho?secret=CRON_SECRET
+
 ```
 
 ## Test
