@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import type { SavedItem } from "@/lib/savedStore";
 import { PrintItem } from "@/components/print/PrintItem";
+import { PrintActionBar, PrintActionBarSpacer } from "@/components/print/PrintActionBar";
 
 export default function PrintItemPage() {
   const params = useParams();
@@ -32,15 +33,9 @@ export default function PrintItemPage() {
 
   return (
     <>
-      <div className="print:hidden sticky top-0 z-10 flex justify-center border-b border-neutral-200 bg-white/95 py-2.5 backdrop-blur">
-        <button
-          onClick={() => window.print()}
-          className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white active:bg-neutral-700"
-        >
-          Print / Save as PDF
-        </button>
-      </div>
       <PrintItem item={item} />
+      <PrintActionBarSpacer />
+      <PrintActionBar />
     </>
   );
 }

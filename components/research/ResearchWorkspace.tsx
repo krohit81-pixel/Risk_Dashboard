@@ -476,6 +476,23 @@ export function ResearchWorkspace({
               🔄 Analyze another
             </button>
           </div>
+
+          {/* Print / Export — active once saved (print reads from Supabase, so it needs a
+              persisted id); visible either way so the option is discoverable, not hidden. */}
+          {savedItem ? (
+            isSaved ? (
+              <a
+                href={`/print/${encodeURIComponent(savedItem.id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 flex items-center justify-center gap-1.5 rounded-xl border border-line bg-ink-800 px-4 py-2.5 text-2xs font-semibold text-fg-muted active:bg-ink-700"
+              >
+                🖨️ Print / Export PDF
+              </a>
+            ) : (
+              <p className="mt-2 text-center text-[10px] text-fg-faint">Save this analysis to enable Print / Export PDF</p>
+            )
+          ) : null}
         </>
       )}
     </section>

@@ -13,6 +13,7 @@ import { useSearchParams } from "next/navigation";
 import type { BriefingBook } from "@/lib/briefingBook";
 import { PrintBook } from "@/components/print/PrintBook";
 import { ProgressRing } from "@/components/shared/ProgressRing";
+import { PrintActionBar, PrintActionBarSpacer } from "@/components/print/PrintActionBar";
 
 function PrintBookInner() {
   const params = useSearchParams();
@@ -44,41 +45,53 @@ function PrintBookInner() {
 
   if (book === undefined) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 text-neutral-500">
-        <div className="text-neutral-700">
-          <ProgressRing
-            active
-            estimateSeconds={20}
-            theme="light"
-            stages={["Querying saved items\u2026", "Writing the preface\u2026", "Drafting action items\u2026"]}
-          />
+      <>
+        <div className="flex min-h-screen flex-col items-center justify-center gap-3 text-neutral-500">
+          <div className="text-neutral-700">
+            <ProgressRing
+              active
+              estimateSeconds={20}
+              theme="light"
+              stages={["Querying saved items…", "Writing the preface…", "Drafting action items…"]}
+            />
+          </div>
+          <p className="text-sm">Compiling your briefing book…</p>
         </div>
-        <p className="text-sm">Compiling your briefing book…</p>
-      </div>
+        <PrintActionBarSpacer />
+        <PrintActionBar />
+      </>
     );
   }
   if (error || !book) {
-    return <p className="p-10 text-center text-sm text-neutral-500">{error || "Something went wrong."}</p>;
+    return (
+      <>
+        <p className="p-10 text-center text-sm text-neutral-500">{error || "Something went wrong."}</p>
+        <PrintActionBarSpacer />
+        <PrintActionBar />
+      </>
+    );
   }
 
   return (
     <>
-      <div className="print:hidden sticky top-0 z-10 flex justify-center border-b border-neutral-200 bg-white/95 py-2.5 backdrop-blur">
-        <button
-          onClick={() => window.print()}
-          className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white active:bg-neutral-700"
-        >
-          Print / Save as PDF
-        </button>
-      </div>
       <PrintBook book={book} />
+      <PrintActionBarSpacer />
+      <PrintActionBar />
     </>
   );
 }
 
 export default function PrintBookPage() {
   return (
-    <Suspense fallback={<p className="p-10 text-center text-sm text-neutral-500">Loading…</p>}>
+    <Suspense
+      fallback={
+        <>
+          <p className="p-10 text-center text-sm text-neutral-500">Loading…</p>
+          <PrintActionBarSpacer />
+          <PrintActionBar />
+        </>
+      }
+    >
       <PrintBookInner />
     </Suspense>
   );
