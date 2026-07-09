@@ -482,7 +482,7 @@ export function ResearchWorkspace({
           {savedItem ? (
             isSaved ? (
               <a
-                href={`/print/${encodeURIComponent(savedItem.id)}`}
+                href={`/print/item?id=${encodeURIComponent(savedItem.id)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-2 flex items-center justify-center gap-1.5 rounded-xl border border-line bg-ink-800 px-4 py-2.5 text-2xs font-semibold text-fg-muted active:bg-ink-700"

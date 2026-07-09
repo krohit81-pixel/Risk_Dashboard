@@ -211,7 +211,7 @@ function SavedCard({
               </a>
             ) : null}
             <a
-              href={`/print/${encodeURIComponent(it.id)}`}
+              href={`/print/item?id=${encodeURIComponent(it.id)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-2xs font-semibold text-fg-muted active:bg-ink-700"

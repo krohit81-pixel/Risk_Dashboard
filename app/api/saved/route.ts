@@ -12,8 +12,10 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const id = new URL(req.url).searchParams.get("id");
   if (id) {
+    console.log(`[api/saved] id lookup requested: "${id}"`);
     try {
       const item = await getSavedById(id);
+      console.log(`[api/saved] id lookup result: ${item ? "found" : "not found"}`);
       return NextResponse.json({ item }); // item: null here means a genuine "no such id"
     } catch (e) {
       return NextResponse.json({ item: null, error: String(e) }, { status: 500 });
