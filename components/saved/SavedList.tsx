@@ -199,16 +199,26 @@ function SavedCard({
                 : ""}
             </p>
           ) : null}
-          {it.originalUrl ? (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {it.originalUrl ? (
+              <a
+                href={it.originalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex rounded-lg border border-line px-2.5 py-1 text-2xs font-semibold text-fg-muted active:bg-ink-700"
+              >
+                Read article ↗
+              </a>
+            ) : null}
             <a
-              href={it.originalUrl}
+              href={`/print/${encodeURIComponent(it.id)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-1.5 inline-flex rounded-lg border border-line px-2.5 py-1 text-2xs font-semibold text-fg-muted active:bg-ink-700"
+              className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-2xs font-semibold text-fg-muted active:bg-ink-700"
             >
-              Read article ↗
+              🖨️ Print / Export PDF
             </a>
-          ) : null}
+          </div>
 
           {show(it.whatHappened, it.layman?.whatHappened) ? (
             <Line label="What happened">{show(it.whatHappened, it.layman?.whatHappened)}</Line>
