@@ -1,4 +1,4 @@
-# v5.2.0 — Supabase migration (saved items only)
+# v5.2.0:Supabase migration (saved items only)
 
 **Regenerated** — three revisions below since you hadn't deployed yet: (1) schema isolated to its own Postgres schema since Supabase is shared with Orbit, (2) a doc correction, (3) a circular progress indicator during analysis. Foundation for briefing books (v5.4) and PDF export (v5.3). Scope confirmed: **saved items only** — the daily snapshot / weekly re-rate / newsletter digests stay in Vercel KV. ✅ tsc + build clean.
 

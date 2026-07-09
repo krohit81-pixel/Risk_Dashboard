@@ -58,6 +58,19 @@ create trigger saved_items_touch
 -- key from touching this table (defense in depth in case that key is ever exposed client-side).
 alter table risk_dashboard.saved_items enable row level security;
 
+-- ── GRANTS — required for a non-public schema, easy to miss ──
+-- Creating a schema does NOT automatically give any API role access to it. Only Supabase's
+-- default `public` schema comes pre-granted. Without this block you'll hit
+-- "permission denied for schema risk_dashboard" the moment the app tries to read/write,
+-- even though the table exists and the schema is exposed to the API.
+grant usage on schema risk_dashboard to service_role;
+grant all on all tables in schema risk_dashboard to service_role;
+grant all on all sequences in schema risk_dashboard to service_role;
+grant all on all functions in schema risk_dashboard to service_role;
+alter default privileges in schema risk_dashboard grant all on tables to service_role;
+alter default privileges in schema risk_dashboard grant all on sequences to service_role;
+alter default privileges in schema risk_dashboard grant all on functions to service_role;
+
 -- ── IMPORTANT — one dashboard setting required for a non-public schema ──
 -- PostgREST (what supabase-js talks to) only serves schemas you explicitly expose.
 -- After running this file: Supabase dashboard → Project Settings → API → "Exposed schemas"

@@ -13,6 +13,7 @@ One deliberate difference from the other admin routes (`seed-mizuho`, the crons)
 3. Run the migration:
    ```
    https://<your-app>/api/admin/migrate-saved?secret=<MIGRATION_SECRET>
+   https://global-risk-dashboard.vercel.app/api/admin/migrate-saved?secret=MIGRATION_SECRET
    ```
    If you forget to set the env var first, you'll get a clear `401 { error: "unauthorized — set MIGRATION_SECRET in Vercel env and pass ?secret=<it>" }` rather than a confusing failure.
 
