@@ -25,6 +25,7 @@ import { ConceptLibrary } from "@/components/learn/ConceptLibrary";
 import { MizuhoReference } from "@/components/learn/MizuhoReference";
 import { BriefingBooks } from "@/components/learn/BriefingBooks";
 import { AppearanceToggle } from "@/components/learn/AppearanceToggle";
+import { ConceptStudio } from "@/components/learn/ConceptStudio";
 import { RadarSection } from "@/components/intel/RadarSection";
 import { SavedList } from "@/components/saved/SavedList";
 import type { SavedItem } from "@/lib/savedStore";
@@ -363,6 +364,9 @@ export default function Page() {
                 </CollapsibleSection>
                 <CollapsibleSection id="appearance" n="07" title="Appearance" accent="#5B8DEF" hint="dark / light" defaultOpen={false}>
                   <AppearanceToggle />
+                </CollapsibleSection>
+                <CollapsibleSection id="addconcept" n="08" title="Add Concept" accent="#2DD4A7" hint="paste → analyze → save" defaultOpen={false}>
+                  <ConceptStudio />
                 </CollapsibleSection>
               </>
             ) : null}
