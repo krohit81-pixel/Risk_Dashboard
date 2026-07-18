@@ -5,7 +5,19 @@ import type { Indicator } from "@/lib/types";
 import { Card, TrendArrow } from "./ui";
 import { fmtValue, fmtChange } from "@/lib/format";
 
-const TRACK = ["cpi", "fedfunds", "ust10y", "sp500", "vix", "usdjpy", "brent"];
+// V5.5.1 — was a 7-item subset that excluded several indicators the "What Changed" movers
+// list (lib/overnight.ts) already ranks by magnitude (japancpi, nikkei, curve2s10s, jgb10y,
+// move, gold, nasdaq, unrate) — so a mover could show a delta with no way to see its actual
+// prev/now values. Expanded to the full tracked set, grouped for readability. Any indicator
+// not actually present in the fetched data simply won't render a row (existing .filter(Boolean)
+// below already handles that safely).
+const TRACK = [
+  "cpi", "japancpi", "unrate", "fedfunds", // rates & inflation
+  "ust10y", "jgb10y", "curve2s10s",         // rates curve
+  "vix", "move", "hyspread",                // vol & credit
+  "usdjpy", "brent", "gold",                // FX & commodities
+  "sp500", "nasdaq", "nikkei",              // equities
+];
 
 export function WhatChanged({ indicators }: { indicators: Indicator[] }) {
   const rows = TRACK.map((id) => indicators.find((i) => i.id === id)).filter(

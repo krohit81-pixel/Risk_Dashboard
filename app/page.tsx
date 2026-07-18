@@ -158,9 +158,7 @@ export default function Page() {
       <header className="safe-top sticky top-0 z-20 border-b border-line bg-ink-900/85 backdrop-blur-md">
         <div className="flex items-center justify-between px-5 py-3">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-steel/15 text-sm font-bold text-steel">
-              R
-            </span>
+            <img src="/icons/logo-header.png" alt="" className="h-8 w-8 flex-none rounded-lg" />
             <div className="leading-tight">
               <p className="text-[13px] font-semibold text-fg">
                 Global Risk Intelligence

@@ -253,7 +253,29 @@ export function ConceptStudio() {
                   </span>
                   <span className="text-[13.5px] font-semibold text-fg">{c.term}</span>
                 </div>
-                <p className="text-[12px] leading-relaxed text-fg-muted">{c.layman}</p>
+                {c.formal && c.formal !== c.term ? <p className="mb-1.5 text-[11px] italic text-fg-faint">{c.formal}</p> : null}
+
+                <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">Plain English</p>
+                <p className="mb-1.5 text-[12px] leading-relaxed text-fg-muted">{c.layman}</p>
+
+                {c.risk ? (
+                  <>
+                    <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">CRO language</p>
+                    <p className="mb-1.5 text-[12px] leading-relaxed text-fg-muted">{c.risk}</p>
+                  </>
+                ) : null}
+
+                {c.cro ? (
+                  <>
+                    <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">Why a CRO cares</p>
+                    <p className="mb-1.5 text-[12px] leading-relaxed text-fg-muted">{c.cro}</p>
+                  </>
+                ) : null}
+
+                {c.aliases?.length ? (
+                  <p className="text-[11px] text-fg-faint">Also known as: {c.aliases.join(", ")}</p>
+                ) : null}
+
                 <div className="mt-2 flex gap-3">
                   <button onClick={() => editItem(c)} className="text-2xs font-semibold text-steel">
                     Edit
