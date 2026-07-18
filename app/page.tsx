@@ -158,7 +158,17 @@ export default function Page() {
       <header className="safe-top sticky top-0 z-20 border-b border-line bg-ink-900/85 backdrop-blur-md">
         <div className="flex items-center justify-between px-5 py-3">
           <div className="flex items-center gap-2.5">
-            <img src="/icons/logo-header.png" alt="" className="h-8 w-8 flex-none rounded-lg" />
+            <span className="relative flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-steel/15 text-sm font-bold text-steel">
+              <span aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center">R</span>
+              <img
+                src="/icons/logo-header.png"
+                alt=""
+                className="relative h-8 w-8 rounded-lg object-cover"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+            </span>
             <div className="leading-tight">
               <p className="text-[13px] font-semibold text-fg">
                 Global Risk Intelligence
@@ -351,20 +361,20 @@ export default function Page() {
                     onConsumeOpen={() => setOpenConceptId(null)}
                   />
                 </CollapsibleSection>
-                <CollapsibleSection id="weekly" n="04" title="Weekly Summary" accent="#F5A524" hint="generated weekly" defaultOpen={false}>
+                <CollapsibleSection id="addconcept" n="04" title="Add Concept" accent="#2DD4A7" hint="paste → analyze → save" defaultOpen={false}>
+                  <ConceptStudio />
+                </CollapsibleSection>
+                <CollapsibleSection id="weekly" n="05" title="Weekly Summary" accent="#F5A524" hint="generated weekly" defaultOpen={false}>
                   <WeeklyLearningSection data={data.intelligence.weekly} />
                 </CollapsibleSection>
-                <CollapsibleSection id="mizuhoref" n="05" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
+                <CollapsibleSection id="mizuhoref" n="06" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
                   <MizuhoReference />
                 </CollapsibleSection>
-                <CollapsibleSection id="briefingbooks" n="06" title="Briefing Books" accent="#2DD4A7" hint="print / PDF" defaultOpen={false}>
+                <CollapsibleSection id="briefingbooks" n="07" title="Briefing Books" accent="#2DD4A7" hint="print / PDF" defaultOpen={false}>
                   <BriefingBooks />
                 </CollapsibleSection>
-                <CollapsibleSection id="appearance" n="07" title="Appearance" accent="#5B8DEF" hint="dark / light" defaultOpen={false}>
+                <CollapsibleSection id="appearance" n="08" title="Appearance" accent="#5B8DEF" hint="dark / light" defaultOpen={false}>
                   <AppearanceToggle />
-                </CollapsibleSection>
-                <CollapsibleSection id="addconcept" n="08" title="Add Concept" accent="#2DD4A7" hint="paste → analyze → save" defaultOpen={false}>
-                  <ConceptStudio />
                 </CollapsibleSection>
               </>
             ) : null}

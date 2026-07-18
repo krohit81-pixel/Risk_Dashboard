@@ -27,6 +27,7 @@ export function WhatChanged({ indicators }: { indicators: Indicator[] }) {
   return (
     <section className="rise">
       <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead>
             <tr className="border-b border-line-soft text-2xs uppercase tracking-wide text-fg-faint">
@@ -50,17 +51,15 @@ export function WhatChanged({ indicators }: { indicators: Indicator[] }) {
                   key={ind.id}
                   className={i < rows.length - 1 ? "border-b border-line-soft/60" : ""}
                 >
-                  <td className="px-4 py-2.5 text-left font-medium text-fg">
-                    {ind.label}
-                  </td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-left font-medium text-fg">{ind.label}</td>
                   <td className="px-2 py-2.5 text-right text-fg-muted">
                     {fmtValue(ind.previous, ind)}
                   </td>
                   <td className="px-2 py-2.5 text-right font-semibold text-fg">
                     {fmtValue(ind.value, ind)}
                   </td>
-                  <td className={`px-4 py-2.5 text-right font-medium ${chgColor}`}>
-                    <span className="inline-flex items-center gap-1.5">
+                  <td className={`px-2 py-2.5 text-right font-medium ${chgColor}`}>
+                    <span className="inline-flex items-center justify-end gap-1 whitespace-nowrap">
                       {chg.text}
                       <TrendArrow trend={ind.trend} riskUpIsBad={ind.riskUpIsBad} />
                     </span>
@@ -70,6 +69,7 @@ export function WhatChanged({ indicators }: { indicators: Indicator[] }) {
             })}
           </tbody>
         </table>
+        </div>
       </Card>
     </section>
   );
