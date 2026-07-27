@@ -2,9 +2,13 @@
 
 // components/learn/ConceptStudio.tsx
 // V5.5 — "Add Concept" prototype screen: paste text → Analyze (Gemini converts it into the
-// app's standard concept format) → review/edit the draft → Save. Also lists + edits/deletes
-// your previously-added concepts. Deliberately separate from the curated static library
-// (lib/concepts.ts) for this iteration — see CHANGES for the scope reasoning.
+// app's standard concept format) → review/edit the draft → Save. Deliberately separate from
+// the curated static library (lib/concepts.ts) for this iteration — see CHANGES for the scope
+// reasoning.
+// V5.6 — moved into Settings ("maintenance" part of Add Concept). The "Your concepts" list now
+// lives under Concept Library (components/learn/UserConceptsList.tsx); this component only
+// handles create/edit. It can be driven externally: pass `editTarget` (a UserConcept) to open
+// it pre-filled for editing — e.g. when the user taps "Edit" from the Concept Library list.
 
 import { useEffect, useState } from "react";
 import type { UserConcept } from "@/lib/userConcepts";
@@ -32,7 +36,18 @@ function conceptToForm(c: UserConcept): FormState {
   return { term: c.term, formal: c.formal || "", category: c.category, aliasesText: c.aliases.join(", "), layman: c.layman, risk: c.risk, cro: c.cro };
 }
 
-export function ConceptStudio() {
+export function ConceptStudio({
+  editTarget,
+  onEditConsumed,
+  onSaved,
+}: {
+  /** Set from outside (e.g. Concept Library's "Edit" button) to open the form pre-filled. */
+  editTarget?: UserConcept | null;
+  /** Called once the editTarget has been loaded into the form, so the caller can clear it. */
+  onEditConsumed?: () => void;
+  /** Called after a successful save/update, so callers can refresh their own concept lists. */
+  onSaved?: () => void;
+}) {
   const [rawText, setRawText] = useState("");
   const [termHint, setTermHint] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
@@ -42,20 +57,13 @@ export function ConceptStudio() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [items, setItems] = useState<UserConcept[]>([]);
-  const [loadingList, setLoadingList] = useState(true);
-
-  function loadList() {
-    setLoadingList(true);
-    fetch("/api/concepts")
-      .then((r) => r.json())
-      .then((j) => setItems(j.items ?? []))
-      .catch(() => setItems([]))
-      .finally(() => setLoadingList(false));
-  }
   useEffect(() => {
-    loadList();
-  }, []);
+    if (!editTarget) return;
+    setForm(conceptToForm(editTarget));
+    setEditingId(editTarget.id);
+    setRawText(editTarget.sourceText || "");
+    onEditConsumed?.();
+  }, [editTarget, onEditConsumed]);
 
   async function analyze() {
     if (rawText.trim().length < 10 || analyzing) return;
@@ -105,8 +113,8 @@ export function ConceptStudio() {
       if (!j.ok) {
         setSaveError(j.error || "Save failed.");
       } else {
-        setItems(j.items ?? []);
         discard();
+        onSaved?.();
       }
     } catch (e) {
       setSaveError(String(e));
@@ -124,28 +132,12 @@ export function ConceptStudio() {
     setSaveError(null);
   }
 
-  function editItem(c: UserConcept) {
-    setForm(conceptToForm(c));
-    setEditingId(c.id);
-    setRawText(c.sourceText || "");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  async function removeItem(id: string) {
-    try {
-      const res = await fetch(`/api/concepts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-      const j = await res.json();
-      if (j.ok) setItems(j.items ?? []);
-    } catch {
-      // best-effort; list will resync on next load if this silently failed
-    }
-  }
-
   return (
     <div className="space-y-3">
       <p className="text-[11px] leading-relaxed text-fg-faint">
         Paste any text about a concept (a term, a paragraph from an article, a rough note). Analyze converts it into
-        the standard library format for you to review before saving.
+        the standard library format for you to review before saving. Your saved concepts appear under Concept
+        Library, in the Learn tab.
       </p>
 
       {!form ? (
@@ -234,61 +226,6 @@ export function ConceptStudio() {
           </div>
         </div>
       )}
-
-      <div className="pt-1">
-        <p className="mb-1.5 text-2xs font-semibold uppercase tracking-wide text-fg-faint">
-          Your concepts {loadingList ? "" : `(${items.length})`}
-        </p>
-        {loadingList ? (
-          <p className="text-2xs text-fg-faint">Loading…</p>
-        ) : items.length === 0 ? (
-          <p className="text-2xs text-fg-faint">Nothing added yet — paste some text above to get started.</p>
-        ) : (
-          <div className="space-y-2">
-            {items.map((c) => (
-              <div key={c.id} className="rounded-xl border border-line bg-ink-800 px-3 py-2.5">
-                <div className="mb-1 flex items-center gap-2">
-                  <span className="rounded-full border border-line-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-fg-faint">
-                    {c.category}
-                  </span>
-                  <span className="text-[13.5px] font-semibold text-fg">{c.term}</span>
-                </div>
-                {c.formal && c.formal !== c.term ? <p className="mb-1.5 text-[11px] italic text-fg-faint">{c.formal}</p> : null}
-
-                <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">Plain English</p>
-                <p className="mb-1.5 text-[12px] leading-relaxed text-fg-muted">{c.layman}</p>
-
-                {c.risk ? (
-                  <>
-                    <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">CRO language</p>
-                    <p className="mb-1.5 text-[12px] leading-relaxed text-fg-muted">{c.risk}</p>
-                  </>
-                ) : null}
-
-                {c.cro ? (
-                  <>
-                    <p className="text-2xs font-semibold uppercase tracking-wide text-fg-faint">Why a CRO cares</p>
-                    <p className="mb-1.5 text-[12px] leading-relaxed text-fg-muted">{c.cro}</p>
-                  </>
-                ) : null}
-
-                {c.aliases?.length ? (
-                  <p className="text-[11px] text-fg-faint">Also known as: {c.aliases.join(", ")}</p>
-                ) : null}
-
-                <div className="mt-2 flex gap-3">
-                  <button onClick={() => editItem(c)} className="text-2xs font-semibold text-steel">
-                    Edit
-                  </button>
-                  <button onClick={() => removeItem(c.id)} className="text-2xs font-semibold text-stress">
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

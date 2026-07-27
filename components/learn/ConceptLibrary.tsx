@@ -4,6 +4,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { CONCEPTS, conceptById, type Concept, type ConceptVisualStep } from "@/lib/concepts";
 import type { ConceptSeen } from "@/lib/types";
+import type { UserConcept } from "@/lib/userConcepts";
+import { UserConceptsList } from "./UserConceptsList";
 
 const PIN_KEY = "learn:pins";
 
@@ -130,10 +132,16 @@ export function ConceptLibrary({
   conceptSeen,
   openId,
   onConsumeOpen,
+  onEditUserConcept,
+  userConceptsRefreshKey,
 }: {
   conceptSeen: Record<string, ConceptSeen>;
   openId: string | null;
   onConsumeOpen: () => void;
+  /** V5.6 — routes to Settings → Add Concept, pre-filled, for editing a user-added concept. */
+  onEditUserConcept: (c: UserConcept) => void;
+  /** V5.6 — bump to force the "Your Concepts" list to refetch (e.g. after a save in Settings). */
+  userConceptsRefreshKey?: number;
 }) {
   const [pins, setPins] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
@@ -186,6 +194,10 @@ export function ConceptLibrary({
         placeholder="Search concepts…  (e.g. carry, IRRBB, CET1)"
         className="mb-3 w-full rounded-xl border border-line bg-ink-800 px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-faint"
       />
+
+      <div className="mb-4 rounded-xl border border-line-soft bg-ink-800/40 px-3.5 py-3">
+        <UserConceptsList onEdit={onEditUserConcept} refreshKey={userConceptsRefreshKey} />
+      </div>
 
       <p className="mb-2 mt-1 text-2xs font-bold uppercase tracking-wide text-fg-faint">📌 Pinned</p>
       {pinned.length ? (

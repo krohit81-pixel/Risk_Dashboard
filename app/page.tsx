@@ -34,17 +34,28 @@ import type { RunRecord } from "@/lib/runStore";
 import { ResearchWorkspace } from "@/components/research/ResearchWorkspace";
 import { resolveIntelligence } from "@/lib/layman";
 import { AppFooter } from "@/components/shared/AppFooter";
+import type { UserConcept } from "@/lib/userConcepts";
 
 export default function Page() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [learning, setLearning] = useState(false);
-  const [tab, setTab] = useState<"today" | "markets" | "research" | "learn">("today");
+  const [tab, setTab] = useState<"today" | "markets" | "research" | "learn" | "settings">("today");
   const [openConceptId, setOpenConceptId] = useState<string | null>(null);
   const openConcept = (id: string) => {
     setOpenConceptId(id);
     setTab("learn");
+    window.scrollTo(0, 0);
+  };
+
+  // ── Add Concept (Settings) ↔ Your Concepts (Learn → Concept Library) ──
+  // Editing a saved concept routes the user to Settings → Add Concept, pre-filled.
+  const [editConceptTarget, setEditConceptTarget] = useState<UserConcept | null>(null);
+  const [conceptRefreshKey, setConceptRefreshKey] = useState(0);
+  const openEditUserConcept = (c: UserConcept) => {
+    setEditConceptTarget(c);
+    setTab("settings");
     window.scrollTo(0, 0);
   };
 
@@ -179,15 +190,58 @@ export default function Page() {
               </p>
             </div>
           </div>
-          <button
-            onClick={load}
-            disabled={loading}
-            className="rounded-lg border border-line bg-ink-800 px-3 py-1.5 text-2xs font-semibold text-fg-muted transition active:scale-95 disabled:opacity-50"
-            aria-label="Refresh data"
-          >
-            {loading ? "…" : "Refresh"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={load}
+              disabled={loading}
+              className="rounded-lg border border-line bg-ink-800 px-3 py-1.5 text-2xs font-semibold text-fg-muted transition active:scale-95 disabled:opacity-50"
+              aria-label="Refresh data"
+            >
+              {loading ? "…" : "Refresh"}
+            </button>
+            <button
+              onClick={() => {
+                setTab("settings");
+                window.scrollTo(0, 0);
+              }}
+              className={`flex h-[30px] w-[30px] flex-none items-center justify-center rounded-lg border text-sm transition active:scale-95 ${
+                tab === "settings" ? "border-steel/40 bg-steel/10 text-steel" : "border-line bg-ink-800 text-fg-muted"
+              }`}
+              aria-label="Settings"
+            >
+              ⚙️
+            </button>
+          </div>
         </div>
+
+        {/* Executive / Learning view — fixed at the top, alongside the header, while on Home. */}
+        {data && tab === "today" ? (
+          <div className="border-t border-line-soft px-5 py-2">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setLearning(false)}
+                className={`text-[13px] font-semibold transition ${
+                  !learning ? "text-fg" : "text-fg-faint"
+                }`}
+              >
+                Executive view
+              </button>
+              <button
+                onClick={() => setLearning(true)}
+                className={`text-[13px] font-semibold transition ${
+                  learning ? "text-calm" : "text-fg-faint"
+                }`}
+              >
+                Learning view
+              </button>
+            </div>
+            {learning ? (
+              <p className="mt-1 text-2xs leading-relaxed text-fg-faint">
+                Learning view — rewrites the conversation, editorial and Japan sections in plain English.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
       <div className="safe-bottom space-y-6 px-4 pt-4 pb-24">
@@ -210,40 +264,12 @@ export default function Page() {
 
         {data ? (
           <>
-            {tab === "today" ? (
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => setLearning(false)}
-                    className={`text-[13px] font-semibold transition ${
-                      !learning ? "text-fg" : "text-fg-faint"
-                    }`}
-                  >
-                    Executive view
-                  </button>
-                  <button
-                    onClick={() => setLearning(true)}
-                    className={`text-[13px] font-semibold transition ${
-                      learning ? "text-calm" : "text-fg-faint"
-                    }`}
-                  >
-                    Learning view
-                  </button>
-                </div>
-                {learning ? (
-                  <p className="text-2xs leading-relaxed text-fg-faint">
-                    Learning view — rewrites the conversation, editorial and Japan sections in plain English.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {/* ===== TODAY ===== */}
+            {/* ===== TODAY / HOME ===== */}
             {tab === "today" ? (
               <>
                 <MorningBrief brief={data.brief} anyLive={data.anyLive} />
 
-                <CollapsibleSection id="whatchanged" n="01" title="What Changed" hint="biggest movers · risk-ranked" lockOpen>
+                <CollapsibleSection id="whatchanged" n="01" icon="📊" title="What Changed" hint="biggest movers · risk-ranked" lockOpen>
                   <WhatChangedOvernight items={data.overnight} />
                   <div className="mt-3">
                     <CollapsibleSection id="allindicators" n="" title="Show all indicators" defaultOpen={false}>
@@ -252,14 +278,14 @@ export default function Page() {
                   </div>
                 </CollapsibleSection>
 
-                <CollapsibleSection id="developments" n="02" title="Top Developments" hint="last 24–72h" defaultOpen>
+                <CollapsibleSection id="developments" n="02" icon="📰" title="Top Developments" hint="last 24–72h" defaultOpen>
                   <TopDevelopments items={data.developments} />
                 </CollapsibleSection>
 
                 <StaleBanner meta={data.snapshotMeta} />
                 <SnapshotHeader meta={data.snapshotMeta} />
 
-                <CollapsibleSection id="conversation" n="03" title="Today's CRO Conversation" hint="ranked themes · tap Go deeper" lockOpen>
+                <CollapsibleSection id="conversation" n="03" icon="💬" title="Today's CRO Conversation" hint="ranked themes · tap Go deeper" lockOpen>
                   <CroConversation
                     themes={intel!.themes}
                     rawThemes={data.intelligence.themes}
@@ -272,51 +298,30 @@ export default function Page() {
                   />
                 </CollapsibleSection>
 
-                <CollapsibleSection id="editorial" n="04" title="Editorial Intelligence" hint="other developments" defaultOpen={false}>
+                <CollapsibleSection id="editorial" n="04" icon="🗞️" title="Editorial Intelligence" hint="other developments" defaultOpen={false}>
                   <EditorialIntelligence cards={intel!.editorial} rawCards={data.intelligence.editorial} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
                 </CollapsibleSection>
-                <CollapsibleSection id="japanasia" n="05" title="Japan & Asia Watch" hint="daily narrative" defaultOpen={false}>
+                <CollapsibleSection id="japanasia" n="05" icon="🇯🇵" title="Japan & Asia Watch" hint="daily narrative" defaultOpen={false}>
                   <JapanAsiaWatchSection data={intel!.japanAsia} raw={data.intelligence.japanAsia} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
                 </CollapsibleSection>
                 {intel!.radar?.length ? (
-                  <CollapsibleSection id="radar" n="06" title="Also on the Radar" hint="high-relevance near-misses" defaultOpen={false}>
+                  <CollapsibleSection id="radar" n="06" icon="📡" title="Also on the Radar" hint="high-relevance near-misses" defaultOpen={false}>
                     <RadarSection items={intel!.radar} />
                   </CollapsibleSection>
                 ) : null}
-                <CollapsibleSection id="runs" n="07" title="Generation History" hint="recent runs" defaultOpen={false}>
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-2xs leading-relaxed text-fg-faint">
-                      Re-run today's editorial now. Takes ~1–2 minutes; the last good briefing is kept if it fails.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={regenerate}
-                      disabled={regenState === "running"}
-                      className={`flex-none inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-2xs font-semibold transition ${
-                        regenState === "running"
-                          ? "border-line bg-ink-800 text-fg-faint"
-                          : "border-line bg-ink-800 text-steel active:bg-ink-700"
-                      }`}
-                    >
-                      {regenState === "running" ? "↻ Regenerating…" : regenState === "failed" ? "↻ Retry" : "↻ Regenerate"}
-                    </button>
-                  </div>
-                  <RunHistory runs={runs} />
-                  <BloombergRunHistory runs={data.bloombergRuns} />
-                </CollapsibleSection>
               </>
             ) : null}
 
             {/* ===== MARKETS ===== */}
             {tab === "markets" ? (
               <>
-                <CollapsibleSection id="crodash" n="01" title="Key CRO Dashboard" hint="live indicators" defaultOpen>
+                <CollapsibleSection id="crodash" n="01" icon="📈" title="Key CRO Dashboard" hint="live indicators" defaultOpen>
                   <CroDashboard indicators={data.indicators} />
                 </CollapsibleSection>
-                <CollapsibleSection id="japanwatch" n="02" title="Japan Watch" hint="🇯🇵 carry & rates" defaultOpen>
+                <CollapsibleSection id="japanwatch" n="02" icon="🇯🇵" title="Japan Watch" hint="carry & rates" defaultOpen>
                   <JapanWatch indicators={data.japanWatch} />
                 </CollapsibleSection>
-                <CollapsibleSection id="heatmap" n="03" title="Global Risk Heat Map" hint="tap a region" defaultOpen>
+                <CollapsibleSection id="heatmap" n="03" icon="🗺️" title="Global Risk Heat Map" hint="tap a region" defaultOpen>
                   {data.weeklyRefreshedISO ? (
                     <p className="mb-2 rounded-lg border border-steel/25 bg-steel/5 px-3 py-1.5 text-2xs leading-relaxed text-steel">
                       Weekly view · heat map, emerging risks & implications refreshed{" "}
@@ -325,10 +330,10 @@ export default function Page() {
                   ) : null}
                   <RiskHeatMap regions={data.heatMap} />
                 </CollapsibleSection>
-                <CollapsibleSection id="emerging" n="04" title="Top Emerging Risks" hint="watchlist" defaultOpen={false}>
+                <CollapsibleSection id="emerging" n="04" icon="⚠️" title="Top Emerging Risks" hint="watchlist" defaultOpen={false}>
                   <EmergingRisks risks={emergingRisks} />
                 </CollapsibleSection>
-                <CollapsibleSection id="implications" n="05" title="Implications for a Global Bank" hint="CRO playbook" defaultOpen={false}>
+                <CollapsibleSection id="implications" n="05" icon="🏦" title="Implications for a Global Bank" hint="CRO playbook" defaultOpen={false}>
                   <BankImplications items={implications} />
                 </CollapsibleSection>
               </>
@@ -336,7 +341,7 @@ export default function Page() {
 
             {/* ===== RESEARCH ===== */}
             {tab === "research" ? (
-              <CollapsibleSection id="research" n="01" title="Research Workspace" hint="analyze any content" lockOpen>
+              <CollapsibleSection id="research" n="01" icon="🔬" title="Research Workspace" hint="analyze any content" lockOpen>
                 <ResearchWorkspace
                   onOpenConcept={openConcept}
                   onToggleSave={toggleSave}
@@ -348,33 +353,80 @@ export default function Page() {
             {/* ===== LEARN ===== */}
             {tab === "learn" ? (
               <>
-                <CollapsibleSection id="analyses" n="01" title="Saved Analyses" accent="#2DD4A7" hint={`${savedAnalyses.length} item${savedAnalyses.length === 1 ? "" : "s"}`} defaultOpen={savedAnalyses.length > 0}>
+                <CollapsibleSection id="analyses" n="01" icon="⭐" title="Saved Analyses" accent="#2DD4A7" hint={`${savedAnalyses.length} item${savedAnalyses.length === 1 ? "" : "s"}`} defaultOpen={savedAnalyses.length > 0}>
                   <SavedList items={savedAnalyses} onRemove={removeSavedItem} />
                 </CollapsibleSection>
-                <CollapsibleSection id="saved" n="02" title="Saved for Later" accent="#A78BFA" hint={`${savedDaily.length} item${savedDaily.length === 1 ? "" : "s"}`} defaultOpen={savedDaily.length > 0}>
+                <CollapsibleSection id="saved" n="02" icon="🔖" title="Saved for Later" accent="#A78BFA" hint={`${savedDaily.length} item${savedDaily.length === 1 ? "" : "s"}`} defaultOpen={savedDaily.length > 0}>
                   <SavedList items={savedDaily} onRemove={removeSavedItem} />
                 </CollapsibleSection>
-                <CollapsibleSection id="library" n="03" title="Concept Library" accent="#5B8DEF" hint="your growing glossary" defaultOpen>
+                <CollapsibleSection id="library" n="03" icon="📖" title="Concept Library" accent="#5B8DEF" hint="your growing glossary" defaultOpen>
                   <ConceptLibrary
                     conceptSeen={data.conceptSeen ?? {}}
                     openId={openConceptId}
                     onConsumeOpen={() => setOpenConceptId(null)}
+                    onEditUserConcept={openEditUserConcept}
+                    userConceptsRefreshKey={conceptRefreshKey}
                   />
                 </CollapsibleSection>
-                <CollapsibleSection id="addconcept" n="04" title="Add Concept" accent="#2DD4A7" hint="paste → analyze → save" defaultOpen={false}>
-                  <ConceptStudio />
-                </CollapsibleSection>
-                <CollapsibleSection id="weekly" n="05" title="Weekly Summary" accent="#F5A524" hint="generated weekly" defaultOpen={false}>
+                <CollapsibleSection id="weekly" n="04" icon="🗓️" title="Weekly Summary" accent="#F5A524" hint="generated weekly" defaultOpen={false}>
                   <WeeklyLearningSection data={data.intelligence.weekly} />
                 </CollapsibleSection>
-                <CollapsibleSection id="mizuhoref" n="06" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
-                  <MizuhoReference />
+              </>
+            ) : null}
+
+            {/* ===== SETTINGS ===== */}
+            {tab === "settings" ? (
+              <>
+                <p className="-mt-1 mb-1 text-2xs leading-relaxed text-fg-faint">
+                  Appearance, references and maintenance tools live here — out of the way of the daily briefing.
+                </p>
+                <CollapsibleSection id="appearance" n="01" icon="🌓" title="Appearance" accent="#5B8DEF" hint="dark / light" defaultOpen>
+                  <AppearanceToggle />
                 </CollapsibleSection>
-                <CollapsibleSection id="briefingbooks" n="07" title="Briefing Books" accent="#2DD4A7" hint="print / PDF" defaultOpen={false}>
+                <CollapsibleSection id="briefingbooks" n="02" icon="📚" title="Briefing Books" accent="#2DD4A7" hint="print / PDF" defaultOpen={false}>
                   <BriefingBooks />
                 </CollapsibleSection>
-                <CollapsibleSection id="appearance" n="08" title="Appearance" accent="#5B8DEF" hint="dark / light" defaultOpen={false}>
-                  <AppearanceToggle />
+                <CollapsibleSection id="addconcept" n="03" icon="➕" title="Add Concept" accent="#2DD4A7" hint="paste → analyze → save" defaultOpen={!!editConceptTarget}>
+                  <ConceptStudio
+                    editTarget={editConceptTarget}
+                    onEditConsumed={() => setEditConceptTarget(null)}
+                    onSaved={() => setConceptRefreshKey((k) => k + 1)}
+                  />
+                </CollapsibleSection>
+                <CollapsibleSection id="mizuhoref" n="04" icon="🏦" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
+                  <MizuhoReference />
+                </CollapsibleSection>
+                <CollapsibleSection id="runs" n="05" icon="🕘" title="Generation History" accent="#F5A524" hint="today's runs" defaultOpen={false}>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-2xs leading-relaxed text-fg-faint">
+                      Refresh reloads the current briefing. Regenerate re-runs today's editorial (~1–2 minutes; the
+                      last good briefing is kept if it fails).
+                    </p>
+                    <div className="flex flex-none gap-2">
+                      <button
+                        type="button"
+                        onClick={load}
+                        disabled={loading}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-ink-800 px-2.5 py-1.5 text-2xs font-semibold text-fg-muted transition active:scale-95 disabled:opacity-50"
+                      >
+                        {loading ? "…" : "↻ Refresh"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={regenerate}
+                        disabled={regenState === "running"}
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-2xs font-semibold transition ${
+                          regenState === "running"
+                            ? "border-line bg-ink-800 text-fg-faint"
+                            : "border-line bg-ink-800 text-steel active:bg-ink-700"
+                        }`}
+                      >
+                        {regenState === "running" ? "↻ Regenerating…" : regenState === "failed" ? "↻ Retry" : "↻ Regenerate"}
+                      </button>
+                    </div>
+                  </div>
+                  <RunHistory runs={runs} />
+                  <BloombergRunHistory runs={data.bloombergRuns} />
                 </CollapsibleSection>
               </>
             ) : null}
@@ -388,21 +440,22 @@ export default function Page() {
       {data ? (
         <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-app border-t border-line bg-ink-900/95 backdrop-blur-md">
           {([
-            ["today", "Today"],
-            ["markets", "Markets"],
-            ["research", "Research"],
-            ["learn", "Learn"],
-          ] as const).map(([id, label]) => (
+            ["today", "🏠", "Home"],
+            ["markets", "📈", "Markets"],
+            ["research", "🔬", "Research"],
+            ["learn", "🎓", "Learn"],
+          ] as const).map(([id, icon, label]) => (
             <button
               key={id}
               onClick={() => {
                 setTab(id);
                 window.scrollTo(0, 0);
               }}
-              className={`flex-1 py-3 text-xs font-semibold transition ${
+              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-semibold transition ${
                 tab === id ? "text-steel" : "text-fg-faint"
               }`}
             >
+              <span className="text-base leading-none" aria-hidden>{icon}</span>
               {label}
             </button>
           ))}

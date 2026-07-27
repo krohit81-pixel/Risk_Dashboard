@@ -13,6 +13,7 @@ export function CollapsibleSection({
   n,
   title,
   hint,
+  icon,
   defaultOpen = true,
   lockOpen = false,
   accent,
@@ -22,6 +23,8 @@ export function CollapsibleSection({
   n: string;
   title: string;
   hint?: string;
+  /** V5.6 — optional leading emoji/icon shown before the title. */
+  icon?: string;
   defaultOpen?: boolean;
   lockOpen?: boolean;
   /** V4.6 — optional accent color (hex) for the number badge + a small tick. */
@@ -70,7 +73,10 @@ export function CollapsibleSection({
         >
           {n}
         </span>
-        <span className="text-sm font-semibold uppercase tracking-wide text-fg-muted">{title}</span>
+        <span className="text-sm font-semibold uppercase tracking-wide text-fg-muted">
+          {icon ? <span className="mr-1.5 not-italic normal-case tracking-normal">{icon}</span> : null}
+          {title}
+        </span>
         {hint ? <span className="text-2xs text-fg-faint">{hint}</span> : null}
         {!lockOpen ? (
           <span className="ml-auto text-xs text-fg-faint">{show ? "▾" : "▸"}</span>
