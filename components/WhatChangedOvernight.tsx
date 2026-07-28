@@ -1,25 +1,37 @@
 // components/WhatChangedOvernight.tsx
 "use client";
 
-import type { OvernightChange } from "@/lib/types";
+import type { Indicator, OvernightChange } from "@/lib/types";
+import { fmtValue } from "@/lib/format";
+import { ToneTile } from "./shared/ToneTile";
 
-const DOT: Record<OvernightChange["tone"], string> = {
-  negative: "🔴",
-  positive: "🟢",
-  neutral: "🟠",
-};
+function arrowFor(deltaText: string): "up" | "down" | "flat" {
+  const t = deltaText.trim();
+  if (t.startsWith("-") || t.startsWith("−")) return "down";
+  if (t.startsWith("+")) return "up";
+  return "flat";
+}
 
-export function WhatChangedOvernight({ items }: { items: OvernightChange[] }) {
+/** V5.6.4 — the day's biggest movers as a grid of colour-coded tiles (Bloomberg-board style)
+ *  instead of a plain list. `indicators` is optional so the tiles degrade gracefully to
+ *  delta-only if the full indicator set isn't available for some reason. */
+export function WhatChangedOvernight({ items, indicators }: { items: OvernightChange[]; indicators?: Indicator[] }) {
   if (!items.length) return null;
   return (
-    <ul className="space-y-2">
-      {items.map((c) => (
-        <li key={c.id} className="flex items-baseline gap-2.5 text-[15px]">
-          <span aria-hidden>{DOT[c.tone]}</span>
-          <span className="text-fg">{c.label}</span>
-          <span className="tnum ml-auto font-semibold text-fg-muted">{c.deltaText}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="grid grid-cols-2 gap-2.5">
+      {items.map((c) => {
+        const ind = indicators?.find((i) => i.id === c.id);
+        return (
+          <ToneTile
+            key={c.id}
+            tone={c.tone}
+            label={c.label}
+            value={ind ? fmtValue(ind.value, ind) : undefined}
+            changeText={c.deltaText}
+            arrow={arrowFor(c.deltaText)}
+          />
+        );
+      })}
+    </div>
   );
 }

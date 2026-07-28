@@ -274,7 +274,7 @@ export default function Page() {
                 <MorningBrief brief={data.brief} anyLive={data.anyLive} />
 
                 <CollapsibleSection id="whatchanged" n="01" title="What Changed" hint="biggest movers · risk-ranked" lockOpen>
-                  <WhatChangedOvernight items={data.overnight} />
+                  <WhatChangedOvernight items={data.overnight} indicators={data.indicators} />
                   <div className="mt-3">
                     <CollapsibleSection id="allindicators" n="" title="Show all indicators" defaultOpen={false}>
                       <WhatChanged indicators={data.indicators} />
