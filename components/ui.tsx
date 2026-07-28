@@ -75,10 +75,13 @@ const SEVERITY_STYLE: Record<Severity, string> = {
   High: "bg-stress/10 text-stress border-stress/25",
 };
 
-export function SeverityPill({ severity }: { severity: Severity }) {
+/** V5.6.3 — `dense` shrinks text/padding for tight card-header rows (CRO Conversation, Editorial). */
+export function SeverityPill({ severity, dense = false }: { severity: Severity; dense?: boolean }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-2xs font-semibold ${SEVERITY_STYLE[severity]}`}
+      className={`inline-flex items-center rounded-full border font-semibold ${SEVERITY_STYLE[severity]} ${
+        dense ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-2xs"
+      }`}
     >
       {severity}
     </span>
@@ -101,9 +104,14 @@ export function HeatDot({ heat }: { heat: Heat }) {
   );
 }
 
-export function Chip({ children }: { children: ReactNode }) {
+/** V5.6.3 — `dense` shrinks text/padding for tight card-header rows (CRO Conversation, Editorial). */
+export function Chip({ children, dense = false }: { children: ReactNode; dense?: boolean }) {
   return (
-    <span className="inline-flex items-center rounded-md border border-line bg-ink-700 px-2 py-0.5 text-2xs font-medium text-fg-muted">
+    <span
+      className={`inline-flex items-center rounded-md border border-line bg-ink-700 font-medium text-fg-muted ${
+        dense ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-2xs"
+      }`}
+    >
       {children}
     </span>
   );

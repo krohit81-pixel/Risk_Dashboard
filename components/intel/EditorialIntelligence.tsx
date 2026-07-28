@@ -38,12 +38,12 @@ export function EditorialIntelligence({
       <div className="space-y-3">
         {cards.map((c) => (
           <Card key={c.id} className="px-4 py-3.5">
-            <div className="mb-1.5 flex flex-wrap items-center gap-2">
-              <Chip>{c.category}</Chip>
-              <SeverityPill severity={c.severity} />
-              <HorizonPill horizon={c.horizon} />
-            </div>
             <h3 className="text-[15px] font-semibold leading-snug text-fg">{c.title}</h3>
+            <div className="mb-1.5 mt-1.5 flex flex-wrap items-center gap-1.5">
+              <Chip dense>{c.category}</Chip>
+              <SeverityPill severity={c.severity} dense />
+              <HorizonPill horizon={c.horizon} dense />
+            </div>
 
             <p className="mt-2 text-[13px] leading-relaxed text-fg-muted">
               <span className="text-2xs font-semibold uppercase tracking-wide text-steel">

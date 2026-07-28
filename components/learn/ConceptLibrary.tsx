@@ -82,6 +82,9 @@ type EntryMeta = {
   themes?: string[];
 };
 
+/** V5.6.3 — two-line card row: term (+ pin) on top so long terms wrap cleanly, category
+ *  capsule + meta label on their own line below. Pinned rows get a subtle amber tint so
+ *  "floats to the top" is visible, not just positional. */
 function EntryRow({
   entry,
   pinned,
@@ -96,22 +99,85 @@ function EntryRow({
   return (
     <div
       onClick={onOpen}
-      className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-line bg-ink-800 px-3.5 py-3"
+      className={`cursor-pointer rounded-xl border px-3.5 py-3 transition ${
+        pinned ? "border-amber/30 bg-amber/5" : "border-line bg-ink-800"
+      }`}
     >
-      <span className="text-[15px] font-semibold text-fg">{entry.term}</span>
-      <span className="rounded-full border border-line bg-ink-700 px-2 py-0.5 text-2xs font-semibold text-fg-muted">
-        {entry.category}
-      </span>
-      <span className="ml-auto whitespace-nowrap text-2xs text-fg-faint">{entry.metaLabel}</span>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onTogglePin();
-        }}
-        className={`text-base ${pinned ? "text-amber" : "text-fg-faint"}`}
-      >
-        {pinned ? "★" : "☆"}
-      </button>
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-[15px] font-semibold leading-snug text-fg">{entry.term}</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePin();
+          }}
+          className={`-mt-0.5 flex-none text-base leading-none ${pinned ? "text-amber" : "text-fg-faint"}`}
+          aria-label={pinned ? "Unpin" : "Pin"}
+        >
+          {pinned ? "★" : "☆"}
+        </button>
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <span className="rounded-full border border-line bg-ink-700 px-2 py-0.5 text-2xs font-semibold text-fg-muted">
+          {entry.category}
+        </span>
+        <span className="text-2xs text-fg-faint">{entry.metaLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+/** V5.6.3 — groups a sorted entry list into an explicit "Pinned" cluster up top, so pinning
+ *  reads as an unmistakable, labelled group rather than a subtle sort-order change. */
+function EntryList({
+  entries,
+  pins,
+  onOpen,
+  onTogglePin,
+  emptyMessage,
+}: {
+  entries: EntryMeta[];
+  pins: Set<string>;
+  onOpen: (id: string) => void;
+  onTogglePin: (id: string) => void;
+  emptyMessage: string;
+}) {
+  if (entries.length === 0) {
+    return <p className="text-2xs text-fg-faint">{emptyMessage}</p>;
+  }
+  const pinnedEntries = entries.filter((e) => pins.has(e.id));
+  const restEntries = entries.filter((e) => !pins.has(e.id));
+  return (
+    <div className="space-y-3">
+      {pinnedEntries.length ? (
+        <div className="space-y-2">
+          <p className="text-2xs font-bold uppercase tracking-wide text-amber">📌 Pinned</p>
+          {pinnedEntries.map((entry) => (
+            <EntryRow
+              key={entry.id}
+              entry={entry}
+              pinned
+              onOpen={() => onOpen(entry.id)}
+              onTogglePin={() => onTogglePin(entry.id)}
+            />
+          ))}
+        </div>
+      ) : null}
+      {restEntries.length ? (
+        <div className="space-y-2">
+          {pinnedEntries.length ? (
+            <p className="pt-1 text-2xs font-bold uppercase tracking-wide text-fg-faint">All</p>
+          ) : null}
+          {restEntries.map((entry) => (
+            <EntryRow
+              key={entry.id}
+              entry={entry}
+              pinned={false}
+              onOpen={() => onOpen(entry.id)}
+              onTogglePin={() => onTogglePin(entry.id)}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -372,22 +438,14 @@ export function ConceptLibrary({
       >
         {loadingUser ? (
           <p className="text-2xs text-fg-faint">Loading…</p>
-        ) : sortedUser.length === 0 ? (
-          <p className="text-2xs text-fg-faint">
-            Nothing added yet — use Settings → Add Concept to paste some text and get started.
-          </p>
         ) : (
-          <div className="space-y-2">
-            {sortedUser.map((entry) => (
-              <EntryRow
-                key={entry.id}
-                entry={entry}
-                pinned={pins.has(entry.id)}
-                onOpen={() => setSelectedId(entry.id)}
-                onTogglePin={() => togglePin(entry.id)}
-              />
-            ))}
-          </div>
+          <EntryList
+            entries={sortedUser}
+            pins={pins}
+            onOpen={setSelectedId}
+            onTogglePin={togglePin}
+            emptyMessage="Nothing added yet — use Settings → Add Concept to paste some text and get started."
+          />
         )}
       </CollapsibleSection>
 
@@ -405,17 +463,13 @@ export function ConceptLibrary({
             placeholder="Search concepts…  (e.g. carry, IRRBB, CET1)"
             className="mb-3 w-full rounded-xl border border-line bg-ink-800 px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-faint"
           />
-          <div className="space-y-2">
-            {filteredCurated.map((entry) => (
-              <EntryRow
-                key={entry.id}
-                entry={entry}
-                pinned={pins.has(entry.id)}
-                onOpen={() => setSelectedId(entry.id)}
-                onTogglePin={() => togglePin(entry.id)}
-              />
-            ))}
-          </div>
+          <EntryList
+            entries={filteredCurated}
+            pins={pins}
+            onOpen={setSelectedId}
+            onTogglePin={togglePin}
+            emptyMessage="No concepts match your search."
+          />
           <p className="mt-4 text-2xs leading-relaxed text-fg-faint">
             Concepts are collected automatically as themes mention them, and you can pin the ones you care about —
             pinned concepts float to the top. Each entry shows where you first met it and how often it has recurred.

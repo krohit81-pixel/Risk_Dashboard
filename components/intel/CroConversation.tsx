@@ -52,16 +52,6 @@ function ThemeCard({ theme: t, raw, learning, onOpenConcept, savedIds, onToggleS
   const [cardOpen, setCardOpen] = useState(false); // V4.7 — collapsed by default; tap title to expand
   return (
     <Card className="px-4 py-3.5">
-      <div className="mb-1 flex flex-wrap items-center gap-2">
-        <Chip>{t.category}</Chip>
-        <SeverityPill severity={t.severity} />
-        <HorizonPill horizon={t.horizon} />
-      </div>
-      {t.isNew || (t.dayN && t.dayN > 1) ? (
-        <div className="mb-1.5 flex justify-end">
-          <PersistenceBadge theme={t} />
-        </div>
-      ) : null}
       <button
         type="button"
         onClick={() => setCardOpen((v) => !v)}
@@ -71,9 +61,19 @@ function ThemeCard({ theme: t, raw, learning, onOpenConcept, savedIds, onToggleS
         <h3 className="flex-1 text-[15px] font-semibold leading-snug text-fg">{t.title}</h3>
         <span className="mt-0.5 flex-none text-xs text-fg-faint">{cardOpen ? "\u25be" : "\u25b8"}</span>
       </button>
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <Chip dense>{t.category}</Chip>
+        <SeverityPill severity={t.severity} dense />
+        <HorizonPill horizon={t.horizon} dense />
+      </div>
 
       {cardOpen ? (
         <>
+          {t.isNew || (t.dayN && t.dayN > 1) ? (
+            <div className="mt-2">
+              <PersistenceBadge theme={t} />
+            </div>
+          ) : null}
           {t.whatsNew ? (
             <p className="mt-2 rounded-lg border border-calm/30 bg-calm/5 px-2.5 py-1.5 text-2xs leading-relaxed text-calm">
               <span className="font-semibold">What&rsquo;s new: </span>
