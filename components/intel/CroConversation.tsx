@@ -52,14 +52,16 @@ function ThemeCard({ theme: t, raw, learning, onOpenConcept, savedIds, onToggleS
   const [cardOpen, setCardOpen] = useState(false); // V4.7 — collapsed by default; tap title to expand
   return (
     <Card className="px-4 py-3.5">
-      <div className="mb-1.5 flex items-start justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Chip>{t.category}</Chip>
-          <SeverityPill severity={t.severity} />
-          <HorizonPill horizon={t.horizon} inline />
-        </div>
-        <PersistenceBadge theme={t} />
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <Chip>{t.category}</Chip>
+        <SeverityPill severity={t.severity} />
+        <HorizonPill horizon={t.horizon} />
       </div>
+      {t.isNew || (t.dayN && t.dayN > 1) ? (
+        <div className="mb-1.5 flex justify-end">
+          <PersistenceBadge theme={t} />
+        </div>
+      ) : null}
       <button
         type="button"
         onClick={() => setCardOpen((v) => !v)}

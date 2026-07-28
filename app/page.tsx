@@ -34,6 +34,7 @@ import type { RunRecord } from "@/lib/runStore";
 import { ResearchWorkspace } from "@/components/research/ResearchWorkspace";
 import { resolveIntelligence } from "@/lib/layman";
 import { AppFooter } from "@/components/shared/AppFooter";
+import { HomeIcon, MarketsIcon, ResearchIcon, LearnIcon } from "@/components/shared/NavIcons";
 import type { UserConcept } from "@/lib/userConcepts";
 
 export default function Page() {
@@ -362,7 +363,7 @@ export default function Page() {
                 <CollapsibleSection id="saved" n="02" title="Saved for Later" accent="#A78BFA" hint={`${savedDaily.length} item${savedDaily.length === 1 ? "" : "s"}`} defaultOpen={savedDaily.length > 0}>
                   <SavedList items={savedDaily} onRemove={removeSavedItem} />
                 </CollapsibleSection>
-                <CollapsibleSection id="library" n="03" title="Concept Library" accent="#5B8DEF" hint="your growing glossary" defaultOpen>
+                <CollapsibleSection id="learn-library" n="03" title="Concept Library" accent="#5B8DEF" hint="your growing glossary" defaultOpen>
                   <ConceptLibrary
                     conceptSeen={data.conceptSeen ?? {}}
                     openId={openConceptId}
@@ -383,23 +384,23 @@ export default function Page() {
                 <p className="-mt-1 mb-1 text-2xs leading-relaxed text-fg-faint">
                   Appearance, references and maintenance tools live here — out of the way of the daily briefing.
                 </p>
-                <CollapsibleSection id="appearance" n="01" title="Appearance" accent="#5B8DEF" hint="dark / light" defaultOpen>
+                <CollapsibleSection id="settings-appearance" n="01" title="Appearance" accent="#5B8DEF" hint="dark / light" defaultOpen>
                   <AppearanceToggle />
                 </CollapsibleSection>
-                <CollapsibleSection id="briefingbooks" n="02" title="Briefing Books" accent="#2DD4A7" hint="print / PDF" defaultOpen={false}>
+                <CollapsibleSection id="settings-briefingbooks" n="02" title="Briefing Books" accent="#2DD4A7" hint="print / PDF" defaultOpen={false}>
                   <BriefingBooks />
                 </CollapsibleSection>
-                <CollapsibleSection id="addconcept" n="03" title="Add Concept" accent="#2DD4A7" hint="paste → analyze → save" defaultOpen={!!editConceptTarget}>
+                <CollapsibleSection id="settings-addconcept" n="03" title="Add Concept" accent="#2DD4A7" hint="paste → analyze → save" defaultOpen={!!editConceptTarget}>
                   <ConceptStudio
                     editTarget={editConceptTarget}
                     onEditConsumed={() => setEditConceptTarget(null)}
                     onSaved={() => setConceptRefreshKey((k) => k + 1)}
                   />
                 </CollapsibleSection>
-                <CollapsibleSection id="mizuhoref" n="04" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
+                <CollapsibleSection id="settings-mizuhoref" n="04" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
                   <MizuhoReference />
                 </CollapsibleSection>
-                <CollapsibleSection id="runs" n="05" title="Generation History" accent="#F5A524" hint="today's runs" defaultOpen={false}>
+                <CollapsibleSection id="settings-genhistory" n="05" title="Generation History" accent="#F5A524" hint="today's runs" defaultOpen={false}>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-2xs leading-relaxed text-fg-faint">
                       Refresh reloads the current briefing. Regenerate re-runs today's editorial (~1–2 minutes; the
@@ -443,21 +444,22 @@ export default function Page() {
       {data ? (
         <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-app border-t border-line bg-ink-900/95 backdrop-blur-md">
           {([
-            ["today", "Home"],
-            ["markets", "Markets"],
-            ["research", "Research"],
-            ["learn", "Learn"],
-          ] as const).map(([id, label]) => (
+            ["today", "Home", HomeIcon],
+            ["markets", "Markets", MarketsIcon],
+            ["research", "Research", ResearchIcon],
+            ["learn", "Learn", LearnIcon],
+          ] as const).map(([id, label, Icon]) => (
             <button
               key={id}
               onClick={() => {
                 setTab(id);
                 window.scrollTo(0, 0);
               }}
-              className={`flex-1 py-3 text-xs font-semibold transition ${
+              className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-semibold transition ${
                 tab === id ? "text-steel" : "text-fg-faint"
               }`}
             >
+              <Icon className="h-5 w-5" />
               {label}
             </button>
           ))}

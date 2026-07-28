@@ -1,7 +1,6 @@
 // components/RiskGauge.tsx
 "use client";
 
-import { RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";
 import type { RiskStatus } from "@/lib/types";
 
 const COLORS: Record<RiskStatus, string> = {
@@ -12,8 +11,8 @@ const COLORS: Record<RiskStatus, string> = {
 };
 
 /**
- * Semicircular risk meter. score ∈ [-3, +3] → 0..100.
- * Higher = more risk-off / stressed.
+ * V5.6.2 — slim horizontal risk meter (replaces the semicircle donut for a cleaner,
+ * more editorial look). score ∈ [-3, +3] → 0..100 position along a calm→stress gradient.
  */
 export function RiskGauge({
   score,
@@ -22,40 +21,34 @@ export function RiskGauge({
   score: number;
   status: RiskStatus;
 }) {
-  const pct = Math.round(((score + 3) / 6) * 100);
+  const pct = Math.min(100, Math.max(0, Math.round(((score + 3) / 6) * 100)));
   const color = COLORS[status];
-  const data = [{ name: "risk", value: pct, fill: color }];
 
   return (
-    <div className="relative h-[104px] w-[180px] select-none">
-      <RadialBarChart
-        width={180}
-        height={180}
-        cx={90}
-        cy={104}
-        innerRadius={70}
-        outerRadius={92}
-        barSize={14}
-        data={data}
-        startAngle={180}
-        endAngle={0}
-      >
-        <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
-        <RadialBar
-          background={{ fill: "rgb(var(--ink-700))" }}
-          dataKey="value"
-          cornerRadius={8}
-          angleAxisId={0}
-        />
-      </RadialBarChart>
-      <div className="pointer-events-none absolute inset-x-0 bottom-1 flex flex-col items-center">
-        <span
-          className="text-2xl font-bold tracking-tightest"
-          style={{ color }}
-        >
+    <div className="w-[152px] select-none pt-0.5">
+      <div className="text-right">
+        <span className="text-xl font-bold leading-tight tracking-tightest" style={{ color }}>
           {status}
         </span>
-        <span className="text-2xs text-fg-faint">risk environment</span>
+        <p className="text-2xs text-fg-faint">risk environment</p>
+      </div>
+
+      <div
+        className="relative mt-3 h-1.5 w-full rounded-full"
+        style={{
+          background:
+            "linear-gradient(90deg, rgb(var(--calm)) 0%, rgb(var(--steel)) 38%, rgb(var(--elevated)) 68%, rgb(var(--stress)) 100%)",
+        }}
+      >
+        <span
+          className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px]"
+          style={{ left: `${pct}%`, backgroundColor: color, borderColor: "rgb(var(--ink-800))" }}
+        />
+      </div>
+
+      <div className="mt-1 flex justify-between text-[9px] font-medium uppercase tracking-wide text-fg-faint">
+        <span>Calm</span>
+        <span>High</span>
       </div>
     </div>
   );
