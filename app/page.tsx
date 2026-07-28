@@ -49,6 +49,14 @@ export default function Page() {
     window.scrollTo(0, 0);
   };
 
+  // V5.6.1 — today's date in the header (replaces the old top Refresh button; Refresh now
+  // lives in Settings → Generation History). Gated on mount to avoid a server/client date mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const todayLabel = mounted
+    ? new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+    : "";
+
   // ── Add Concept (Settings) ↔ Your Concepts (Learn → Concept Library) ──
   // Editing a saved concept routes the user to Settings → Add Concept, pre-filled.
   const [editConceptTarget, setEditConceptTarget] = useState<UserConcept | null>(null);
@@ -190,26 +198,21 @@ export default function Page() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={load}
-              disabled={loading}
-              className="rounded-lg border border-line bg-ink-800 px-3 py-1.5 text-2xs font-semibold text-fg-muted transition active:scale-95 disabled:opacity-50"
-              aria-label="Refresh data"
-            >
-              {loading ? "…" : "Refresh"}
-            </button>
+          <div className="flex items-center gap-3">
+            <span className="text-2xs font-semibold text-fg-muted">{todayLabel}</span>
             <button
               onClick={() => {
                 setTab("settings");
                 window.scrollTo(0, 0);
               }}
-              className={`flex h-[30px] w-[30px] flex-none items-center justify-center rounded-lg border text-sm transition active:scale-95 ${
-                tab === "settings" ? "border-steel/40 bg-steel/10 text-steel" : "border-line bg-ink-800 text-fg-muted"
+              className={`flex h-[30px] w-[30px] flex-none flex-col items-center justify-center gap-[3px] rounded-lg border transition active:scale-95 ${
+                tab === "settings" ? "border-steel/40 bg-steel/10" : "border-line bg-ink-800"
               }`}
               aria-label="Settings"
             >
-              ⚙️
+              <span className={`h-[2px] w-4 rounded-full ${tab === "settings" ? "bg-steel" : "bg-fg-muted"}`} />
+              <span className={`h-[2px] w-4 rounded-full ${tab === "settings" ? "bg-steel" : "bg-fg-muted"}`} />
+              <span className={`h-[2px] w-4 rounded-full ${tab === "settings" ? "bg-steel" : "bg-fg-muted"}`} />
             </button>
           </div>
         </div>
@@ -269,7 +272,7 @@ export default function Page() {
               <>
                 <MorningBrief brief={data.brief} anyLive={data.anyLive} />
 
-                <CollapsibleSection id="whatchanged" n="01" icon="📊" title="What Changed" hint="biggest movers · risk-ranked" lockOpen>
+                <CollapsibleSection id="whatchanged" n="01" title="What Changed" hint="biggest movers · risk-ranked" lockOpen>
                   <WhatChangedOvernight items={data.overnight} />
                   <div className="mt-3">
                     <CollapsibleSection id="allindicators" n="" title="Show all indicators" defaultOpen={false}>
@@ -278,14 +281,14 @@ export default function Page() {
                   </div>
                 </CollapsibleSection>
 
-                <CollapsibleSection id="developments" n="02" icon="📰" title="Top Developments" hint="last 24–72h" defaultOpen>
+                <CollapsibleSection id="developments" n="02" title="Top Developments" hint="last 24–72h" defaultOpen>
                   <TopDevelopments items={data.developments} />
                 </CollapsibleSection>
 
                 <StaleBanner meta={data.snapshotMeta} />
                 <SnapshotHeader meta={data.snapshotMeta} />
 
-                <CollapsibleSection id="conversation" n="03" icon="💬" title="Today's CRO Conversation" hint="ranked themes · tap Go deeper" lockOpen>
+                <CollapsibleSection id="conversation" n="03" title="Today's CRO Conversation" hint="ranked themes · tap Go deeper" lockOpen>
                   <CroConversation
                     themes={intel!.themes}
                     rawThemes={data.intelligence.themes}
@@ -298,14 +301,14 @@ export default function Page() {
                   />
                 </CollapsibleSection>
 
-                <CollapsibleSection id="editorial" n="04" icon="🗞️" title="Editorial Intelligence" hint="other developments" defaultOpen={false}>
+                <CollapsibleSection id="editorial" n="04" title="Editorial Intelligence" hint="other developments" defaultOpen={false}>
                   <EditorialIntelligence cards={intel!.editorial} rawCards={data.intelligence.editorial} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
                 </CollapsibleSection>
-                <CollapsibleSection id="japanasia" n="05" icon="🇯🇵" title="Japan & Asia Watch" hint="daily narrative" defaultOpen={false}>
+                <CollapsibleSection id="japanasia" n="05" title="Japan & Asia Watch" hint="daily narrative" defaultOpen={false}>
                   <JapanAsiaWatchSection data={intel!.japanAsia} raw={data.intelligence.japanAsia} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
                 </CollapsibleSection>
                 {intel!.radar?.length ? (
-                  <CollapsibleSection id="radar" n="06" icon="📡" title="Also on the Radar" hint="high-relevance near-misses" defaultOpen={false}>
+                  <CollapsibleSection id="radar" n="06" title="Also on the Radar" hint="high-relevance near-misses" defaultOpen={false}>
                     <RadarSection items={intel!.radar} />
                   </CollapsibleSection>
                 ) : null}
@@ -315,13 +318,13 @@ export default function Page() {
             {/* ===== MARKETS ===== */}
             {tab === "markets" ? (
               <>
-                <CollapsibleSection id="crodash" n="01" icon="📈" title="Key CRO Dashboard" hint="live indicators" defaultOpen>
+                <CollapsibleSection id="crodash" n="01" title="Key CRO Dashboard" hint="live indicators" defaultOpen>
                   <CroDashboard indicators={data.indicators} />
                 </CollapsibleSection>
-                <CollapsibleSection id="japanwatch" n="02" icon="🇯🇵" title="Japan Watch" hint="carry & rates" defaultOpen>
+                <CollapsibleSection id="japanwatch" n="02" title="Japan Watch" hint="carry & rates" defaultOpen>
                   <JapanWatch indicators={data.japanWatch} />
                 </CollapsibleSection>
-                <CollapsibleSection id="heatmap" n="03" icon="🗺️" title="Global Risk Heat Map" hint="tap a region" defaultOpen>
+                <CollapsibleSection id="heatmap" n="03" title="Global Risk Heat Map" hint="tap a region" defaultOpen>
                   {data.weeklyRefreshedISO ? (
                     <p className="mb-2 rounded-lg border border-steel/25 bg-steel/5 px-3 py-1.5 text-2xs leading-relaxed text-steel">
                       Weekly view · heat map, emerging risks & implications refreshed{" "}
@@ -330,10 +333,10 @@ export default function Page() {
                   ) : null}
                   <RiskHeatMap regions={data.heatMap} />
                 </CollapsibleSection>
-                <CollapsibleSection id="emerging" n="04" icon="⚠️" title="Top Emerging Risks" hint="watchlist" defaultOpen={false}>
+                <CollapsibleSection id="emerging" n="04" title="Top Emerging Risks" hint="watchlist" defaultOpen={false}>
                   <EmergingRisks risks={emergingRisks} />
                 </CollapsibleSection>
-                <CollapsibleSection id="implications" n="05" icon="🏦" title="Implications for a Global Bank" hint="CRO playbook" defaultOpen={false}>
+                <CollapsibleSection id="implications" n="05" title="Implications for a Global Bank" hint="CRO playbook" defaultOpen={false}>
                   <BankImplications items={implications} />
                 </CollapsibleSection>
               </>
@@ -341,7 +344,7 @@ export default function Page() {
 
             {/* ===== RESEARCH ===== */}
             {tab === "research" ? (
-              <CollapsibleSection id="research" n="01" icon="🔬" title="Research Workspace" hint="analyze any content" lockOpen>
+              <CollapsibleSection id="research" n="01" title="Research Workspace" hint="analyze any content" lockOpen>
                 <ResearchWorkspace
                   onOpenConcept={openConcept}
                   onToggleSave={toggleSave}
@@ -353,13 +356,13 @@ export default function Page() {
             {/* ===== LEARN ===== */}
             {tab === "learn" ? (
               <>
-                <CollapsibleSection id="analyses" n="01" icon="⭐" title="Saved Analyses" accent="#2DD4A7" hint={`${savedAnalyses.length} item${savedAnalyses.length === 1 ? "" : "s"}`} defaultOpen={savedAnalyses.length > 0}>
+                <CollapsibleSection id="analyses" n="01" title="Saved Analyses" accent="#2DD4A7" hint={`${savedAnalyses.length} item${savedAnalyses.length === 1 ? "" : "s"}`} defaultOpen={savedAnalyses.length > 0}>
                   <SavedList items={savedAnalyses} onRemove={removeSavedItem} />
                 </CollapsibleSection>
-                <CollapsibleSection id="saved" n="02" icon="🔖" title="Saved for Later" accent="#A78BFA" hint={`${savedDaily.length} item${savedDaily.length === 1 ? "" : "s"}`} defaultOpen={savedDaily.length > 0}>
+                <CollapsibleSection id="saved" n="02" title="Saved for Later" accent="#A78BFA" hint={`${savedDaily.length} item${savedDaily.length === 1 ? "" : "s"}`} defaultOpen={savedDaily.length > 0}>
                   <SavedList items={savedDaily} onRemove={removeSavedItem} />
                 </CollapsibleSection>
-                <CollapsibleSection id="library" n="03" icon="📖" title="Concept Library" accent="#5B8DEF" hint="your growing glossary" defaultOpen>
+                <CollapsibleSection id="library" n="03" title="Concept Library" accent="#5B8DEF" hint="your growing glossary" defaultOpen>
                   <ConceptLibrary
                     conceptSeen={data.conceptSeen ?? {}}
                     openId={openConceptId}
@@ -368,7 +371,7 @@ export default function Page() {
                     userConceptsRefreshKey={conceptRefreshKey}
                   />
                 </CollapsibleSection>
-                <CollapsibleSection id="weekly" n="04" icon="🗓️" title="Weekly Summary" accent="#F5A524" hint="generated weekly" defaultOpen={false}>
+                <CollapsibleSection id="weekly" n="04" title="Weekly Summary" accent="#F5A524" hint="generated weekly" defaultOpen={false}>
                   <WeeklyLearningSection data={data.intelligence.weekly} />
                 </CollapsibleSection>
               </>
@@ -380,23 +383,23 @@ export default function Page() {
                 <p className="-mt-1 mb-1 text-2xs leading-relaxed text-fg-faint">
                   Appearance, references and maintenance tools live here — out of the way of the daily briefing.
                 </p>
-                <CollapsibleSection id="appearance" n="01" icon="🌓" title="Appearance" accent="#5B8DEF" hint="dark / light" defaultOpen>
+                <CollapsibleSection id="appearance" n="01" title="Appearance" accent="#5B8DEF" hint="dark / light" defaultOpen>
                   <AppearanceToggle />
                 </CollapsibleSection>
-                <CollapsibleSection id="briefingbooks" n="02" icon="📚" title="Briefing Books" accent="#2DD4A7" hint="print / PDF" defaultOpen={false}>
+                <CollapsibleSection id="briefingbooks" n="02" title="Briefing Books" accent="#2DD4A7" hint="print / PDF" defaultOpen={false}>
                   <BriefingBooks />
                 </CollapsibleSection>
-                <CollapsibleSection id="addconcept" n="03" icon="➕" title="Add Concept" accent="#2DD4A7" hint="paste → analyze → save" defaultOpen={!!editConceptTarget}>
+                <CollapsibleSection id="addconcept" n="03" title="Add Concept" accent="#2DD4A7" hint="paste → analyze → save" defaultOpen={!!editConceptTarget}>
                   <ConceptStudio
                     editTarget={editConceptTarget}
                     onEditConsumed={() => setEditConceptTarget(null)}
                     onSaved={() => setConceptRefreshKey((k) => k + 1)}
                   />
                 </CollapsibleSection>
-                <CollapsibleSection id="mizuhoref" n="04" icon="🏦" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
+                <CollapsibleSection id="mizuhoref" n="04" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
                   <MizuhoReference />
                 </CollapsibleSection>
-                <CollapsibleSection id="runs" n="05" icon="🕘" title="Generation History" accent="#F5A524" hint="today's runs" defaultOpen={false}>
+                <CollapsibleSection id="runs" n="05" title="Generation History" accent="#F5A524" hint="today's runs" defaultOpen={false}>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-2xs leading-relaxed text-fg-faint">
                       Refresh reloads the current briefing. Regenerate re-runs today's editorial (~1–2 minutes; the
@@ -440,22 +443,21 @@ export default function Page() {
       {data ? (
         <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-app border-t border-line bg-ink-900/95 backdrop-blur-md">
           {([
-            ["today", "🏠", "Home"],
-            ["markets", "📈", "Markets"],
-            ["research", "🔬", "Research"],
-            ["learn", "🎓", "Learn"],
-          ] as const).map(([id, icon, label]) => (
+            ["today", "Home"],
+            ["markets", "Markets"],
+            ["research", "Research"],
+            ["learn", "Learn"],
+          ] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => {
                 setTab(id);
                 window.scrollTo(0, 0);
               }}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-semibold transition ${
+              className={`flex-1 py-3 text-xs font-semibold transition ${
                 tab === id ? "text-steel" : "text-fg-faint"
               }`}
             >
-              <span className="text-base leading-none" aria-hidden>{icon}</span>
               {label}
             </button>
           ))}
