@@ -41,16 +41,25 @@ export async function quote(symbol: string): Promise<Quote | null> {
         ? meta.regularMarketPrice
         : clean[clean.length - 1];
 
+    // V5.6.5 — prefer the prior trading day's close from the actual daily series. Yahoo's
+    // meta.chartPreviousClose is NOT "yesterday's close" — it's the close immediately before
+    // the *start* of the requested range (here, range=1mo), i.e. roughly a month old. Using it
+    // as "previous" silently compared today's value against a stale, month-old baseline (e.g.
+    // Brent Crude showing a large "overnight" delta that was actually a month of drift).
+    // meta.previousClose / chartPreviousClose are kept only as a last-resort fallback for the
+    // rare case the daily series itself is too short.
     let previous =
-      typeof meta.chartPreviousClose === "number"
-        ? meta.chartPreviousClose
+      clean.length >= 2
+        ? clean[clean.length - 2]
         : typeof meta.previousClose === "number"
         ? meta.previousClose
-        : clean[clean.length - 2];
+        : typeof meta.chartPreviousClose === "number"
+        ? meta.chartPreviousClose
+        : undefined;
 
-    // If meta gave us the same point, step back one close.
-    if (value === previous && clean.length >= 2) {
-      previous = clean[clean.length - 2];
+    // If that still landed on the same point as value (e.g. today's bar duplicated), step back once more.
+    if (value === previous && clean.length >= 3) {
+      previous = clean[clean.length - 3];
     }
 
     if (typeof value !== "number" || typeof previous !== "number") return null;
