@@ -23,6 +23,7 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { WhatChangedOvernight } from "@/components/WhatChangedOvernight";
 import { ConceptLibrary } from "@/components/learn/ConceptLibrary";
 import { MizuhoReference } from "@/components/learn/MizuhoReference";
+import { BankEarnings } from "@/components/learn/BankEarnings";
 import { BriefingBooks } from "@/components/learn/BriefingBooks";
 import { AppearanceToggle } from "@/components/learn/AppearanceToggle";
 import { ConceptStudio } from "@/components/learn/ConceptStudio";
@@ -400,7 +401,10 @@ export default function Page() {
                 <CollapsibleSection id="settings-mizuhoref" n="04" title="Mizuho Reference" accent="#B79BFF" hint="disclosed positions" defaultOpen={false}>
                   <MizuhoReference />
                 </CollapsibleSection>
-                <CollapsibleSection id="settings-genhistory" n="05" title="Generation History" accent="#F5A524" hint="today's runs" defaultOpen={false}>
+                <CollapsibleSection id="settings-bankearnings" n="05" title="Bank Earnings" accent="#5B8DEF" hint="latest quarter · 15 banks" defaultOpen={false}>
+                  <BankEarnings />
+                </CollapsibleSection>
+                <CollapsibleSection id="settings-genhistory" n="06" title="Generation History" accent="#F5A524" hint="today's runs" defaultOpen={false}>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-2xs leading-relaxed text-fg-faint">
                       Refresh reloads the current briefing. Regenerate re-runs today's editorial (~1–2 minutes; the
