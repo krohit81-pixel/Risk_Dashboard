@@ -2,13 +2,15 @@
 
 // components/learn/BankEarnings.tsx
 // V5.7.0 — "Bank Earnings" prototype: latest-quarter results for 15 major banks, grouped by
-// region, each as a collapsible card (highlights / market reaction / risk watch). Lives in
-// Settings, per the same "reference material" pattern as Mizuho Reference.
+// region, each as a collapsible card (highlights / market reaction / risk watch / plain
+// English). Lives in Settings, per the same "reference material" pattern as Mizuho Reference.
+//
+// V5.8.0 — reads from /api/bank-earnings instead of importing the static baseline directly,
+// so a bank refreshed via Settings → Generation History → "Refresh Earnings" shows up here
+// without a redeploy. `refreshKey` (passed from page.tsx) forces a refetch after a refresh run.
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  AS_OF,
-  BANK_EARNINGS,
   REGION_LABEL,
   REGION_FLAG,
   REGION_NOTES,
@@ -35,7 +37,19 @@ function ReactionPill({ direction, changeText }: { direction: StockReactionDirec
   );
 }
 
-function BankCard({ bank }: { bank: BankEarningsEntry }) {
+function fmtRefreshed(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+function BankCard({
+  bank,
+  overlayMeta,
+}: {
+  bank: BankEarningsEntry;
+  overlayMeta?: { refreshedISO: string; sourceNote: string };
+}) {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-xl border border-line bg-ink-800 px-3.5 py-3">
@@ -49,6 +63,11 @@ function BankCard({ bank }: { bank: BankEarningsEntry }) {
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span className="text-[14.5px] font-semibold text-fg">{bank.name}</span>
             <span className="text-2xs text-fg-faint">{bank.ticker}</span>
+            {overlayMeta ? (
+              <span className="rounded-full border border-calm/30 bg-calm/10 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-calm">
+                ↻ refreshed {fmtRefreshed(overlayMeta.refreshedISO)}
+              </span>
+            ) : null}
           </div>
           <p className="mt-0.5 text-2xs text-fg-faint">
             {bank.period} · {bank.reportDate}
@@ -67,6 +86,11 @@ function BankCard({ bank }: { bank: BankEarningsEntry }) {
       {open ? (
         <div className="mt-3 space-y-3">
           <p className="text-[13px] leading-relaxed text-fg-muted">{bank.headline}</p>
+
+          <div className="rounded-lg border border-steel/25 bg-steel/5 px-2.5 py-2">
+            <p className="text-2xs font-semibold uppercase tracking-wide text-steel">Plain English</p>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-fg-muted">{bank.plainEnglish}</p>
+          </div>
 
           <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
             {bank.metrics.map((m) => (
@@ -105,6 +129,12 @@ function BankCard({ bank }: { bank: BankEarningsEntry }) {
               ))}
             </ul>
           </div>
+
+          {overlayMeta ? (
+            <p className="text-[10px] leading-relaxed text-fg-faint">
+              Refreshed from {overlayMeta.sourceNote} on {fmtRefreshed(overlayMeta.refreshedISO)}.
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -113,24 +143,55 @@ function BankCard({ bank }: { bank: BankEarningsEntry }) {
 
 const REGIONS: Region[] = ["US", "Europe", "Asia"];
 
-export function BankEarnings() {
+export function BankEarnings({ refreshKey }: { refreshKey?: number } = {}) {
+  const [banks, setBanks] = useState<BankEarningsEntry[] | null>(null);
+  const [asOf, setAsOf] = useState<string>("");
+  const [overlayMeta, setOverlayMeta] = useState<Record<string, { refreshedISO: string; sourceNote: string }>>({});
+  const [error, setError] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch("/api/bank-earnings", { cache: "no-store" });
+      if (!r.ok) throw new Error(String(r.status));
+      const json = await r.json();
+      setBanks(json.banks ?? []);
+      setAsOf(json.asOf ?? "");
+      setOverlayMeta(json.overlayMeta ?? {});
+      setError(false);
+    } catch {
+      setError(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load, refreshKey]);
+
+  if (error && !banks) {
+    return <p className="text-xs text-fg-faint">Couldn't load Bank Earnings — try refreshing.</p>;
+  }
+  if (!banks) {
+    return <p className="text-xs text-fg-faint">Loading…</p>;
+  }
+
   return (
     <div className="space-y-5">
       <p className="text-[11px] leading-relaxed text-fg-faint">
-        Latest reported quarter for 15 major banks — highlights, market reaction, and risk-management watch
-        items. Compiled from public earnings releases and financial news as of {AS_OF}; a curated prototype
-        snapshot, not a live feed — verify against primary filings before relying on any figure.
+        Latest reported quarter for 15 major banks — highlights, plain-English summary, market reaction, and
+        risk-management watch items. Curated baseline compiled as of {asOf}; banks with a "refreshed" tag were
+        updated by the Refresh Earnings action (Settings → Generation History) from real news, not the static
+        baseline. Verify against primary filings before relying on any figure.
       </p>
 
       {REGIONS.map((region) => {
-        const banks = BANK_EARNINGS.filter((b) => b.region === region);
-        if (!banks.length) return null;
+        const regionBanks = banks.filter((b) => b.region === region);
+        if (!regionBanks.length) return null;
         return (
           <div key={region}>
             <p className="mb-2 flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wide text-fg-faint">
               <span aria-hidden>{REGION_FLAG[region]}</span>
               {REGION_LABEL[region]}
-              <span className="text-fg-faint">· {banks.length}</span>
+              <span className="text-fg-faint">· {regionBanks.length}</span>
             </p>
             {REGION_NOTES[region] ? (
               <p className="mb-2 rounded-lg border border-steel/25 bg-steel/5 px-3 py-2 text-[11px] leading-relaxed text-steel">
@@ -138,8 +199,8 @@ export function BankEarnings() {
               </p>
             ) : null}
             <div className="space-y-2">
-              {banks.map((b) => (
-                <BankCard key={b.id} bank={b} />
+              {regionBanks.map((b) => (
+                <BankCard key={b.id} bank={b} overlayMeta={overlayMeta[b.id]} />
               ))}
             </div>
           </div>

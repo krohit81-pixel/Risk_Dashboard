@@ -173,6 +173,26 @@ export default function Page() {
     }
   }, [regenState, load, loadRuns]);
 
+  // ── Manual "Refresh Earnings" (V5.8.0) — separate from the editorial regenerate above;
+  // re-checks all 15 Bank Earnings entries against real news and updates only banks where a
+  // genuinely newer reported quarter was confirmed. earningsRefreshKey bump forces the
+  // BankEarnings component to refetch /api/bank-earnings afterwards. ──
+  const [earningsRegenState, setEarningsRegenState] = useState<"idle" | "running" | "failed">("idle");
+  const [earningsRefreshKey, setEarningsRefreshKey] = useState(0);
+  const refreshEarnings = useCallback(async () => {
+    if (earningsRegenState === "running") return;
+    setEarningsRegenState("running");
+    try {
+      const r = await fetch("/api/bank-earnings/refresh", { method: "POST" });
+      setEarningsRegenState(r.ok ? "idle" : "failed");
+      if (r.ok) setEarningsRefreshKey((k) => k + 1);
+    } catch {
+      setEarningsRegenState("failed");
+    } finally {
+      loadRuns();
+    }
+  }, [earningsRegenState, loadRuns]);
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-app">
       {/* Sticky compact header */}
@@ -402,15 +422,17 @@ export default function Page() {
                   <MizuhoReference />
                 </CollapsibleSection>
                 <CollapsibleSection id="settings-bankearnings" n="05" title="Bank Earnings" accent="#5B8DEF" hint="latest quarter · 15 banks" defaultOpen={false}>
-                  <BankEarnings />
+                  <BankEarnings refreshKey={earningsRefreshKey} />
                 </CollapsibleSection>
                 <CollapsibleSection id="settings-genhistory" n="06" title="Generation History" accent="#F5A524" hint="today's runs" defaultOpen={false}>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-2xs leading-relaxed text-fg-faint">
                       Refresh reloads the current briefing. Regenerate re-runs today's editorial (~1–2 minutes; the
-                      last good briefing is kept if it fails).
+                      last good briefing is kept if it fails). Refresh Earnings re-checks all 15 Bank Earnings
+                      entries against real news and updates only the ones where a genuinely newer reported quarter
+                      was confirmed — safe to click again next quarter.
                     </p>
-                    <div className="flex flex-none gap-2">
+                    <div className="flex flex-none flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={load}
@@ -430,6 +452,22 @@ export default function Page() {
                         }`}
                       >
                         {regenState === "running" ? "↻ Regenerating…" : regenState === "failed" ? "↻ Retry" : "↻ Regenerate"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={refreshEarnings}
+                        disabled={earningsRegenState === "running"}
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-2xs font-semibold transition ${
+                          earningsRegenState === "running"
+                            ? "border-line bg-ink-800 text-fg-faint"
+                            : "border-line bg-ink-800 text-steel active:bg-ink-700"
+                        }`}
+                      >
+                        {earningsRegenState === "running"
+                          ? "↻ Refreshing earnings…"
+                          : earningsRegenState === "failed"
+                            ? "↻ Retry earnings"
+                            : "↻ Refresh Earnings"}
                       </button>
                     </div>
                   </div>

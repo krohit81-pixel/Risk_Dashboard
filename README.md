@@ -35,6 +35,12 @@ FRED_API_KEY=your_key_here
 
 4. Restart `npm run dev`.
 
+Everything else (live news, LLM-written editorial, saved items, user-added concepts) is
+**progressively enabled** the same way — see `.env.local.example` for the full list
+(Marketaux/Finnhub/NewsData for news, Gemini/Anthropic for editorial writing, Supabase for
+persistence). None of it is required to run the app; each layer just falls back to sample or
+curated content when its keys are absent.
+
 ---
 
 ## Add to iPhone Home Screen
@@ -48,21 +54,23 @@ FRED_API_KEY=your_key_here
 
 ---
 
-## What's on the screen
+## What's on the screen (current, v5.7.0)
 
-| # | Section | Source |
-|---|---------|--------|
-| 1 | **Morning Risk Brief** — status, change vs yesterday, generated summary, risk meter | computed from live deltas |
-| 2 | **Top Developments** — 5 items with category, severity, why-it-matters | derived from data + curated watch items |
-| 3 | **What Changed Since Yesterday** — compact table with arrows | live indicators |
-| 4 | **Top Emerging Risks** — 5 cards (probability / impact / trend) | curated CRO watch-list |
-| 5 | **Global Risk Heat Map** — US / EU / UK / JP / CN / IN, green-amber-red | US is data-driven; others editorial |
-| 6 | **Key CRO Dashboard** — grouped indicator cards | live + fallback |
-| 7 | **Implications for a Global Bank** — credit / market / liquidity / capital / profitability | CRO framework |
+Bottom nav has four tabs; a fifth area (**Settings**) is reached via the hamburger button in
+the header, not the nav bar.
+
+| Tab | Sections |
+|---|---|
+| **Home** | Executive/Learning toggle (sticky, in the header) · Daily Risk Brief (risk meter) · What Changed (top movers + "show all indicators", both as colour-tile grids) · Top Developments · Today's CRO Conversation · Editorial Intelligence · Japan & Asia Watch · Also on the Radar |
+| **Markets** | Key CRO Dashboard (live indicators) · Japan Watch · Global Risk Heat Map (tappable regions) · Top Emerging Risks · Implications for a Global Bank |
+| **Research** | Research Workspace — paste text or a URL, analyzed through the same CRO framework as the daily editorial; save results to Learn |
+| **Learn** | Saved Analyses · Saved for Later · Concept Library (Your Concepts + All Concepts, both collapsible, pinned items grouped to the top) · Weekly Summary |
+| **Settings** (hamburger) | Appearance (dark/light) · Briefing Books (print/PDF) · Add Concept (paste → analyze → save; editing a saved concept opens here pre-filled) · Mizuho Reference · Bank Earnings (15-bank prototype, latest quarter) · Generation History (Refresh + Regenerate) |
 
 The risk colours (green / amber / red) are **functional**: they always reflect the
 *risk* direction of a move, not just whether a number went up or down. A falling
-S&P shows red; a falling VIX shows green.
+S&P shows red; a falling VIX shows green. See `lib/overnight.ts` (`RISK_ON_RISE`) and
+`riskUpIsBad` on `Indicator` (`lib/types.ts`).
 
 ---
 
@@ -70,22 +78,50 @@ S&P shows red; a falling VIX shows green.
 
 ```
 app/
-  layout.tsx            Inter font + iOS home-screen meta
-  page.tsx              Client page: fetch /api/dashboard, render 7 sections
-  globals.css           Tailwind + safe-area + reduced-motion
-  api/dashboard/route.ts  Fetches FRED + Yahoo in parallel, runs the engine
-components/             One file per section + shared ui primitives + RiskGauge
+  layout.tsx                    Inter font + iOS home-screen meta + ThemeProvider
+  page.tsx                      Client page: tabs, header, all section wiring
+  globals.css                   Tailwind + dark/light theme tokens + safe-area
+  api/
+    dashboard/route.ts          Live indicators (FRED + Yahoo) + reads the frozen snapshot
+    cron/editorial/route.ts     Scheduled daily editorial generation (CRON_SECRET-protected)
+    cron/weekly/route.ts        Scheduled weekly summary generation
+    regenerate/route.ts         Manual on-demand editorial re-run
+    research/analyze/route.ts   Research Workspace: analyze pasted text/URL
+    concepts/, concepts/analyze/  User-added concept CRUD + AI-assisted drafting
+    saved/, runs/, bloomberg/, briefing/generate/, admin/*
+api/cron-bloomberg.py           Separate Python cron (newsletter ingestion) — NOT under app/,
+                                 deployed as its own Vercel function; see requirements.txt
+components/
+  <Section>.tsx                 One component per Home/Markets section
+  intel/                        Editorial-layer cards (CRO Conversation, Editorial
+                                 Intelligence, Japan & Asia Watch, Mizuho alignment, shared
+                                 intelUi.tsx primitives like HorizonPill)
+  learn/                        Settings/Learn reference & tooling (Concept Library, Add
+                                 Concept, Mizuho Reference, Bank Earnings, Briefing Books,
+                                 Appearance)
+  research/, saved/, print/, shared/, ui.tsx
 lib/
-  fred.ts               FRED fetch (level + YoY helpers)
-  markets.ts            Yahoo Finance quote fetch
-  riskEngine.ts         Composite score, status, generated brief, derived developments
-  fallbackData.ts       Sample values + curated narrative content
-  format.ts             Display formatting
-  types.ts              Shared types
+  riskEngine.ts                 Composite score/status/brief from live deltas
+  overnight.ts                  Top-mover ranking + risk-direction colour logic
+  intelligence.ts               The single theme engine (THEMES) — radar + CRO Conversation
+                                 both draw from this one set
+  snapshotEngine.ts / snapshotStore.ts   Daily editorial generation + freeze/read
+  llm.ts                        Gemini-first, Anthropic-fallback provider chain
+  newsAdapter.ts / relevanceConfig.ts    News ingestion, dedupe, CRO relevance scoring
+  mizuhoTopRisks.ts / mizuhoKnowledgeData.ts   Mizuho's own published positions (versioned
+                                 locally, never fetched at runtime)
+  bankEarnings.ts                Bank Earnings prototype data (curated static snapshot)
+  concepts.ts / userConcepts.ts  Curated glossary vs. user-added concepts (separate stores)
+  fred.ts / markets.ts / marketData.ts   FRED + Yahoo Finance fetch
+  fallbackData.ts               Sample values + curated narrative content (no-key fallback)
+  supabase.ts / savedStore.ts / runStore.ts   Persistence (Supabase primary, KV/in-memory)
+  format.ts / types.ts          Display formatting + shared types
 ```
 
-All third-party fetching is **server-side** (the API route), so there are no CORS
-issues and no keys are exposed to the browser.
+All third-party fetching is **server-side** (API routes), so there are no CORS
+issues and no keys are exposed to the browser. See `CLAUDE.md` for the deeper
+architectural notes (the two-clock live/frozen-snapshot model, LLM grounding rules,
+versioning convention, and a couple of hard-won gotchas).
 
 ### Tuning the analysis
 
@@ -527,3 +563,115 @@ Out of scope (roadmap): PDF/DOCX, OCR, Ask About This, Supabase, personal notes,
   (including "BOJ kept policy unchanged with no immediate change…").
 - **Date-specific Japan save id** (`japan-watch-<date>`) so a past save no longer reads as
   "Saved" on a different day's card. (The empty card hides the save action entirely.)
+
+---
+
+## Version 4.1 – 4.9 — Research polish, Bloomberg newsletter ingestion, live Japan data
+
+Condensed summary (see `git log --oneline` for the exact commit-by-commit history —
+commit messages are the authoritative changelog for this range):
+
+- **Research Workspace matured**: daily quota, bulleted banking impact, full-piece capture,
+  Learning-view parity, personalized-focus section, and a screenshot-input mode.
+- **In-repo Bloomberg extractor** (`api/cron-bloomberg.py`, a separate Python Vercel function —
+  see `requirements.txt` at repo root): ingests Bloomberg newsletter emails, twice daily, with
+  per-briefing grouping, staleness guards, run history, and iterative bug fixes through v4.5–4.9
+  (decode/parsing fixes, dedupe logging, configurable lookback, Anthropic fallback in the
+  extractor itself).
+- **Live macro expansion**: CPI, Core PCE, Markets/Releases split, sparkline trends; Japan Watch
+  gained sparklines and its own colour treatment in Learn.
+- **Weekly cadence**: Weekly Markets + Weekly Learning summary (Anthropic-generated).
+- **Theme persistence hardened**: transient-failure retry, robust "Day N · seen N×" tracking,
+  "what's new" detection, and a risk↔implication cross-link.
+
+## Version 5.0 – 5.5 — Mizuho Knowledge Repository, Supabase, print/PDF, Appearance, Add Concept
+
+- **v5.0–5.2**: Mizuho Knowledge Repository added to the Research path, then expanded into a
+  multi-card reference (core disclosures, risk governance, RAF/top risks, business model) —
+  `lib/mizuhoKnowledgeData.ts`, surfaced in Learn → Mizuho Reference. **Supabase** introduced
+  (`lib/supabase.ts`) as the persistence layer for saved items.
+- **v5.3**: Print/PDF export — saved items and "briefing books" (monthly/quarterly/themed packs)
+  can be rendered to a print-friendly view and exported. Iterated through v5.3.1–5.3.4 on the
+  action-bar placement and a routing fix for single-item print (moved to a query-string route).
+- **v5.4**: Manual dark/light **Appearance** toggle in Learn (`next-themes`-backed), with a
+  v5.4.1 deploy fix.
+- **v5.5**: **Add Concept** prototype — paste text → Gemini drafts a concept in the library's
+  standard format → review/edit → save, plus full CRUD on your own concepts. Iterated on concept
+  card detail, indicator-table completeness, app icons, and Learn section ordering through v5.5.2.
+
+## Version 5.6 — Screen restructure: Settings, Concept Library rework, visual polish
+
+The big navigational change: introduced the **Settings** area (hamburger button in the header,
+not in the bottom nav) and moved maintenance/reference screens there — Appearance, Briefing
+Books, the Add-Concept *form* (its saved-items list stayed in Learn → Concept Library, now
+labelled "Your Concepts"), Mizuho Reference, and Generation History (with Refresh + Regenerate
+both available there). Learn tab was trimmed to just Saved Analyses / Saved for Later / Concept
+Library / Weekly Summary. Today tab was relabelled **Home**.
+
+Follow-on point releases (5.6.1–5.6.5) fixed real bugs surfaced by this restructure and did
+visual polish:
+- **5.6.1**: reworked Concept Library into two independently-collapsible groups (Your Concepts /
+  All Concepts) with a shared row+detail component, pinned-first sorting, and "Added <date>" for
+  user concepts (which have no seen-tracking).
+- **5.6.2**: removed decorative section icons per feedback; header's top-right Refresh button
+  replaced with today's date (Refresh moved fully into Settings); hamburger icon replaced the
+  gear; `RiskGauge` redesigned from a semicircle donut to a slim gradient bar; CRO Conversation
+  card header split into two rows to stop mid-word wrapping.
+- **5.6.3**: fixed a real bug — sections relocated to Settings had **kept their old
+  `localStorage` collapse ids**, so a previously-opened "Add Concept" rendered pre-expanded and
+  crowded out the rest of Settings (looked like Concept Library had disappeared). Renamed all
+  relocated section ids (`settings-*` prefix). Also reworked Concept Library rows to a two-line
+  layout (term+pin on top, capsule+meta below) and gave pinned items an explicit "📌 Pinned"
+  group instead of just a sort-order change; added a `dense` size variant to `Chip`/
+  `SeverityPill`/`HorizonPill` and moved topic titles above their chip row in both CRO
+  Conversation and Editorial Intelligence.
+- **5.6.4**: "What Changed" and "Show all indicators" redesigned as Bloomberg-style solid-colour
+  tile grids (`components/shared/ToneTile.tsx`) instead of a list/table.
+- **5.6.5**: fixed a real data bug in `lib/markets.ts` — Yahoo's `chartPreviousClose` reflects
+  the close *before the requested chart range* (≈1 month back for `range=1mo`), not yesterday's
+  close, so "vs. yesterday" deltas were silently comparing against a stale, month-old baseline
+  (surfaced by Brent Crude showing an inflated overnight move). Fixed to prefer the actual
+  second-to-last daily close from the fetched time series.
+
+## Version 5.7.0 — Bank Earnings prototype
+
+New **Bank Earnings** section in Settings: latest-reported-quarter results for 15 banks (5 US:
+JPMorgan, Goldman Sachs, Citigroup, Bank of America, Morgan Stanley · 5 Europe: Barclays,
+Standard Chartered, HSBC, UBS, Deutsche Bank · 5 Asia: Mizuho, MUFG, SMFG, DBS, ICBC), each a
+collapsible card with headline metrics, highlights, stock-market reaction, and risk-management
+watch items. Data lives in `lib/bankEarnings.ts` as a **curated static snapshot** (compiled via
+research as of the `AS_OF` date in that file) — it is explicitly **not** wired to a live
+earnings-data feed yet; update the file by hand (or wire a real provider) to refresh it.
+
+---
+
+## Version 5.8.0 — Bank Earnings: plain-English summaries + Refresh Earnings
+
+- **Plain English.** Every bank card now has a short, jargon-free summary (`plainEnglish`
+  field) alongside the existing highlights / market reaction / risk watch — a hand-authored
+  translation of the same facts, always visible when a card is expanded.
+- **Refresh Earnings** (Settings → Generation History): re-checks all 15 banks against real
+  news and updates only the ones where a genuinely newer reported quarter is confirmed.
+  - Fetches candidate articles per bank from the **same adapters already in this app**
+    (Marketaux / NewsData.io / Finnhub — no new API keys) and keeps only articles that name
+    the bank, carry a genuine earnings signal, and were published after the bank's
+    currently-stored report date.
+  - Banks with qualifying articles go into **one batched, grounded LLM call**
+    (`lib/bankEarningsRefresh.ts`, via the existing Gemini-first/Anthropic-fallback
+    `interpretWithProvider`) — same "one call for many items" shape as the daily theme
+    engine. The model may only use the supplied article snippets and must say so rather than
+    guess if it can't confirm a newer quarter.
+  - Accepted, schema-validated results are written to a KV overlay
+    (`lib/bankEarningsStore.ts`), keyed per bank — the curated baseline in
+    `lib/bankEarnings.ts` is never overwritten, so a failed or empty run just leaves
+    everything as the last-good fallback (same two-clock guarantee as the daily editorial).
+  - `app/api/bank-earnings` serves the merged baseline+overlay data; the Bank Earnings screen
+    fetches from there instead of importing the static file, and tags overlay-refreshed banks
+    with a "↻ refreshed" badge and source note.
+  - Recorded in Generation History with its own `earnings` badge and a short summary
+    ("N checked · M with news · K updated").
+- **Mizuho Q1 FY2026 (Apr–Jun 2026)** refreshed by hand for this release: net profit ¥422.91B
+  (+45.5% YoY), total income ¥2.520T (+18.3%), FY2027 guidance raised to ¥1.40T from ¥1.30T.
+  This quarter's CET1/credit-cost/stock-reaction figures weren't cleanly confirmed from
+  available sources at write time — flagged as unconfirmed rather than guessed; a future
+  Refresh Earnings run can fill them in once clearer coverage exists.

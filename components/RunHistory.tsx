@@ -58,10 +58,15 @@ export function RunHistory({ runs }: { runs: RunRecord[] }) {
               weekly
             </span>
           ) : null}
+          {r.job === "earnings" ? (
+            <span className="rounded-full border border-calm/30 bg-calm/10 px-1.5 py-0.5 font-semibold uppercase tracking-wide text-calm">
+              earnings
+            </span>
+          ) : null}
           <span className="ml-auto text-fg-faint">
             {r.ok ? (
               <>
-                {r.provider ?? "—"}
+                {r.note ?? r.provider ?? "—"}
                 {r.fallbackUsed ? " · fallback" : ""}
                 {r.degradeReason && r.degradeReason !== "ok" ? ` · ${r.degradeReason}` : ""}
               </>

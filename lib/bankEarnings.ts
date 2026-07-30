@@ -1,8 +1,17 @@
 // lib/bankEarnings.ts
 // V5.7.0 — "Bank Earnings" prototype: latest-quarter results for 15 major banks (5 US,
-// 5 Europe, 5 Asia), compiled from public earnings releases and reputable financial news
-// as of Jul 29, 2026. This is a curated static snapshot for the prototype, not a live feed —
-// see AS_OF and each bank's periodNote for exactly how current the data is.
+// 5 Europe, 5 Asia), compiled from public earnings releases and reputable financial news.
+// This file is the curated FALLBACK BASELINE — not a live feed on its own. See AS_OF and
+// each bank's periodNote for exactly how current the baseline data is.
+//
+// V5.8.0 — a refresh layer sits on top of this baseline (see lib/bankEarningsStore.ts /
+// lib/bankEarningsRefresh.ts): Settings → Generation History → "Refresh Earnings" fetches
+// real news via the existing adapters and has the grounded LLM extract updated figures for
+// any bank where a genuinely newer quarter is confirmed in the fetched articles, persisting
+// the result in a KV overlay. This file never gets overwritten by that process — it's the
+// last-good fallback if a refresh run finds nothing new or fails. Update it by hand when you
+// want to move the baseline itself forward (e.g. once a quarter, to fold refreshed figures
+// back in and keep the KV overlay small).
 //
 // Sourcing note: figures below were reconciled from company press releases / investor
 // relations pages plus Reuters, Bloomberg, CNBC, FT and similar coverage. Where sources
@@ -11,7 +20,7 @@
 // rather than stated as precise facts. Treat this as directional intelligence, not a
 // substitute for the banks' own filings.
 
-export const AS_OF = "Jul 29, 2026";
+export const AS_OF = "Jul 30, 2026";
 
 export type StockReactionDirection = "up" | "down" | "mixed";
 export type Region = "US" | "Europe" | "Asia";
@@ -34,6 +43,8 @@ export interface BankEarnings {
     detail: string;
   };
   riskWatch: string[];
+  /** V5.8.0 — short, jargon-free translation of the same facts above (no new claims). */
+  plainEnglish: string;
 }
 
 export const REGION_LABEL: Record<Region, string> = {
@@ -87,6 +98,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "Provisions were trimmed >10% QoQ across JPM and several peers — some analysts flag this as potentially premature given rising consumer-credit stress elsewhere in the sector.",
       "Raised NII guidance implies more balance-sheet growth and rate sensitivity going forward.",
     ],
+    plainEnglish:
+      "JPMorgan made more money than Wall Street expected, mostly from booming trading and dealmaking. Investors barely reacted because everyone already expected a strong quarter. One thing to watch: the bank trimmed some of the money it sets aside for bad loans, even as pressure is building elsewhere in consumer credit — worth watching if that turns out to be premature.",
   },
   {
     id: "gs",
@@ -118,6 +131,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "CET1 improved to 12.9% standardized / 13.7% advanced — solid buffer.",
       "Aggressive capital-return pace ($5.36B this quarter, dividend +11%) worth weighing against the reserve-release trend above.",
     ],
+    plainEnglish:
+      "Goldman Sachs blew past expectations, with trading and dealmaking revenue way up, and the stock jumped the most of any big US bank this quarter. It also cut back sharply on money set aside for loan losses — a good sign if credit stays healthy, but worth watching given how much cash it's now returning to shareholders on top of that.",
   },
   {
     id: "citi",
@@ -149,6 +164,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "CET1 12.8%, ~120bps above the current regulatory requirement.",
       "Stock fell despite the beat — a guidance-credibility signal worth tracking into Q3.",
     ],
+    plainEnglish:
+      "Citigroup beat expectations on both profit and revenue, but the stock fell anyway — investors didn't like that the bank plans to spend more in the second half without raising its return targets. Citi was also one of the few big US banks adding to its bad-loan reserves this quarter, mainly because of stress in its US credit-card business.",
   },
   {
     id: "bac",
@@ -179,6 +196,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "Loan growth (+8% YoY) is outpacing deposit growth (+2.5% YoY) — a funding-mix trend worth tracking.",
       "$8B returned to shareholders this quarter — capital-return pace vs. capital-build trajectory to monitor.",
     ],
+    plainEnglish:
+      "Bank of America had a clean, straightforward good quarter — profit, trading and dealmaking all beat expectations, and credit quality actually improved, with fewer loans going bad. The stock rose to near a 52-week high on the news.",
   },
   {
     id: "ms",
@@ -209,6 +228,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "Heavy reliance on trading/equities revenue (+69% YoY, tied to AI-driven volumes) for the beat — a concentration risk if that activity normalizes.",
       "Provisions fell to $98M from $196M YoY — a small base relative to peers given MS's less credit-heavy balance sheet.",
     ],
+    plainEnglish:
+      "Morgan Stanley posted its best quarter ever in both trading/dealmaking and wealth management, helped in part by a boom in AI-related trading activity, and the stock hit an all-time high. The flip side: a good chunk of this quarter's strength depends on that trading boom continuing — if AI-driven trading activity cools off, so could this growth.",
   },
 
   // ───────────────────────── Europe ─────────────────────────
@@ -241,6 +262,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "~£11B of RWA inflation flagged from a US Consumer Bank IRB model migration expected in H2 2027 — a known future capital drag.",
       "Ongoing regulatory/AML and consumer-protection matters disclosed, with no new material charge quantified this release.",
     ],
+    plainEnglish:
+      "Barclays beat profit expectations and raised its full-year targets, but the stock still fell — its trading revenue grew much more slowly than its big US rivals', and it flagged a chunk of extra costs coming in the second half. A future accounting-rule change will also add to the assets Barclays needs to hold capital against, though that's a couple of years out.",
   },
   {
     id: "stanchart",
@@ -272,6 +295,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "CET1 14.2%, within the reiterated 13–14% target range; leverage 4.7%, total capital 21.1% — comfortable buffers.",
       "FY2028 targets (cost-income ~57%, RoTE >15%) reiterated — multi-year execution risk remains.",
     ],
+    plainEnglish:
+      "Standard Chartered had its best first half ever, beat expectations, raised guidance, and announced a new share buyback — the stock rose on the news. The bank did set aside extra money specifically for Middle East-related loan risk, which is worth watching as that conflict continues.",
   },
   {
     id: "hsbc",
@@ -304,6 +329,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "CET1 fell 0.9pp QoQ to 14.0% — driven by the Hang Seng Bank privatisation, dividends and RWA growth; cushion within target range but narrowing.",
       "Hong Kong commercial real estate exposure ~$29.5B — stable quality reported, but a standing concentration to monitor.",
     ],
+    plainEnglish:
+      "HSBC's profit was roughly flat versus a year ago even though revenue grew, because the bank had to set aside more money for loans that might go bad — including a fraud-related issue in the UK and a Middle East-related buffer. Its capital cushion also shrank a bit. The bigger, more complete half-year results are due in early August, so treat this as a partial picture.",
   },
   {
     id: "ubs",
@@ -335,6 +362,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "Credit Suisse integration not yet fully complete — residual execution/restructuring risk remains through year-end 2026.",
       "Management flagged geopolitical risk and a potential AI-driven market pullback as macro watch items.",
     ],
+    plainEnglish:
+      "UBS beat profit expectations and is nearly done folding in Credit Suisse — it's recovered most of the promised cost savings — but the stock barely moved. Investors seem to be waiting for more clarity on when UBS will return more cash to shareholders and finish the last stages of the Credit Suisse integration.",
   },
   {
     id: "db",
@@ -365,6 +394,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "CET1 13.9% — the lowest of the five European banks in this set, though still comfortably above requirements.",
       "Some outlets cite offsetting restructuring costs against the “record” profit headline — worth reconciling against the bank's own release detail.",
     ],
+    plainEnglish:
+      "Deutsche Bank had arguably its best-ever quarter and first half on paper — revenue and profit both up nicely, with 20 straight quarters of growth — but different outlets reported very different stock reactions (some sharply up, some flat), so the market's actual verdict isn't fully clear yet. Money set aside for bad loans also rose about 50% year-over-year — the one number worth watching.",
   },
 
   // ───────────────────────── Asia ─────────────────────────
@@ -373,31 +404,34 @@ export const BANK_EARNINGS: BankEarnings[] = [
     name: "Mizuho Financial Group",
     ticker: "8411.T",
     region: "Asia",
-    period: "FY2025 (year ended Mar 2026)",
-    reportDate: "May 15, 2026",
-    periodNote: "Q1 FY2026 (Apr–Jun) is due Jul 30, 2026 — one day after this snapshot.",
-    headline: "Record full-year profit, but Middle East-linked credit costs and a thin capital buffer stand out.",
+    period: "Q1 FY2026 (Apr–Jun 2026)",
+    reportDate: "Jul 30, 2026",
+    headline: "Record Q1 profit on strong loan growth and a weaker yen; FY guidance raised — but this quarter's capital and credit-cost figures aren't yet confirmed.",
     metrics: [
-      { label: "Profit", value: "¥1,248.6B (+41.0% YoY, record)" },
-      { label: "FY26 guidance", value: "¥1,300.0B (+4.1%)" },
-      { label: "ROE", value: "11.4% (record)" },
-      { label: "CET1", value: "9.9%" },
+      { label: "Net profit", value: "¥422.91B (+45.5% YoY)" },
+      { label: "Total income", value: "¥2.520T (+18.3% YoY)" },
+      { label: "FY26 guidance (yr to Mar 2027)", value: "¥1.40T (raised from ¥1.30T)" },
+      { label: "Prior FY profit (record)", value: "¥1,248.6B (FY ended Mar 2026)" },
     ],
     highlights: [
-      "Ordinary profit ¥1,573.2B (+34.6% YoY).",
-      "Net gains on stock sales ¥325.1B, driven mainly by cross-shareholding unwinds — analysts assess roughly ¥100B of FY25 profit as non-recurring.",
-      "Dividend raised to an estimated ¥150/share for FY26 (from ¥145).",
+      "Total income rose 18.3% YoY to ¥2.520 trillion, with robust growth across core retail banking divisions.",
+      "Loan demand stayed strong despite sticky inflation and Middle East-conflict headwinds; investment banking benefited from a weaker yen boosting overseas activity.",
+      "BOJ hiked rates 25bps to 1.0% in June 2026 — a continued tailwind for loan-deposit spreads across the Japanese megabanks.",
+      "Management raised the FY2026 (year to Mar 2027) net profit forecast to ¥1.40 trillion from ¥1.30 trillion, in line with consensus.",
     ],
     stockReaction: {
-      direction: "down",
-      changeText: "-0.6%",
-      detail: "Shares dipped modestly to ¥7,006 on release day despite the earnings beat; sentiment improved over the following days, with at least one analyst upgrading to Buy by May 19.",
+      direction: "mixed",
+      changeText: "Unconfirmed",
+      detail: "Same-day share-price reaction wasn't cleanly confirmed from available sources as of this update (Jul 30, 2026) — treat as unresolved rather than a stated beat/miss reaction; check back on the next refresh.",
     },
     riskWatch: [
-      "Credit-related costs jumped to ¥133.0B (+¥81.4B YoY), explicitly tied by management to “specific companies” and forward-looking provisioning for Middle East conflict-related uncertainty.",
-      "CET1 at 9.9% sits at the low end of Mizuho's own 9–10% target range — limited buffer versus peers.",
-      "Analysts flag that NIM/earnings tailwinds could fade from FY2027 as non-Japan rates ease while the BOJ continues hiking — an asymmetric rate exposure.",
+      "This quarter's CET1 ratio and credit-cost figures were not cleanly confirmed from available sources as of this update — for context, FY2025 (year ended Mar 2026) CET1 was 9.9%, at the low end of Mizuho's own 9–10% target range.",
+      "FY2025 credit-related costs had jumped to ¥133.0B on Middle East conflict-related provisioning; worth checking whether that trend continued into Q1 FY2026 once fuller results commentary is available.",
+      "Investment banking strength was partly weak-yen-driven — a reversal in yen direction would remove some of this quarter's tailwind.",
+      "Analysts continue to flag that NIM/earnings tailwinds could fade from FY2027 as non-Japan rates ease while the BOJ keeps hiking — an asymmetric rate exposure.",
     ],
+    plainEnglish:
+      "Mizuho's profit jumped 45% this quarter, mostly because more people and businesses are borrowing, and a weaker yen made its overseas trading arm look better in yen terms. Management got confident enough to raise its full-year profit target. The one thing we don't have solid numbers on yet is how much of a safety buffer (capital) and bad-loan cost this quarter carried — last year that safety buffer was already thin, so it's worth checking once the fuller report is out.",
   },
   {
     id: "mufg",
@@ -430,6 +464,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "Morningstar expects earnings growth to slow to ~5% from FY2027 as non-Japan rates ease.",
       "Large late-quarter loan growth funding the RWA increase — worth watching for underwriting discipline.",
     ],
+    plainEnglish:
+      "MUFG became the first Japanese bank ever to earn more than ¥2 trillion (roughly $13–14B) in a year, and investors liked it — the stock rose and kept climbing the following week. The catch: its capital safety buffer actually fell below the bank's own target range, partly because of a large stake in an Indian lender and a late surge in loan growth — worth watching as a trend, not just a one-quarter blip.",
   },
   {
     id: "smfg",
@@ -462,6 +498,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "Continued cross-shareholding unwind is flattering reported profit (one-off gains) versus a lower sustainable run-rate.",
       "Shared BOJ policy-path sensitivity — a mid-July single-day ~3.25% stock drop was attributed to BOJ officials signaling a more cautious hike path than markets had priced.",
     ],
+    plainEnglish:
+      "Sumitomo Mitsui posted a record profit and holds the strongest capital cushion of Japan's three megabanks, and it's also splitting its stock 2-for-1 to make shares more accessible to investors. About a third of its loan book sits outside Japan, which cuts both ways — more growth, but more exposure to foreign-currency and interest-rate swings.",
   },
   {
     id: "dbs",
@@ -493,6 +531,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "NPL ratio improved to 1.0% (from 1.1%) — a positive signal, worth watching against continued RWA growth.",
       "Growing reliance on wealth-management fee income for growth — a concentration/market-sensitivity item as rate-cut cycles progress.",
     ],
+    plainEnglish:
+      "DBS had its best-ever quarter for total income, driven by strong wealth-management and fee business, and its credit quality actually improved. The one thing to watch is that DBS is leaning more and more on wealth-management fees for its growth story — fine while markets are calm, more exposed if rate cuts or market swings slow that business down.",
   },
   {
     id: "icbc",
@@ -523,5 +563,7 @@ export const BANK_EARNINGS: BankEarnings[] = [
       "China property-sector exposure is a standing structural risk given ICBC's scale in mortgage and corporate real-estate lending; current-quarter, bank-specific exposure figures were not available to confirm and are deliberately omitted here rather than guessed.",
       "Capital ratios were only described qualitatively as “above regulatory minimums” in available sources — exact CET1 for this quarter unconfirmed.",
     ],
+    plainEnglish:
+      "ICBC's profit came in roughly as expected — no big surprise — but the deeper story is that the bank's lending margins remain stuck near historic lows, a structural problem across China's big state banks. Exposure to China's property sector remains a standing risk to watch, even though this quarter didn't provide fresh numbers on it.",
   },
 ];

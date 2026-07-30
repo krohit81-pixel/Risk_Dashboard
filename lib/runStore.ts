@@ -14,8 +14,12 @@ export interface RunRecord {
   degradeReason?: string;
   themes?: number;
   error?: string;
-  /** V4.2 — which job produced this run. Defaults to the daily editorial. */
-  job?: "editorial" | "weekly";
+  /** V4.2 — which job produced this run. Defaults to the daily editorial.
+   *  V5.8.0 — "earnings" is the Bank Earnings refresh (Settings → Generation History). */
+  job?: "editorial" | "weekly" | "earnings";
+  /** V5.8.0 — short free-text summary for jobs whose result isn't just ok/fail, e.g.
+   *  "15 checked · 1 updated". */
+  note?: string;
 }
 
 const KEY = "runs:log";
