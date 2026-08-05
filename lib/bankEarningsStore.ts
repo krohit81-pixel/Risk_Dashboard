@@ -54,3 +54,31 @@ export async function getOverlayMeta(): Promise<Record<string, { refreshedISO: s
   for (const [id, e] of Object.entries(overlay)) out[id] = { refreshedISO: e.refreshedISO, sourceNote: e.sourceNote };
   return out;
 }
+
+/** V5.10.1 — recovery path: drop one bank's overlay entry (or all of them when id is omitted)
+ *  back to the curated baseline. Needed because a bad refresh result, once accepted, would
+ *  otherwise sit in the overlay indefinitely — it only gets replaced by a LATER successful
+ *  refresh for that same bank, which may not happen soon if no newer news qualifies. */
+export async function clearEarningsOverlay(id?: string): Promise<void> {
+  if (!id) {
+    mem.map = {};
+    if (storeAvailable()) {
+      try {
+        await kvSet(KEY, {});
+      } catch {
+        /* ignore */
+      }
+    }
+    return;
+  }
+  const map = await getEarningsOverlay();
+  delete map[id];
+  mem.map = map;
+  if (storeAvailable()) {
+    try {
+      await kvSet(KEY, map);
+    } catch {
+      /* ignore */
+    }
+  }
+}

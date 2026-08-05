@@ -8,6 +8,13 @@
 // V5.8.0 — reads from /api/bank-earnings instead of importing the static baseline directly,
 // so a bank refreshed via Settings → Generation History → "Refresh Earnings" shows up here
 // without a redeploy. `refreshKey` (passed from page.tsx) forces a refetch after a refresh run.
+//
+// V5.10.1 — ReactionPill guards against bad changeText (a refresh run once let a full news
+// sentence through — e.g. an unrelated "FTSE 100 lifted by miners rally…" headline — instead
+// of a short reaction like "+2.3%"/"Unconfirmed"). The pill itself is a small fixed shape, not
+// a paragraph, so long/sentence-like text is shortened to a direction-based label here rather
+// than wrapping the card header across multiple lines; the original text is never lost since
+// it's always readable in full in the "Market reaction" detail box below when the card is open.
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -26,14 +33,25 @@ const REACTION_STYLE: Record<StockReactionDirection, { cls: string }> = {
   mixed: { cls: "border-line bg-ink-700 text-fg-muted" },
 };
 
+const DIRECTION_FALLBACK_LABEL: Record<StockReactionDirection, string> = { up: "Up", down: "Down", mixed: "Mixed" };
+
+/** A pill shows a short value ("+7.7%", "Unconfirmed", "All-time high") — never a sentence.
+ *  Falls back to a plain direction label rather than wrapping/overflowing the card header. */
+function pillText(direction: StockReactionDirection, changeText: string): string {
+  const looksLikeASentence = changeText.length > 18 || /[.;]/.test(changeText);
+  return looksLikeASentence ? DIRECTION_FALLBACK_LABEL[direction] : changeText;
+}
+
 function ReactionPill({ direction, changeText }: { direction: StockReactionDirection; changeText: string }) {
   const arrow = direction === "up" ? "▲" : direction === "down" ? "▼" : "◆";
+  const text = pillText(direction, changeText);
   return (
     <span
-      className={`inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-2xs font-bold ${REACTION_STYLE[direction].cls}`}
+      title={text !== changeText ? changeText : undefined}
+      className={`inline-flex max-w-[9.5rem] flex-none items-center gap-1 truncate whitespace-nowrap rounded-full border px-2 py-0.5 text-2xs font-bold ${REACTION_STYLE[direction].cls}`}
     >
-      <span aria-hidden>{arrow}</span>
-      {changeText}
+      <span aria-hidden className="flex-none">{arrow}</span>
+      <span className="truncate">{text}</span>
     </span>
   );
 }

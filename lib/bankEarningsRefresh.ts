@@ -64,6 +64,24 @@ function mentionsBank(text: string, bank: BankEarnings): boolean {
   return nameHit || tickerHit;
 }
 
+// V5.10.1 — a refresh run once let an unrelated "FTSE 100 lifted by miners rally…" index-level
+// wrap-up through for HSBC: the article incidentally named HSBC as one of several gainers,
+// which satisfied mentionsBank()+hasEarningsSignal() even though the story wasn't about HSBC's
+// own results. Real earnings coverage almost always names the bank in the HEADLINE; incidental
+// mentions inside a general market wrap-up usually don't. Index-level stories are now dropped
+// unless the bank is actually named in the title, not just the summary/body.
+const INDEX_LEVEL_PATTERNS = [
+  /ftse\s*100/i, /nikkei\s*225/i, /dow\s*jones/i, /s&p\s*500/i, /stoxx\s*600/i,
+  /hang seng index/i, /nasdaq composite/i, /topix/i,
+];
+
+function isIndexLevelNoise(story: CandidateStory, bank: BankEarnings): boolean {
+  const title = story.title.toLowerCase();
+  if (!INDEX_LEVEL_PATTERNS.some((p) => p.test(title))) return false;
+  const namedInTitle = title.includes(bank.name.toLowerCase()) || title.includes(bank.name.split(" ")[0].toLowerCase());
+  return !namedInTitle;
+}
+
 /** Parse the loosely-formatted reportDate strings used throughout bankEarnings.ts. */
 function parseStoredDate(s: string): Date {
   const d = new Date(s);
@@ -148,6 +166,7 @@ async function fetchCandidatesFor(bank: BankEarnings): Promise<CandidateStory[]>
 function qualifyCandidates(bank: BankEarnings, stories: CandidateStory[]): CandidateStory[] {
   const cutoff = parseStoredDate(bank.reportDate);
   return stories.filter((s) => {
+    if (isIndexLevelNoise(s, bank)) return false;
     const text = `${s.title} ${s.summary}`;
     if (!hasEarningsSignal(text)) return false;
     if (!mentionsBank(text, bank)) return false;
@@ -184,6 +203,10 @@ function isValidResult(r: any): r is Required<Omit<LlmRefreshResult, "notConfirm
   if (!r.highlights.every((h: any) => typeof h === "string")) return false;
   if (!r.stockReaction || !["up", "down", "mixed"].includes(r.stockReaction.direction)) return false;
   if (typeof r.stockReaction.changeText !== "string" || typeof r.stockReaction.detail !== "string") return false;
+  // V5.10.1 — changeText renders inside a small pill, never a paragraph. A refresh run once
+  // let a full unrelated news sentence through here; reject anything sentence-shaped so a bad
+  // extraction degrades that bank's update instead of corrupting the overlay.
+  if (r.stockReaction.changeText.length > 24 || /[.;]/.test(r.stockReaction.changeText)) return false;
   if (!Array.isArray(r.riskWatch) || !r.riskWatch.every((x: any) => typeof x === "string")) return false;
   if (typeof r.plainEnglish !== "string" || !r.plainEnglish) return false;
   return true;
@@ -226,13 +249,24 @@ strictly from the supplied articles. If the articles are ambiguous, re-cover the
 quarter, or don't contain hard figures, set hasNewQuarter to false for that bank — do NOT guess
 or restate stale numbers as if new.
 
+Some candidate articles may be general market/index wrap-ups that only mention the bank in
+passing (e.g. as one of several gainers pushing an index to a record). Use ONLY articles that
+are actually ABOUT that bank's own results — ignore incidental mentions of the bank inside a
+broader market story, and never pull an unrelated headline or index-level fact into this bank's
+fields.
+
 Output VALID JSON ONLY: { "results": [ { "id": string, "hasNewQuarter": boolean,
 "period": string, "reportDate": string, "headline": string,
 "metrics": [{"label": string, "value": string}], "highlights": string[],
 "stockReaction": {"direction": "up"|"down"|"mixed", "changeText": string, "detail": string},
 "riskWatch": string[], "plainEnglish": string } ] }
-"plainEnglish" must be a short, jargon-free 2-4 sentence translation of the same facts (no new
-claims). Omit a bank from "results" entirely if hasNewQuarter is false.`;
+"headline" is a one-sentence summary (like "Record profit but capital buffer thins"). "changeText"
+is DIFFERENT and must be SHORT — at most ~15 characters, e.g. "+2.3%", "-1.8%", "Unconfirmed",
+"Mixed", "Muted", "All-time high". NEVER a sentence, a headline, or unrelated news content; if you
+aren't confident of a short reaction value, use "Unconfirmed". The fuller nuance belongs in
+"detail", which may be a full sentence. "plainEnglish" must be a short, jargon-free 2-4 sentence
+translation of the same facts (no new claims). Omit a bank from "results" entirely if
+hasNewQuarter is false.`;
 
   const user = qualified
     .map(({ bank, stories }) => {

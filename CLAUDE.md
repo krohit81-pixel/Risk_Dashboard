@@ -117,6 +117,17 @@ these rather than re-deriving color from `trend` directly.
   `components/learn/MizuhoQ1Earnings.tsx` (Settings → 07) established the hand-drawn inline-SVG
   chart pattern (CSS-var colors via `rgb(var(--x))`, no chart library) that both this file and
   the Compare screen follow — extend that pattern rather than introducing a chart dependency.
+  **V5.10.1 lesson (keep in mind for any future refresh-style LLM extraction):** a live run once
+  let an unrelated general-market headline leak into one bank's `stockReaction.changeText`
+  (a general index wrap-up incidentally named the bank as a passing gainer, which was enough to
+  pass the news filter). Fixed at three layers, not just the symptom — filtering
+  (`isIndexLevelNoise` in `lib/bankEarningsRefresh.ts` drops index-wrap-up stories unless the
+  bank is named in the article's own title, not just its body), validation (`changeText` over
+  24 chars or containing `.`/`;` is rejected outright), and display (`ReactionPill` in
+  `components/learn/BankEarnings.tsx` falls back to a plain Up/Down/Mixed label for anything
+  sentence-shaped rather than trusting upstream data to already be short). Any new
+  grounded-extraction field that renders in a small fixed UI element (a pill, a chip, a badge)
+  should get the same three-layer treatment — don't rely on the LLM prompt alone.
   `lib/concepts.ts` (curated glossary) vs `lib/userConcepts.ts` (user-added, Supabase-backed) are
   deliberately separate — Concept Library (Learn tab) renders both together but they're different
   data sources with different CRUD paths (`/api/concepts` is user-concepts only).

@@ -194,6 +194,20 @@ export default function Page() {
     }
   }, [earningsRegenState, loadRuns]);
 
+  // V5.10.1 — recovery path if a refresh run ever accepts a bad result again: drops the whole
+  // overlay back to the curated baseline (lib/bankEarnings.ts). Confirmed since it discards
+  // any refreshed banks, not just a broken one.
+  const resetEarnings = useCallback(async () => {
+    if (earningsRegenState === "running") return;
+    if (!window.confirm("Reset all Bank Earnings entries to the curated baseline? This discards any banks updated by Refresh Earnings.")) return;
+    try {
+      await fetch("/api/bank-earnings/refresh", { method: "DELETE" });
+      setEarningsRefreshKey((k) => k + 1);
+    } finally {
+      loadRuns();
+    }
+  }, [earningsRegenState, loadRuns]);
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-app">
       {/* Sticky compact header */}
@@ -431,7 +445,8 @@ export default function Page() {
                       Refresh reloads the current briefing. Regenerate re-runs today's editorial (~1–2 minutes; the
                       last good briefing is kept if it fails). Refresh Earnings re-checks all 15 Bank Earnings
                       entries against real news and updates only the ones where a genuinely newer reported quarter
-                      was confirmed — safe to click again next quarter.
+                      was confirmed — safe to click again next quarter. Reset Earnings discards any refreshed
+                      entries and reverts every bank to the curated baseline, if a refresh ever produces a bad card.
                     </p>
                     <div className="flex flex-none flex-wrap gap-2">
                       <button
@@ -469,6 +484,15 @@ export default function Page() {
                           : earningsRegenState === "failed"
                             ? "↻ Retry earnings"
                             : "↻ Refresh Earnings"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetEarnings}
+                        disabled={earningsRegenState === "running"}
+                        title="Discard any Bank Earnings entries updated by Refresh Earnings and revert to the curated baseline"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-ink-800 px-2.5 py-1.5 text-2xs font-semibold text-fg-faint transition active:scale-95 disabled:opacity-50"
+                      >
+                        ↺ Reset Earnings
                       </button>
                     </div>
                   </div>

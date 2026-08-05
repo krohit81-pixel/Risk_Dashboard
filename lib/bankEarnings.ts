@@ -386,8 +386,8 @@ export const BANK_EARNINGS: BankEarnings[] = [
     ],
     stockReaction: {
       direction: "mixed",
-      changeText: "Conflicting across sources",
-      detail: "Some coverage showed shares up as much as 6% intraday on the DAX on the buyback news; other sources showed the NYSE-listed ADR roughly flat to slightly down. Treat the exact magnitude as unresolved pending a single authoritative source.",
+      changeText: "Mixed",
+      detail: "Coverage conflicts: some showed shares up as much as 6% intraday on the DAX on the buyback news; other sources showed the NYSE-listed ADR roughly flat to slightly down. Treat the exact magnitude as unresolved pending a single authoritative source.",
     },
     riskWatch: [
       "Provision for credit losses €460M (38bps annualized) — up roughly 50% YoY, a notable increase worth flagging.",

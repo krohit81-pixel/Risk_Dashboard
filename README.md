@@ -707,6 +707,40 @@ screen (`components/learn/BankEarningsCompare.tsx`) putting all 15 banks side by
   button may show updated text on its card before its bars here catch up (flagged in the
   Compare screen's own caption).
 
+---
+
+## Version 5.10.1 — Refresh-quality bug fixes + Reset Earnings
+
+A live Refresh Earnings run surfaced a real bug: one bank's card ended up showing an unrelated
+news headline ("FTSE 100 lifted by miners rally…") inside its stock-reaction pill instead of a
+short reaction value, because a general market wrap-up article that happened to name the bank
+in passing slipped through the news filter and the model used its headline as color for that
+bank's fields. Fixed at every layer rather than just papered over on screen:
+
+- **Filtering** (`lib/bankEarningsRefresh.ts`): index-level wrap-up stories ("FTSE 100", "Nikkei
+  225", "Dow Jones", "S&P 500", "STOXX 600", "Hang Seng index", "Nasdaq Composite", "TOPIX") are
+  now dropped as candidate evidence for a bank unless that bank is actually named in the
+  article's own title — a real earnings story almost always names the bank in the headline;
+  an incidental mention buried in a market-wrap sentence doesn't.
+- **Prompt**: the extractor now explicitly distinguishes "headline" (one sentence) from
+  "changeText" (≤15 characters — a percentage or a short word like "Unconfirmed"/"Mixed"/
+  "Muted"/"All-time high", never a sentence or unrelated content), and is told to ignore
+  articles that only mention a bank in passing inside a broader market story.
+- **Validation**: any returned `changeText` longer than 24 characters or containing a period/
+  semicolon is now rejected outright — that bank's update is dropped (last-good kept) instead
+  of a sentence-shaped value being accepted into the overlay.
+- **Display** (`components/learn/BankEarnings.tsx`): `ReactionPill` no longer trusts its input
+  to already be short. Anything sentence-like now falls back to a plain "Up"/"Down"/"Mixed"
+  label in the pill (full text still available via a hover tooltip and always visible in the
+  "Market reaction" detail box below) instead of wrapping the card header across multiple lines.
+- **Data**: Deutsche Bank's baseline `changeText` ("Conflicting across sources" — itself a
+  sentence, not a short pill value) shortened to "Mixed"; the fuller nuance was already in its
+  detail text.
+- **Reset Earnings** (Settings → Generation History, new `DELETE /api/bank-earnings/refresh`):
+  a recovery path for exactly this situation — clears the KV overlay and reverts every bank to
+  the curated baseline, since a bad overlay entry otherwise only gets replaced by a LATER
+  successful refresh for that same bank, which may not happen soon.
+
 +## Version 5.9.0 — Mizuho Q1 Earnings (Settings → 07)
 +
 +New standalone **Mizuho Q1 Earnings** section in Settings (`07`, closed by default, purple

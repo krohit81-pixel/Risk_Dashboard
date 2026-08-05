@@ -2,10 +2,16 @@
 // V5.8.0 — manual "Refresh Earnings" trigger (Settings → Generation History). Same busy-flag
 // + last-good-kept pattern as /api/regenerate: never overwrites the baseline/overlay with a
 // bad or partial result, and can't be double-triggered while a run is in flight.
+//
+// V5.10.1 — DELETE is the recovery path: a refresh run once accepted a bad result (an
+// unrelated news snippet leaking into one bank's card — see lib/bankEarningsRefresh.ts fixes).
+// Since a bad overlay entry only gets replaced by a LATER successful refresh for that same
+// bank, this drops it (or the whole overlay) straight back to the curated baseline on demand.
 
 import { NextResponse } from "next/server";
 import { kvGet, kvSet } from "@/lib/snapshotStore";
 import { refreshBankEarnings } from "@/lib/bankEarningsRefresh";
+import { clearEarningsOverlay } from "@/lib/bankEarningsStore";
 import { recordRun } from "@/lib/runStore";
 
 export const dynamic = "force-dynamic";
@@ -59,4 +65,13 @@ export async function POST() {
     console.log(`[earnings] FAILED — baseline/overlay retained: ${error}`);
     return NextResponse.json({ ok: false, error, note: "previous data retained" }, { status: 500 });
   }
+}
+
+export async function DELETE(req: Request) {
+  const id = new URL(req.url).searchParams.get("id") ?? undefined;
+  await clearEarningsOverlay(id);
+  const note = id ? `reset ${id} to baseline` : "reset all banks to baseline";
+  await recordRun({ ranISO: new Date().toISOString(), trigger: "manual", ok: true, job: "earnings", note });
+  console.log(`[earnings] ${note}`);
+  return NextResponse.json({ ok: true, note });
 }
