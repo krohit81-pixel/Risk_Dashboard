@@ -27,8 +27,8 @@ data-fetching steps in a sandboxed/offline environment — prefer `tsc --noEmit`
 ## Versioning convention (do this on every change)
 
 The repo bumps a version on essentially every change-set, in two places kept in sync:
-- `lib/version.ts` → `APP_VERSION` (renders in the header, e.g. "v5.7.0")
-- `package.json` → `"version"`
+- `lib/version.ts` → `APP_VERSION` (renders in the header — current: see that file, currently "5.10.2")
+- `package.json` → `"version"` (must match `APP_VERSION` exactly — these have drifted before; double-check both when bumping)
 
 Follow semver-ish judgment: bug fixes / visual tweaks bump the patch (5.6.3 → 5.6.4), a
 restructure or new feature bumps the minor (5.6.5 → 5.7.0). Check `git log --oneline` for the
@@ -98,37 +98,7 @@ these rather than re-deriving color from `trend` directly.
 - `lib/mizuhoTopRisks.ts` / `lib/mizuhoKnowledgeData.ts` — versioned-locally reference data
   (Mizuho's own published positions/top-risk framework), never fetched at runtime; the
   "Mizuho lens" interpretation and Settings → Mizuho Reference both read from here.
-  `lib/bankEarnings.ts` is the curated FALLBACK BASELINE for the Bank Earnings prototype
-  (Settings) — update it by hand when you want to move the baseline itself forward.
-  `AS_OF` in that file records how current the baseline is; update it whenever the baseline is
-  hand-refreshed. As of V5.8.0 a live-ish overlay sits on top: `lib/bankEarningsStore.ts` (KV,
-  per-bank) + `lib/bankEarningsRefresh.ts` (fetches real news via the existing Marketaux/
-  NewsData/Finnhub adapters, one batched grounded LLM call extracts updated figures + a
-  `plainEnglish` twin, schema-validated before being written to the overlay). Triggered by the
-  "Refresh Earnings" button in Settings → Generation History (`app/api/bank-earnings/refresh/
-  route.ts`); `app/api/bank-earnings/route.ts` serves baseline+overlay merged. Same two-clock
-  shape as the daily editorial: the baseline file is never overwritten, and a failed/empty
-  refresh just leaves it as the last-good fallback.
-  V5.10.0 adds `lib/bankEarningsMetrics.ts` — a structured, USD-converted numeric companion
-  (profit, YoY growth, CET1, stock reaction) feeding the "Compare Banks" charts
-  (`components/learn/BankEarningsCompare.tsx`, reached via a button atop 05 Bank Earnings).
-  It is hand-maintained like the baseline itself, NOT auto-derived from the refresh overlay —
-  update it by hand alongside `lib/bankEarnings.ts` when the baseline moves forward.
-  `components/learn/MizuhoQ1Earnings.tsx` (Settings → 07) established the hand-drawn inline-SVG
-  chart pattern (CSS-var colors via `rgb(var(--x))`, no chart library) that both this file and
-  the Compare screen follow — extend that pattern rather than introducing a chart dependency.
-  **V5.10.1 lesson (keep in mind for any future refresh-style LLM extraction):** a live run once
-  let an unrelated general-market headline leak into one bank's `stockReaction.changeText`
-  (a general index wrap-up incidentally named the bank as a passing gainer, which was enough to
-  pass the news filter). Fixed at three layers, not just the symptom — filtering
-  (`isIndexLevelNoise` in `lib/bankEarningsRefresh.ts` drops index-wrap-up stories unless the
-  bank is named in the article's own title, not just its body), validation (`changeText` over
-  24 chars or containing `.`/`;` is rejected outright), and display (`ReactionPill` in
-  `components/learn/BankEarnings.tsx` falls back to a plain Up/Down/Mixed label for anything
-  sentence-shaped rather than trusting upstream data to already be short). Any new
-  grounded-extraction field that renders in a small fixed UI element (a pill, a chip, a badge)
-  should get the same three-layer treatment — don't rely on the LLM prompt alone.
-  `lib/concepts.ts` (curated glossary) vs `lib/userConcepts.ts` (user-added, Supabase-backed) are
+- `lib/concepts.ts` (curated glossary) vs `lib/userConcepts.ts` (user-added, Supabase-backed) are
   deliberately separate — Concept Library (Learn tab) renders both together but they're different
   data sources with different CRUD paths (`/api/concepts` is user-concepts only).
 - `app/api/cron/editorial/route.ts` / `app/api/cron/weekly/route.ts` — the scheduled generation
@@ -136,6 +106,46 @@ these rather than re-deriving color from `trend` directly.
 - `api/cron-bloomberg.py` (repo root, **not** under `app/`) — a separate Python cron job for
   newsletter ingestion, deployed as its own Vercel function (see `vercel.json` `functions`);
   `requirements.txt` at repo root is for this script, not the Next.js app.
+
+### Bank Earnings suite (Settings → 05, 06, 07)
+Grown across V5.7.0–V5.10.1 into several files that each have a distinct, non-overlapping job.
+Read this before touching any of them — it's easy to update the wrong layer.
+
+| File | Role |
+|---|---|
+| `lib/bankEarnings.ts` | **Curated fallback baseline** — 15 banks (5 US/5 Europe/5 Asia), hand-maintained. `AS_OF` records how current it is. `plainEnglish` field per bank (jargon-free summary). Update by hand to move the baseline itself forward. |
+| `lib/bankEarningsStore.ts` | KV **overlay** on top of the baseline, keyed per bank id (`refreshedISO`, `sourceNote`). `getMergedBankEarnings()` combines baseline+overlay. `clearEarningsOverlay(id?)` reverts one bank (or all) back to baseline — the Reset Earnings recovery path. |
+| `lib/bankEarningsRefresh.ts` | The **refresh engine**. Fetches real news per bank via the existing Marketaux/NewsData/Finnhub adapters (no new keys), filters for genuine newer-quarter evidence (`qualifyCandidates`, `isIndexLevelNoise` — see lesson below), then ONE batched grounded LLM call (`interpretWithProvider`) extracts updated figures + a `plainEnglish` twin for every qualifying bank at once. Schema-validated (`isValidResult`) before anything reaches the overlay. |
+| `lib/bankEarningsMetrics.ts` | **Separate, hand-maintained** structured/USD-converted numeric layer (profit, YoY growth, CET1, stock reaction) feeding the Compare Banks charts. Traces every figure back to `lib/bankEarnings.ts` plus documented FX rates. **Not** auto-derived from the refresh overlay — update it by hand alongside the baseline, or Compare Banks will visually lag a bank whose text card was just refreshed. |
+| `lib/mizuhoQ1Earnings.ts` + `components/learn/MizuhoQ1Earnings.tsx` | Single-bank **deep-dive companion** for Mizuho (Settings → 07), built from the primary results deck rather than news — resolves gaps (credit costs, NPL ratio) that the 05 card flags as unconfirmed. Static, one-off. Established the hand-drawn inline-SVG chart pattern (`rgb(var(--x))` colors, no chart library) — extend it rather than adding a chart dependency. |
+| `components/learn/BankEarnings.tsx` | The 05 list UI. Fetches merged data from `app/api/bank-earnings` (not the static file directly, so a refresh shows up without a redeploy). Houses `ReactionPill`'s defensive short-text guard (see lesson below) and the "📊 Compare Banks" entry point. |
+| `components/learn/BankEarningsCompare.tsx` | The **Compare Banks** screen (opened via a button atop 05, not a separate Settings section) — ranked/diverging hand-drawn SVG bar charts across all 15 banks in USD, reading `lib/bankEarningsMetrics.ts`. |
+| `app/api/bank-earnings/route.ts` | `GET` — merged baseline+overlay, read fresh every request. |
+| `app/api/bank-earnings/refresh/route.ts` | `POST` — runs the refresh engine (KV busy-flag guarded, same last-good-kept pattern as `/api/regenerate`). `GET` — status. `DELETE` (`?id=` optional) — Reset Earnings; clears the overlay back to baseline. |
+
+Settings → 06 Generation History has four buttons total: **Refresh** (reload current briefing),
+**Regenerate** (re-run today's editorial), **Refresh Earnings** (the engine above), **Reset
+Earnings** (the DELETE recovery path). All four record to `lib/runStore.ts`'s `RunRecord` (the
+`job` field distinguishes `"editorial" | "weekly" | "earnings"`; `note` carries a short free-text
+summary for jobs whose result isn't just ok/fail, e.g. "15 checked · 1 updated").
+
+**V5.10.1 lesson — keep this in mind for any future refresh-style LLM extraction on this repo:**
+a live run once let an unrelated general-market headline ("FTSE 100 lifted by miners rally…")
+leak into one bank's `stockReaction.changeText`, because a general index wrap-up incidentally
+named the bank as a passing gainer — enough to pass the news filter as it stood. Fixed at three
+layers, not just the symptom, and any new grounded-extraction field that renders in a small
+fixed UI element (a pill, a chip, a badge) should get the same treatment rather than trusting
+the prompt alone:
+1. **Filtering** — `isIndexLevelNoise` in `lib/bankEarningsRefresh.ts` drops index-wrap-up
+   stories (FTSE 100, Nikkei 225, Dow Jones, S&P 500, STOXX 600, Hang Seng, Nasdaq Composite,
+   TOPIX) as candidate evidence for a bank unless that bank is actually named in the article's
+   own title, not just its body.
+2. **Validation** — `changeText` over 24 characters or containing `.`/`;` is rejected outright;
+   that bank's update is dropped (last-good kept) rather than accepted into the overlay.
+3. **Display** — `ReactionPill` in `components/learn/BankEarnings.tsx` never trusts its input to
+   already be short: anything sentence-shaped falls back to a plain Up/Down/Mixed label (full
+   text still reachable via a hover tooltip and always visible in the "Market reaction" detail
+   box below).
 
 ## Style conventions to match
 

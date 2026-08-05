@@ -54,7 +54,7 @@ curated content when its keys are absent.
 
 ---
 
-## What's on the screen (current, v5.7.0)
+## What's on the screen (current, v5.10.2)
 
 Bottom nav has four tabs; a fifth area (**Settings**) is reached via the hamburger button in
 the header, not the nav bar.
@@ -65,7 +65,7 @@ the header, not the nav bar.
 | **Markets** | Key CRO Dashboard (live indicators) · Japan Watch · Global Risk Heat Map (tappable regions) · Top Emerging Risks · Implications for a Global Bank |
 | **Research** | Research Workspace — paste text or a URL, analyzed through the same CRO framework as the daily editorial; save results to Learn |
 | **Learn** | Saved Analyses · Saved for Later · Concept Library (Your Concepts + All Concepts, both collapsible, pinned items grouped to the top) · Weekly Summary |
-| **Settings** (hamburger) | Appearance (dark/light) · Briefing Books (print/PDF) · Add Concept (paste → analyze → save; editing a saved concept opens here pre-filled) · Mizuho Reference · Bank Earnings (15-bank prototype, latest quarter) · Generation History (Refresh + Regenerate) |
+| **Settings** (hamburger) | 01 Appearance (dark/light) · 02 Briefing Books (print/PDF) · 03 Add Concept (paste → analyze → save; editing a saved concept opens here pre-filled) · 04 Mizuho Reference · 05 Bank Earnings (15-bank baseline+live-overlay, plain-English summaries, "📊 Compare Banks" USD charts screen) · 06 Generation History (Refresh / Regenerate / Refresh Earnings / Reset Earnings) · 07 Mizuho Q1 Earnings (single-bank USD deep-dive, hand-drawn charts) |
 
 The risk colours (green / amber / red) are **functional**: they always reflect the
 *risk* direction of a move, not just whether a number went up or down. A falling
@@ -88,6 +88,8 @@ app/
     regenerate/route.ts         Manual on-demand editorial re-run
     research/analyze/route.ts   Research Workspace: analyze pasted text/URL
     concepts/, concepts/analyze/  User-added concept CRUD + AI-assisted drafting
+    bank-earnings/route.ts      GET — merged Bank Earnings baseline + KV overlay
+    bank-earnings/refresh/route.ts  POST refresh · GET status · DELETE reset-to-baseline
     saved/, runs/, bloomberg/, briefing/generate/, admin/*
 api/cron-bloomberg.py           Separate Python cron (newsletter ingestion) — NOT under app/,
                                  deployed as its own Vercel function; see requirements.txt
@@ -96,9 +98,12 @@ components/
   intel/                        Editorial-layer cards (CRO Conversation, Editorial
                                  Intelligence, Japan & Asia Watch, Mizuho alignment, shared
                                  intelUi.tsx primitives like HorizonPill)
-  learn/                        Settings/Learn reference & tooling (Concept Library, Add
-                                 Concept, Mizuho Reference, Bank Earnings, Briefing Books,
-                                 Appearance)
+  learn/                        Settings/Learn reference & tooling:
+                                 ConceptLibrary, ConceptStudio, MizuhoReference, BriefingBooks,
+                                 AppearanceToggle — plus the Bank Earnings suite:
+                                 BankEarnings.tsx (05 list + Refresh/Reset wiring + Compare
+                                 entry point), BankEarningsCompare.tsx (USD comparison charts),
+                                 MizuhoQ1Earnings.tsx (07 single-bank USD deep-dive)
   research/, saved/, print/, shared/, ui.tsx
 lib/
   riskEngine.ts                 Composite score/status/brief from live deltas
@@ -110,7 +115,13 @@ lib/
   newsAdapter.ts / relevanceConfig.ts    News ingestion, dedupe, CRO relevance scoring
   mizuhoTopRisks.ts / mizuhoKnowledgeData.ts   Mizuho's own published positions (versioned
                                  locally, never fetched at runtime)
-  bankEarnings.ts                Bank Earnings prototype data (curated static snapshot)
+  bankEarnings.ts                05 Bank Earnings — curated fallback baseline, 15 banks
+  bankEarningsStore.ts           KV overlay on the baseline + Reset-Earnings clear
+  bankEarningsRefresh.ts         Refresh engine: news fetch → filter → 1 batched grounded
+                                 LLM call → schema-validate → write to overlay
+  bankEarningsMetrics.ts         Structured USD financials feeding Compare Banks (hand-
+                                 maintained, separate from the overlay — see CLAUDE.md)
+  mizuhoQ1Earnings.ts            Data for the 07 Mizuho Q1 Earnings deep-dive
   concepts.ts / userConcepts.ts  Curated glossary vs. user-added concepts (separate stores)
   fred.ts / markets.ts / marketData.ts   FRED + Yahoo Finance fetch
   fallbackData.ts               Sample values + curated narrative content (no-key fallback)
@@ -740,6 +751,23 @@ bank's fields. Fixed at every layer rather than just papered over on screen:
   a recovery path for exactly this situation — clears the KV overlay and reverts every bank to
   the curated baseline, since a bad overlay entry otherwise only gets replaced by a LATER
   successful refresh for that same bank, which may not happen soon.
+
+---
+
+## Version 5.10.2 — Documentation pass (no code changes)
+
+CLAUDE.md and this README were falling behind the Bank Earnings suite's growth across
+V5.7.0–V5.10.1 (stale version numbers, a Settings section list missing 07 Mizuho Q1 Earnings,
+a file tree missing `bankEarningsStore.ts`/`bankEarningsRefresh.ts`/`bankEarningsMetrics.ts`/
+`mizuhoQ1Earnings.ts`/`BankEarningsCompare.tsx`, and one overloaded bullet point trying to cover
+five files' worth of architecture at once). Brought current so a fresh session reading either
+file gets an accurate map of the repo before writing any code:
+- CLAUDE.md's Bank Earnings content is now its own dedicated section with a file-by-file table
+  (role of each of the 8 files in the suite) instead of one long bullet.
+- This README's "What's on the screen" table and "How it's wired" file tree both reflect the
+  current Settings section list (01–07) and every file the Bank Earnings suite added.
+- Version-number examples in both docs updated to the actual current version rather than a
+  stale example from several releases back.
 
 +## Version 5.9.0 — Mizuho Q1 Earnings (Settings → 07)
 +
