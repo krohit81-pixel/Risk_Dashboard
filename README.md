@@ -676,6 +676,37 @@ earnings-data feed yet; update the file by hand (or wire a real provider) to ref
   available sources at write time — flagged as unconfirmed rather than guessed; a future
   Refresh Earnings run can fill them in once clearer coverage exists.
 
+---
+
+## Version 5.10.0 — Compare Banks
+
+A **"📊 Compare Banks"** button at the top of 05 Bank Earnings opens a separate, chart-heavy
+screen (`components/learn/BankEarningsCompare.tsx`) putting all 15 banks side by side in USD:
+
+- **KPI leaderboard** (computed, not hardcoded): most profitable on a quarterly run-rate basis,
+  fastest YoY profit growth, strongest CET1, biggest earnings-day stock pop.
+- **By-region rollup**, **net profit** (toggle: quarterly run-rate vs. as-reported, region
+  color-coded), **YoY profit growth**, **CET1 ratio**, and **earnings-day stock reaction** —
+  each a ranked or diverging horizontal bar chart, hand-drawn inline SVG in the same visual
+  style as the 07 Mizuho Q1 Earnings screen (CSS-variable colors, no chart library).
+- Backing data: `lib/bankEarningsMetrics.ts` — structured numeric figures (not the free-text
+  label/value pairs in `lib/bankEarnings.ts`) converted to USD at real FX rates (GBP/USD
+  1.3465, EUR/USD 1.153, USD/JPY 162.45 — the same spot rate `lib/mizuhoQ1Earnings.ts`
+  discloses, USD/SGD 1.2828, USD/CNY 6.77, as of Jul 30, 2026). Every figure traces to one
+  already in `lib/bankEarnings.ts` except Citigroup's absolute net income ($5.8B, +45% YoY),
+  which that card only carried as a YoY % — confirmed from Citi's own Q2 2026 results instead
+  of left as a gap in the profit chart.
+- **Honest about basis differences rather than silently blending them**: pre-tax banks
+  (Barclays, Standard Chartered, HSBC) are tagged "(pretax)" next to everyone else's net
+  profit; half-year (Barclays H1, StanChart H1) and full-year (MUFG, SMFG — Q1 FY26 not yet
+  released for either) figures get an even-split "quarterly run-rate" approximation, with the
+  as-reported raw figures one toggle away; banks lacking a clean YoY/CET1/stock-reaction
+  number are listed under each chart rather than papered over with an invented figure.
+- This dataset is a **hand-maintained companion**, like `lib/bankEarnings.ts` itself — it is
+  not yet wired into the automated Refresh Earnings pipeline, so a bank refreshed via that
+  button may show updated text on its card before its bars here catch up (flagged in the
+  Compare screen's own caption).
+
 +## Version 5.9.0 — Mizuho Q1 Earnings (Settings → 07)
 +
 +New standalone **Mizuho Q1 Earnings** section in Settings (`07`, closed by default, purple

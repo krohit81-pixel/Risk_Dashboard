@@ -18,6 +18,7 @@ import {
   type Region,
   type StockReactionDirection,
 } from "@/lib/bankEarnings";
+import { BankEarningsCompare } from "./BankEarningsCompare";
 
 const REACTION_STYLE: Record<StockReactionDirection, { cls: string }> = {
   up: { cls: "border-calm/30 bg-calm/10 text-calm" },
@@ -148,6 +149,7 @@ export function BankEarnings({ refreshKey }: { refreshKey?: number } = {}) {
   const [asOf, setAsOf] = useState<string>("");
   const [overlayMeta, setOverlayMeta] = useState<Record<string, { refreshedISO: string; sourceNote: string }>>({});
   const [error, setError] = useState(false);
+  const [view, setView] = useState<"list" | "compare">("list");
 
   const load = useCallback(async () => {
     try {
@@ -174,14 +176,27 @@ export function BankEarnings({ refreshKey }: { refreshKey?: number } = {}) {
     return <p className="text-xs text-fg-faint">Loading…</p>;
   }
 
+  if (view === "compare") {
+    return <BankEarningsCompare onBack={() => setView("list")} />;
+  }
+
   return (
     <div className="space-y-5">
-      <p className="text-[11px] leading-relaxed text-fg-faint">
-        Latest reported quarter for 15 major banks — highlights, plain-English summary, market reaction, and
-        risk-management watch items. Curated baseline compiled as of {asOf}; banks with a "refreshed" tag were
-        updated by the Refresh Earnings action (Settings → Generation History) from real news, not the static
-        baseline. Verify against primary filings before relying on any figure.
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[11px] leading-relaxed text-fg-faint">
+          Latest reported quarter for 15 major banks — highlights, plain-English summary, market reaction, and
+          risk-management watch items. Curated baseline compiled as of {asOf}; banks with a "refreshed" tag were
+          updated by the Refresh Earnings action (Settings → Generation History) from real news, not the static
+          baseline. Verify against primary filings before relying on any figure.
+        </p>
+        <button
+          type="button"
+          onClick={() => setView("compare")}
+          className="flex-none whitespace-nowrap rounded-lg border border-steel/30 bg-steel/10 px-2.5 py-1.5 text-2xs font-semibold text-steel transition active:scale-95"
+        >
+          📊 Compare Banks
+        </button>
+      </div>
 
       {REGIONS.map((region) => {
         const regionBanks = banks.filter((b) => b.region === region);

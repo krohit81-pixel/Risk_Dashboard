@@ -109,6 +109,14 @@ these rather than re-deriving color from `trend` directly.
   route.ts`); `app/api/bank-earnings/route.ts` serves baseline+overlay merged. Same two-clock
   shape as the daily editorial: the baseline file is never overwritten, and a failed/empty
   refresh just leaves it as the last-good fallback.
+  V5.10.0 adds `lib/bankEarningsMetrics.ts` — a structured, USD-converted numeric companion
+  (profit, YoY growth, CET1, stock reaction) feeding the "Compare Banks" charts
+  (`components/learn/BankEarningsCompare.tsx`, reached via a button atop 05 Bank Earnings).
+  It is hand-maintained like the baseline itself, NOT auto-derived from the refresh overlay —
+  update it by hand alongside `lib/bankEarnings.ts` when the baseline moves forward.
+  `components/learn/MizuhoQ1Earnings.tsx` (Settings → 07) established the hand-drawn inline-SVG
+  chart pattern (CSS-var colors via `rgb(var(--x))`, no chart library) that both this file and
+  the Compare screen follow — extend that pattern rather than introducing a chart dependency.
   `lib/concepts.ts` (curated glossary) vs `lib/userConcepts.ts` (user-added, Supabase-backed) are
   deliberately separate — Concept Library (Learn tab) renders both together but they're different
   data sources with different CRUD paths (`/api/concepts` is user-concepts only).
