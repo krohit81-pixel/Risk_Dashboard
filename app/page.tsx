@@ -24,6 +24,7 @@ import { WhatChangedOvernight } from "@/components/WhatChangedOvernight";
 import { ConceptLibrary } from "@/components/learn/ConceptLibrary";
 import { MizuhoReference } from "@/components/learn/MizuhoReference";
 import { BankEarnings } from "@/components/learn/BankEarnings";
+import { MizuhoQ1Earnings } from "@/components/learn/MizuhoQ1Earnings";
 import { BriefingBooks } from "@/components/learn/BriefingBooks";
 import { AppearanceToggle } from "@/components/learn/AppearanceToggle";
 import { ConceptStudio } from "@/components/learn/ConceptStudio";
@@ -473,6 +474,9 @@ export default function Page() {
                   </div>
                   <RunHistory runs={runs} />
                   <BloombergRunHistory runs={data.bloombergRuns} />
+                </CollapsibleSection>
+                <CollapsibleSection id="settings-mizuhoq1" n="07" title="Mizuho Q1 Earnings" accent="#B79BFF" hint="FY26 Q1 · USD · Jul 30" defaultOpen={false}>
+                  <MizuhoQ1Earnings />
                 </CollapsibleSection>
               </>
             ) : null}

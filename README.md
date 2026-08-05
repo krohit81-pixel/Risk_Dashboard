@@ -675,3 +675,37 @@ earnings-data feed yet; update the file by hand (or wire a real provider) to ref
   This quarter's CET1/credit-cost/stock-reaction figures weren't cleanly confirmed from
   available sources at write time — flagged as unconfirmed rather than guessed; a future
   Refresh Earnings run can fill them in once clearer coverage exists.
+
++## Version 5.9.0 — Mizuho Q1 Earnings (Settings → 07)
++
++New standalone **Mizuho Q1 Earnings** section in Settings (`07`, closed by default, purple
++accent) — a full-detail, USD-converted companion to the Mizuho card in `05 Bank Earnings`,
++built directly from the primary results deck ("Summary of Financial Results for the First
++Quarter of FY2026 (Under Japanese GAAP)", Jul 30, 2026) rather than compiled from news.
++
++- **Resolves the gap the 05 card flags.** That card's `riskWatch` explicitly notes this
++  quarter's CET1/credit-cost figures "were not cleanly confirmed from available sources" —
++  this section supplies the actual credit-related-cost (−$0.04B) and NPL-ratio (0.70%) figures
++  from the filing. CET1/capital ratio still isn't broken out in this particular release and is
++  left unstated rather than guessed.
++- **Static, one-off, not fetched.** Data lives in `lib/mizuhoQ1Earnings.ts` as typed constants —
++  same "curated snapshot, update by hand" posture as `lib/bankEarnings.ts`, but this one isn't
++  wired to the Refresh Earnings pipeline (single-quarter reference, not a recurring feed).
++- **Content:** headline P&L (What Changed), 6-year trajectory (NBP/expense ratio, profit/ROE),
++  full segment engine (RBC/CIBC/GCIBC/AMC/Markets — table + chart), a dedicated Mizuho Americas
++  deep-dive (regional loan book, deposit share, GCIBC non-interest income, U.S. securities
++  entities), balance sheet snapshot, asset quality (credit costs + NPL trend), and FY26 outlook
++  — each with a "Plain English" box in the same style as Bank Earnings cards.
++- **FX conversion is explicit and two-tier:** quarterly P&L and the Jun-2026 balance sheet use
++  the report's own disclosed spot rate (USD/JPY 162.45); the FY26 outlook uses Mizuho's own
++  planned FY26 rate (USD/JPY 150.00). Historical FY20–FY25 trajectory figures are shown at the
++  *current* spot rate throughout (not each year's actual rate) so the trend line reflects
++  business volume, not currency drift — noted inline wherever it applies.
++- **New files:** `lib/mizuhoQ1Earnings.ts` (data), `components/learn/MizuhoQ1Earnings.tsx`
++  (display — reuses the existing `Pill`/card/"Plain English" idiom from `BankEarnings.tsx`).
++  Charts are hand-drawn inline SVG, no new dependency — colors reference the theme CSS
++  variables directly (`style={{ stroke: "rgb(var(--stress))" }}`), the same pattern
++  `RiskGauge.tsx` already uses, so dark/light mode both work without extra handling.
++- Verified with `tsc --noEmit` and a full `next build` against the actual repo before
++  shipping — both compiled clean.
+
