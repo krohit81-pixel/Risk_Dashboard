@@ -44,6 +44,11 @@ export async function POST() {
     console.log(`[earnings] manual refresh starting`);
     const summary = await refreshBankEarnings();
     const note = `${summary.banksChecked} checked · ${summary.banksWithNews} with news · ${summary.banksUpdated} updated`;
+    // V5.10.3 — fold per-bank skip reasons into a secondary `detail` string so a "0 updated"
+    // run is diagnosable from Settings → Generation History alone, not just server logs.
+    const detail = summary.skipped?.length
+      ? summary.skipped.map((s) => `${s.name} — ${s.reason}`).join(" · ").slice(0, 600)
+      : undefined;
     const done: EarningsRegenStatus = { state: "idle", finishedISO: new Date().toISOString(), note };
     await kvSet(KEY, done);
     await recordRun({
@@ -54,9 +59,11 @@ export async function POST() {
       provider: summary.provider,
       degradeReason: summary.degradeReason,
       note,
+      detail,
       error: summary.error,
     });
     console.log(`[earnings] done · ${note}${summary.error ? ` · error=${summary.error}` : ""}`);
+    if (detail) console.log(`[earnings] detail · ${detail}`);
     return NextResponse.json({ ...summary, note });
   } catch (err) {
     const error = String(err);

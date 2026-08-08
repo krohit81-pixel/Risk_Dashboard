@@ -147,6 +147,19 @@ the prompt alone:
    text still reachable via a hover tooltip and always visible in the "Market reaction" detail
    box below).
 
+**V5.10.3 lesson — a "0 updated" refresh used to be a black box.** A run could find real,
+qualifying news for several banks and still update none of them, with no way to tell whether the
+LLM legitimately couldn't confirm hard figures from thin snippets, or a genuine extraction
+returned but failed validation — because the prompt told the model to **omit** any bank it
+couldn't confirm from `results` entirely, so the reason (if the model even had one) was never
+captured. Fixed by making the model return every qualified bank either way (`hasNewQuarter` +
+a short `notConfirmedNote` when false), and giving the validation-rejection path its own
+`explainInvalid()` reason instead of a bare drop. Both reasons now flow into `RefreshSummary.skipped`
+→ `RunRecord.detail` → a secondary line under the run row in `RunHistory` (truncated with a hover
+tooltip, same guard shape as `ReactionPill`). Apply the same shape to any future engine in this
+repo that can silently accept-or-drop per-item: always capture *why* a drop happened, not just
+that it happened.
+
 ## Style conventions to match
 
 - Tailwind only, via CSS-variable-backed theme colors (`bg-ink-800`, `text-fg-muted`, `text-steel`,

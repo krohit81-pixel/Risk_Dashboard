@@ -20,6 +20,11 @@ export interface RunRecord {
   /** V5.8.0 — short free-text summary for jobs whose result isn't just ok/fail, e.g.
    *  "15 checked · 1 updated". */
   note?: string;
+  /** V5.10.3 — optional longer diagnostic string for when `note`'s aggregate counts don't
+   *  explain WHY (e.g. an earnings refresh that found news but updated nothing): per-bank
+   *  reasons, e.g. "DBS — model could not confirm a newer quarter". Rendered as a secondary
+   *  line in RunHistory, not folded into `note`, so the compact summary row stays readable. */
+  detail?: string;
 }
 
 const KEY = "runs:log";
