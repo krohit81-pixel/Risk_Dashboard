@@ -212,6 +212,36 @@ function isValidResult(r: any): r is Required<Omit<LlmRefreshResult, "notConfirm
   return true;
 }
 
+// V5.10.3 — diagnostics only, no change to the validator above. Before this, a bank that
+// reached the LLM step but didn't produce an accepted overlay entry left zero trace: the
+// prompt told the model to omit unconfirmed banks from "results" entirely, so the ambient
+// "N with news · 0 updated" note was the only signal, with no way to tell "the model
+// legitimately couldn't confirm hard figures from thin snippets" apart from "extraction came
+// back malformed". This gives every qualified-but-not-accepted bank a specific reason, logged
+// server-side and folded into the run record, so a repeat "0 updated" is diagnosable instead of
+// a black box.
+function explainInvalid(r: any): string {
+  if (!r || typeof r !== "object") return "model returned no result for this bank";
+  if (!Array.isArray(r.metrics) || !r.metrics.length) return "extraction had no metrics table";
+  if (!r.metrics.every((m: any) => typeof m?.label === "string" && typeof m?.value === "string"))
+    return "extraction's metrics table was malformed";
+  if (!Array.isArray(r.highlights) || !r.highlights.length) return "extraction had no highlights";
+  if (!r.stockReaction || !["up", "down", "mixed"].includes(r.stockReaction.direction))
+    return "extraction's stock reaction was missing or invalid";
+  if (typeof r.stockReaction.changeText !== "string" || r.stockReaction.changeText.length > 24 || /[.;]/.test(r.stockReaction.changeText))
+    return "extraction's stock-reaction text was sentence-shaped, not a short pill value";
+  if (typeof r.plainEnglish !== "string" || !r.plainEnglish) return "extraction had no plain-English summary";
+  if (typeof r.period !== "string" || !r.period || typeof r.reportDate !== "string" || !r.reportDate)
+    return "extraction was missing period/report date";
+  return "extraction was incomplete";
+}
+
+export interface SkippedBank {
+  id: string;
+  name: string;
+  reason: string;
+}
+
 export interface RefreshSummary {
   ok: boolean;
   banksChecked: number;
@@ -221,6 +251,9 @@ export interface RefreshSummary {
   degradeReason?: string;
   error?: string;
   updatedNames?: string[];
+  /** V5.10.3 — one entry per bank that had qualifying news but wasn't accepted, with a
+   *  specific reason (see explainInvalid above). Empty when banksUpdated === banksWithNews. */
+  skipped?: SkippedBank[];
 }
 
 export async function refreshBankEarnings(): Promise<RefreshSummary> {
@@ -236,7 +269,7 @@ export async function refreshBankEarnings(): Promise<RefreshSummary> {
   });
 
   if (!qualified.length) {
-    return { ok: true, banksChecked: banks.length, banksWithNews: 0, banksUpdated: 0, degradeReason: "no_new_news" };
+    return { ok: true, banksChecked: banks.length, banksWithNews: 0, banksUpdated: 0, degradeReason: "no_new_news", skipped: [] };
   }
 
   // Step 2 — one batched, grounded LLM call across all qualifying banks.
@@ -259,14 +292,20 @@ Output VALID JSON ONLY: { "results": [ { "id": string, "hasNewQuarter": boolean,
 "period": string, "reportDate": string, "headline": string,
 "metrics": [{"label": string, "value": string}], "highlights": string[],
 "stockReaction": {"direction": "up"|"down"|"mixed", "changeText": string, "detail": string},
-"riskWatch": string[], "plainEnglish": string } ] }
+"riskWatch": string[], "plainEnglish": string, "notConfirmedNote": string } ] }
 "headline" is a one-sentence summary (like "Record profit but capital buffer thins"). "changeText"
 is DIFFERENT and must be SHORT — at most ~15 characters, e.g. "+2.3%", "-1.8%", "Unconfirmed",
 "Mixed", "Muted", "All-time high". NEVER a sentence, a headline, or unrelated news content; if you
 aren't confident of a short reaction value, use "Unconfirmed". The fuller nuance belongs in
 "detail", which may be a full sentence. "plainEnglish" must be a short, jargon-free 2-4 sentence
-translation of the same facts (no new claims). Omit a bank from "results" entirely if
-hasNewQuarter is false.`;
+translation of the same facts (no new claims).
+
+Include EVERY bank from the input in "results" — do NOT omit one just because hasNewQuarter is
+false. When hasNewQuarter is false, you may leave the other fields out, but ALWAYS fill in
+"notConfirmedNote" with a short (under 100 characters), specific reason, e.g. "articles confirm a
+profit figure only, no ROE/CET1/highlights" or "articles re-cover the quarter already on file" or
+"articles are ambiguous about which quarter this is". This note is for internal diagnostics only
+(never shown to the end user as-is), so be precise rather than generic.`;
 
   const user = qualified
     .map(({ bank, stories }) => {
@@ -288,15 +327,33 @@ hasNewQuarter is false.`;
       provider,
       degradeReason: reason,
       error: `llm returned no usable output (${reason})`,
+      skipped: qualified.map(({ bank }) => ({ id: bank.id, name: bank.name, reason: `llm call failed (${reason})` })),
     };
   }
 
   const nowISO = new Date().toISOString();
   const accepted: BankEarningsOverlayEntry[] = [];
-  for (const r of data.results) {
-    if (!isValidResult(r)) continue;
-    const bank = banks.find((b) => b.id === r.id);
-    if (!bank) continue;
+  const skipped: SkippedBank[] = [];
+  const resultsById = new Map(data.results.filter((r) => r && typeof r.id === "string").map((r) => [r.id, r]));
+
+  for (const { bank } of qualified) {
+    const r = resultsById.get(bank.id);
+    if (!r) {
+      skipped.push({ id: bank.id, name: bank.name, reason: "model did not return a result for this bank" });
+      continue;
+    }
+    if (r.hasNewQuarter !== true) {
+      skipped.push({
+        id: bank.id,
+        name: bank.name,
+        reason: (typeof r.notConfirmedNote === "string" && r.notConfirmedNote.trim()) || "model could not confirm a newer quarter",
+      });
+      continue;
+    }
+    if (!isValidResult(r)) {
+      skipped.push({ id: bank.id, name: bank.name, reason: explainInvalid(r) });
+      continue;
+    }
     const sourceCount = qualified.find((q) => q.bank.id === r.id)?.stories.length ?? 0;
     const sources = [...new Set((qualified.find((q) => q.bank.id === r.id)?.stories ?? []).map((s) => s.source))];
     accepted.push({
@@ -317,8 +374,13 @@ hasNewQuarter is false.`;
 
   if (accepted.length) await saveEarningsOverlayEntries(accepted);
 
+  if (skipped.length) {
+    console.log(`[earnings] not updated: ${skipped.map((s) => `${s.name} — ${s.reason}`).join(" | ")}`);
+  }
+
   return {
     ok: true,
+    skipped,
     banksChecked: banks.length,
     banksWithNews: qualified.length,
     banksUpdated: accepted.length,
