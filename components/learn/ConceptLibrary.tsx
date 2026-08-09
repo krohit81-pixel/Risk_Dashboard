@@ -198,7 +198,10 @@ function Detail({
   onDelete?: () => void;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 top-0 z-40 mx-auto max-w-app overflow-y-auto bg-ink-950 pb-10">
+    // V5.10.4 — width must track app/page.tsx's SHELL_WIDTH (kept as a literal string here,
+    // not an import, since that's a client-page-local const) so this full-screen overlay
+    // doesn't look narrower than the shell it's opened from on iPad/macOS.
+    <div className="fixed inset-x-0 bottom-0 top-0 z-40 mx-auto max-w-app overflow-y-auto bg-ink-950 pb-10 md:max-w-2xl lg:max-w-4xl xl:max-w-5xl">
       <div className="sticky top-0 flex items-center gap-3 border-b border-line bg-ink-900/95 px-4 py-3 backdrop-blur-md">
         <button onClick={onClose} className="text-sm font-semibold text-steel">
           ‹ Library

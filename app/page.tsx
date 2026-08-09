@@ -39,6 +39,16 @@ import { AppFooter } from "@/components/shared/AppFooter";
 import { HomeIcon, MarketsIcon, ResearchIcon, LearnIcon } from "@/components/shared/NavIcons";
 import type { UserConcept } from "@/lib/userConcepts";
 
+// V5.10.4 — the app was single-width (max-w-app, 560px) at every viewport size, including
+// iPad/macOS Safari windows far wider than that, wasting most of the screen. This widens the
+// shell progressively at standard Tailwind breakpoints (md ~iPad portrait, lg ~iPad landscape/
+// small Mac windows, xl ~larger Mac windows) while leaving phone-width layout untouched.
+// `<nav>` below must use this exact same string — it's `fixed` and positioned independently of
+// `<main>`, so a mismatch here would visually misalign the tab bar from the content edges.
+// `ConceptLibrary.tsx`'s full-screen overlay duplicates this string for the same reason (can't
+// import a const across the client-component boundary usefully here) — keep both in sync.
+const SHELL_WIDTH = "max-w-app md:max-w-2xl lg:max-w-4xl xl:max-w-5xl";
+
 export default function Page() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -209,7 +219,7 @@ export default function Page() {
   }, [earningsRegenState, loadRuns]);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-app">
+    <main className={`mx-auto min-h-screen w-full ${SHELL_WIDTH}`}>
       {/* Sticky compact header */}
       <header className="safe-top sticky top-0 z-20 border-b border-line bg-ink-900/85 backdrop-blur-md">
         <div className="flex items-center justify-between px-5 py-3">
@@ -284,7 +294,7 @@ export default function Page() {
         ) : null}
       </header>
 
-      <div className="safe-bottom space-y-6 px-4 pt-4 pb-24">
+      <div className="safe-bottom-content space-y-6 px-4 pt-4">
         {loading && !data ? <Skeleton /> : null}
 
         {error && !data ? (
@@ -512,7 +522,7 @@ export default function Page() {
 
       {/* ===== bottom tab bar ===== */}
       {data ? (
-        <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-app border-t border-line bg-ink-900/95 backdrop-blur-md">
+        <nav className={`safe-bottom-nav fixed inset-x-0 bottom-0 z-30 mx-auto flex ${SHELL_WIDTH} border-t border-line bg-ink-900/95 backdrop-blur-md`}>
           {([
             ["today", "Home", HomeIcon],
             ["markets", "Markets", MarketsIcon],

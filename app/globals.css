@@ -92,4 +92,10 @@ body {
 
 /* iOS safe-area padding for home-screen / notch devices. */
 .safe-top { padding-top: env(safe-area-inset-top); }
-.safe-bottom { padding-bottom: calc(env(safe-area-inset-bottom) + 1.5rem); }
+/* V5.10.4 — split from one .safe-bottom class that used to be applied verbatim to BOTH the
+   fixed tab bar and the scrollable content wrapper. That stacked an extra 1.5rem on top of the
+   nav's own padding, in addition to the home-indicator inset (which already provides its own
+   clearance) — producing a visibly oversized gap below the tab labels on notched iPhones in
+   standalone/add-to-homescreen mode. Now scoped to what each actually needs. */
+.safe-bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
+.safe-bottom-content { padding-bottom: calc(env(safe-area-inset-bottom) + 4.5rem); }
