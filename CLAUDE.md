@@ -85,6 +85,25 @@ the old one carries over its old open/closed state, which can make a section ren
 section ids are now prefixed `settings-*` specifically to avoid colliding with their old
 Learn-tab ids.
 
+**Responsive shell (v5.10.4+):** despite "mobile-first," the app was single-width (`max-w-app`,
+560px) at *every* viewport, including iPad/macOS Safari windows — there were zero `md:`/`lg:`/
+`xl:` classes anywhere in the codebase before this. `SHELL_WIDTH` in `app/page.tsx`
+(`"max-w-app md:max-w-2xl lg:max-w-4xl xl:max-w-5xl"`) now widens progressively at standard
+Tailwind breakpoints. Three places must all use this exact string or they'll visually
+misalign/look narrower than the shell: `<main>` and `<nav>` in `app/page.tsx` (nav is `fixed`,
+positioned independently of main), and the full-screen overlay in
+`components/learn/ConceptLibrary.tsx` (duplicated as a literal since it's a separate
+client component). Any new full-screen fixed overlay needs the same treatment.
+
+**iOS safe-area padding (v5.10.4+):** `.safe-bottom-nav` / `.safe-bottom-content` in
+`globals.css` are deliberately separate classes, not one shared `.safe-bottom`. They used to be
+the same class applied to both the fixed tab bar and the scrollable content wrapper, which
+stacked an extra 1.5rem onto the nav's own padding on top of the home-indicator inset it already
+gets from `env(safe-area-inset-bottom)` — a visibly oversized gap below the tab labels on
+notched iPhones in standalone/add-to-homescreen mode. `-nav` gets exactly the inset; `-content`
+gets the inset plus enough to clear the fixed nav's rendered height, folded into one `calc()`
+instead of stacking two paddings.
+
 ### Risk color semantics (repo-wide convention)
 Color always encodes the **direction of risk**, never the raw sign of the number. A falling
 S&P is red (risk-off); a falling VIX is green (risk-on). This logic lives per-indicator in
