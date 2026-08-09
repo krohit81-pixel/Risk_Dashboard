@@ -104,6 +104,26 @@ notched iPhones in standalone/add-to-homescreen mode. `-nav` gets exactly the in
 gets the inset plus enough to clear the fixed nav's rendered height, folded into one `calc()`
 instead of stacking two paddings.
 
+**Logo assets (v5.10.5–6):** the brand mark is a glow-on-black illustration (blue→green
+gradient "R"), not a flat vector icon — its own alpha channel as supplied is unusable (doesn't
+correlate with the visible content; checked and confirmed, not a rendering assumption). Two
+different treatments are deliberately in place for two different contexts:
+- `public/icons/logo-header.png` renders live inside the themed header, so it's a genuinely
+  transparent PNG (alpha reconstructed via threshold+gamma-shaped luminance keying — see git
+  history on this file's commit for the derivation) — it shows dark or light behind it
+  automatically. Because it's really transparent now, `app/page.tsx`'s header logo can't rely on
+  the old trick (an always-rendered fallback "R" letter sitting behind an assumed-opaque image,
+  hidden only because the image used to fully cover it) — a `logoFailed` state now renders one
+  or the other, never both, on `<img>`'s `onError`.
+- `app/icon.png`, `app/apple-icon.png`, `public/icons/icon-192.png`, `public/icons/icon-512.png`
+  (browser tab / home-screen / PWA manifest icons) stay flattened onto solid **black**, not
+  transparent and not theme-reactive. These are static OS-level assets that can't watch the
+  in-app theme toggle, and — tested directly — keying this specific glow artwork onto white
+  comes out visibly hazy/soft (the letterform's own shaded regions read at similar brightness to
+  the ambient background bloom, so no threshold/gamma curve separates "shaded glyph" from "glow
+  falloff" cleanly). If a crisp white-background variant is ever wanted, it needs source art
+  actually authored with flat/opaque shapes, not this glow style.
+
 ### Risk color semantics (repo-wide convention)
 Color always encodes the **direction of risk**, never the raw sign of the number. A falling
 S&P is red (risk-off); a falling VIX is green (risk-on). This logic lives per-indicator in
