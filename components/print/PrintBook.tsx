@@ -35,7 +35,7 @@ export function PrintBook({ book }: { book: BriefingBook }) {
     <article className="mx-auto max-w-2xl px-6 py-10 print:px-0 print:py-0">
       {/* Cover */}
       <header className="mb-8 border-b-2 border-neutral-900 pb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-neutral-500">Global Risk Intelligence — Briefing Book</p>
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-neutral-500">Risk Intelligence — Briefing Book</p>
         <h1 className="mt-1 text-[26px] font-bold leading-tight text-neutral-900">{book.title}</h1>
         <p className="mt-1 text-[13px] text-neutral-600">{book.subtitle}</p>
         <p className="mt-3 text-[11px] text-neutral-500">
