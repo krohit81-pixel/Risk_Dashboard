@@ -4,7 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/shared/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "Global Risk Intelligence",
+  title: "Risk Intelligence",
   description: "Daily risk briefing for a global-bank CRO.",
   manifest: "/manifest.json",
   appleWebApp: {

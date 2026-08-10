@@ -104,21 +104,22 @@ notched iPhones in standalone/add-to-homescreen mode. `-nav` gets exactly the in
 gets the inset plus enough to clear the fixed nav's rendered height, folded into one `calc()`
 instead of stacking two paddings.
 
-**Logo assets (v5.10.7, supersedes v5.10.5–6):** the brand mark is a globe+"R"+chart
-illustration with flat, opaque shading (not the earlier glow-on-black attempt — see below) —
-current source is `public/icons/global_risk_intelligence_attached_logo.svg`, which despite the
-extension is **not a real vector**: it's a `<svg>` wrapper around one base64-embedded PNG
-(check before assuming any future replacement is actually vector — `grep -o "image/png" <file>`
-is enough to tell). Its embedded alpha channel is real and usable this time (correlates with
-visible content — checked directly, ~87% brightness/alpha correlation vs. ~50% on the earlier
-glow asset, transparent corners read true `(0,0,0,0)`), so no luminance-keying reconstruction
-was needed — just crop-to-content-bbox, scale into a padded square, done. `public/icons/logo-
-header.png` uses this transparent square directly (genuinely theme-reactive — shows dark or
-light behind it live). `app/icon.png`, `app/apple-icon.png`, `public/icons/icon-192.png`,
-`public/icons/icon-512.png` (OS-level, can't watch the in-app theme toggle) flatten the same
-transparent square onto solid black by deliberate choice, not a technical limitation this time —
-this asset actually keys cleanly onto white too, unlike the glow one; black was kept to match
-the already-established brand default rather than re-litigate it.
+**Logo assets (v5.10.8, supersedes v5.10.5–7):** the header (top-left of `app/page.tsx`) is
+**intentionally logo-free** — just the "Risk Intelligence" title text, no icon/wordmark image.
+This was a deliberate visual-cleanup request; don't reintroduce a header logo without checking
+first. `public/icons/logo-header.png` was deleted as part of that (it had no other consumer).
+
+The OS-level icons are untouched by that change and still exist: `app/icon.png`,
+`app/apple-icon.png`, `public/icons/icon-192.png`, `public/icons/icon-512.png` (browser tab /
+home-screen / PWA manifest) are a globe+"R"+chart illustration with flat, opaque shading, sourced
+from `public/icons/global_risk_intelligence_attached_logo.svg` — which despite the extension is
+**not a real vector**: it's an `<svg>` wrapper around one base64-embedded PNG (check before
+assuming any future replacement is actually vector — `grep -o "image/png" <file>` is enough to
+tell). Its embedded alpha channel is real and usable (correlates with visible content — checked
+directly, ~87% brightness/alpha correlation, transparent corners read true `(0,0,0,0)`), flattened
+onto solid black by deliberate choice (this asset actually keys cleanly onto white too, unlike an
+earlier glow-style attempt — black was kept to match the established brand default, not a
+technical limitation).
 
 Historical note, kept in case a future logo swap hits the same failure mode: the very first
 brand-mark attempt was a soft glow-on-black illustration whose own alpha channel was unusable

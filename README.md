@@ -1,4 +1,4 @@
-# Global Risk Intelligence Dashboard
+# Risk Intelligence Dashboard
 
 A morning risk briefing for the CRO of a global bank. Answers one question:
 **“What are the most important global risk developments I need to know this morning?”**
