@@ -182,6 +182,20 @@ there, but it's no longer the *only* place the choice is offered. General lesson
 silently wins whenever a control goes unnoticed is indistinguishable from that control not
 existing — for a real choice, decide at the point of action, not after.
 
+**v5.11.2 polish pass** (same feature, next round of feedback): `CollapsibleNote` dropped its
+parenthetical `hint` text — at phone width, label + hint together wrapped the header onto two
+lines, which read as broken rather than descriptive; the label alone ("Simple explanation",
+"Original text") is self-explanatory. `stripLeadingUrl()` (`lib/format.ts`) strips a leading
+URL-only line from Original Text's display — pasted content very often starts with the URL
+itself (iOS share-sheet paste pattern), which is redundant with the source line above; render-
+time only, the stored `originalText` stays a verbatim, untouched copy. `PrintItem.tsx`'s
+`Section` label style bumped from a faint 10px/neutral-500 to a bolder 11px/bold/neutral-700
+(`LABEL_CLASS`), and its footer swapped `AppFooterText` (the live app's data-provider credits —
+meaningless for a single-article export) for a print-specific one: "Prepared by Rohit Kohli" +
+a one-line note that source articles may be paywalled and the publisher's own terms govern
+re-sharing. `SavedList.tsx`'s action row (Read/Export Full/Export Share) compacted to fit one
+line at phone width — shorter labels, no emoji, tighter padding.
+
 ### Bank Earnings suite (Settings → 05, 06, 07)
 Grown across V5.7.0–V5.10.1 into several files that each have a distinct, non-overlapping job.
 Read this before touching any of them — it's easy to update the wrong layer.

@@ -12,6 +12,7 @@ import { Card, SeverityPill, Chip } from "@/components/ui";
 import { HorizonPill, UnderstandBlock } from "@/components/intel/intelUi";
 import { MizuhoLensBlock } from "@/components/intel/MizuhoLensBlock";
 import { ProgressRing } from "@/components/shared/ProgressRing";
+import { stripLeadingUrl } from "@/lib/format";
 
 const conceptTerm = (id: string) => CONCEPTS.find((c) => c.id === id)?.term ?? id;
 
@@ -467,12 +468,7 @@ export function ResearchWorkspace({
               app. Also what the "share externally" export is built from, so someone can read
               the article + a plain-English take without the Mizuho/risk-lens layer. */}
           {analysis.layman?.whatHappened || analysis.whatToUnderstand ? (
-            <CollapsibleNote
-              label="Simple explanation"
-              hint="what happened, in plain terms — plus the mechanics"
-              open={showSimple}
-              onToggle={() => setShowSimple((v) => !v)}
-            >
+            <CollapsibleNote label="Simple explanation" open={showSimple} onToggle={() => setShowSimple((v) => !v)}>
               {analysis.layman?.whatHappened ? (
                 <p className="text-[12px] leading-relaxed text-fg-muted">{analysis.layman.whatHappened}</p>
               ) : null}
@@ -486,13 +482,10 @@ export function ResearchWorkspace({
           ) : null}
 
           {analysis.originalText ? (
-            <CollapsibleNote
-              label="Original text"
-              hint={analysis.sourceType === "image" ? "what was read from your image" : "saved as submitted"}
-              open={showOriginal}
-              onToggle={() => setShowOriginal((v) => !v)}
-            >
-              <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-fg-muted">{analysis.originalText}</p>
+            <CollapsibleNote label="Original text" open={showOriginal} onToggle={() => setShowOriginal((v) => !v)}>
+              <p className="whitespace-pre-wrap break-words text-[12px] leading-relaxed text-fg-muted">
+                {stripLeadingUrl(analysis.originalText)}
+              </p>
             </CollapsibleNote>
           ) : null}
 
@@ -561,25 +554,25 @@ export function ResearchWorkspace({
  *  collapsed rather than remembering the last one's open/closed state.
  *  V5.11.1 — exported so components/saved/SavedList.tsx can render the identical "Simple
  *  explanation"/"Original text" blocks for a re-opened saved analysis in Learn, not a
- *  lookalike — same component, same props, so the two can't visually drift apart. */
+ *  lookalike — same component, same props, so the two can't visually drift apart.
+ *  V5.11.2 — dropped the parenthetical `hint` text: at mobile width it pushed the header onto
+ *  two lines, which read as broken rather than descriptive. `label` alone is self-explanatory
+ *  once you've seen "Simple explanation"/"Original text" once. */
 export function CollapsibleNote({
   label,
-  hint,
   open,
   onToggle,
   children,
 }: {
   label: string;
-  hint?: string;
   open: boolean;
   onToggle: () => void;
   children: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-line bg-ink-800 px-3.5 py-2.5">
-      <button onClick={onToggle} className="flex w-full items-center gap-1.5 text-left text-2xs font-semibold text-steel">
+      <button onClick={onToggle} className="flex w-full items-center gap-1.5 whitespace-nowrap text-left text-2xs font-semibold text-steel">
         {open ? "▾" : "→"} {label}
-        {hint ? <span className="font-normal text-fg-faint">&nbsp;({hint})</span> : null}
       </button>
       {open ? <div className="mt-2">{children}</div> : null}
     </div>

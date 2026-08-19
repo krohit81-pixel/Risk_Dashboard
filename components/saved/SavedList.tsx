@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { SavedItem } from "@/lib/savedStore";
 import { FocusBlock, CollapsibleNote } from "@/components/research/ResearchWorkspace";
 import { MizuhoLensBlock } from "@/components/intel/MizuhoLensBlock";
+import { stripLeadingUrl } from "@/lib/format";
 
 const KIND_LABEL: Record<SavedItem["kind"], string> = {
   theme: "CRO Conversation",
@@ -206,15 +207,17 @@ function SavedCard({
                 : ""}
             </p>
           ) : null}
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {/* V5.11.2 — compact enough to stay on one line at phone width: shorter labels, no
+              emoji (it was costing width without adding clarity), tighter padding. */}
+          <div className="mt-1.5 flex gap-1">
             {it.originalUrl ? (
               <a
                 href={it.originalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex rounded-lg border border-line px-2.5 py-1 text-2xs font-semibold text-fg-muted active:bg-ink-700"
+                className="inline-flex flex-none items-center rounded-lg border border-line px-2 py-1 text-[10px] font-semibold text-fg-muted active:bg-ink-700"
               >
-                Read article ↗
+                Read ↗
               </a>
             ) : null}
             {/* V5.11.1 — two explicit links (was one, defaulting silently to Full) — see the
@@ -223,17 +226,17 @@ function SavedCard({
               href={`/print/item?id=${encodeURIComponent(it.id)}&mode=full`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-2xs font-semibold text-fg-muted active:bg-ink-700"
+              className="inline-flex flex-none items-center rounded-lg border border-line px-2 py-1 text-[10px] font-semibold text-fg-muted active:bg-ink-700"
             >
-              🖨️ Export — Full
+              Export Full
             </a>
             <a
               href={`/print/item?id=${encodeURIComponent(it.id)}&mode=share`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-2xs font-semibold text-fg-muted active:bg-ink-700"
+              className="inline-flex flex-none items-center rounded-lg border border-line px-2 py-1 text-[10px] font-semibold text-fg-muted active:bg-ink-700"
             >
-              🔗 Export — Share
+              Export Share
             </a>
           </div>
 
@@ -281,12 +284,7 @@ function SavedCard({
 
           {it.kind === "analysis" && (it.layman?.whatHappened || it.detail?.whatToUnderstand) ? (
             <div className="mt-2">
-              <CollapsibleNote
-                label="Simple explanation"
-                hint="what happened, in plain terms — plus the mechanics"
-                open={showSimple}
-                onToggle={() => setShowSimple((v) => !v)}
-              >
+              <CollapsibleNote label="Simple explanation" open={showSimple} onToggle={() => setShowSimple((v) => !v)}>
                 {it.layman?.whatHappened ? (
                   <p className="text-[12px] leading-relaxed text-fg-muted">{it.layman.whatHappened}</p>
                 ) : null}
@@ -302,13 +300,10 @@ function SavedCard({
 
           {it.kind === "analysis" && it.originalText ? (
             <div className="mt-2">
-              <CollapsibleNote
-                label="Original text"
-                hint={it.sourceType === "image" ? "what was read from your image" : "saved as submitted"}
-                open={showOriginal}
-                onToggle={() => setShowOriginal((v) => !v)}
-              >
-                <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-fg-muted">{it.originalText}</p>
+              <CollapsibleNote label="Original text" open={showOriginal} onToggle={() => setShowOriginal((v) => !v)}>
+                <p className="whitespace-pre-wrap break-words text-[12px] leading-relaxed text-fg-muted">
+                  {stripLeadingUrl(it.originalText)}
+                </p>
               </CollapsibleNote>
             </div>
           ) : null}

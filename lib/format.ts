@@ -67,3 +67,17 @@ export function clockTime(iso: string): string {
     timeZoneName: "short",
   });
 }
+
+/** V5.11.2 — Research's "Original text" is the raw pasted/fetched content, which very often
+ *  starts with the URL itself (e.g. iOS's share-sheet paste pattern: link, blank line, then
+ *  the article). That URL is redundant there — it's already shown separately (the "Read
+ *  article" link / print header's source line) — so strip leading URL-only line(s), and any
+ *  blank lines around them, before display. Render-time only: the stored originalText stays a
+ *  verbatim, untouched copy of what was actually submitted. */
+export function stripLeadingUrl(text: string): string {
+  const lines = text.split("\n");
+  while (lines.length && (lines[0].trim() === "" || /^https?:\/\/\S+$/i.test(lines[0].trim()))) {
+    lines.shift();
+  }
+  return lines.join("\n");
+}

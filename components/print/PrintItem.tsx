@@ -9,9 +9,19 @@
 // mode renders ONLY the title/date/source, the plain-English "Simple explanation," and the
 // original article text. Both modes pull from fields already on SavedItem; share mode adds
 // nothing new, it just omits the Mizuho/risk-lens sections.
+//
+// V5.11.2 — section headers ("What happened", "Simple explanation", …) bumped from a faint
+// 10px/neutral-500 label to a bolder, more prominent 11px/bold/neutral-700 one per feedback
+// that the original read as too subtle in the printed output. Also: the "Original article
+// text" section strips a leading URL (stripLeadingUrl) since the source line above already
+// shows it — showing it twice was flagged as redundant. Footer replaced with a short,
+// print-specific one (was reusing the live app's data-provider credits, which don't apply to
+// a single article export).
 
 import type { SavedItem } from "@/lib/savedStore";
-import { AppFooterText } from "@/components/shared/AppFooter";
+import { stripLeadingUrl } from "@/lib/format";
+
+const LABEL_CLASS = "text-[11px] font-bold uppercase tracking-wide text-neutral-700";
 
 function fmt(iso?: string): string {
   if (!iso) return "";
@@ -22,7 +32,7 @@ function fmt(iso?: string): string {
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mt-4 break-inside-avoid">
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{label}</p>
+      <p className={`mb-1 ${LABEL_CLASS}`}>{label}</p>
       <div className="text-[13px] leading-relaxed text-neutral-800">{children}</div>
     </div>
   );
@@ -58,11 +68,16 @@ function SimpleExplanationSection({ item }: { item: SavedItem }) {
   );
 }
 
+/** V5.11.2 — strips a leading URL line: it's already shown on the source line above (and,
+ *  when saved from a URL-mode analysis, doubled up with the "Read article" link in-app), so
+ *  repeating it inside the article body was redundant. `break-words` guards against a long
+ *  unbroken token (a tracking-parameter-laden URL, an unbroken hashtag string, etc.) forcing
+ *  the page wider than print allows if one ever slips through. */
 function OriginalTextSection({ item }: { item: SavedItem }) {
   if (!item.originalText) return null;
   return (
     <Section label="Original article text">
-      <p className="whitespace-pre-wrap">{item.originalText}</p>
+      <p className="whitespace-pre-wrap break-words">{stripLeadingUrl(item.originalText)}</p>
     </Section>
   );
 }
@@ -75,11 +90,27 @@ function SourceLine({ item }: { item: SavedItem }) {
       {item.originalUrl ? (
         <>
           {" · "}
-          <a href={item.originalUrl} className="underline">
+          <a href={item.originalUrl} className="break-all underline">
             {item.originalUrl}
           </a>
         </>
       ) : null}
+    </p>
+  );
+}
+
+/** V5.11.2 — replaces the live app's AppFooterText (data-provider credits — meaningless for a
+ *  single-article export). Short, and states the thing that actually matters for something
+ *  the user might forward: this is a personal read + take, and some source articles are
+ *  subscription content, so the original publisher's own terms govern re-sharing it further. */
+function PrintFooterText() {
+  return (
+    <p className="text-2xs leading-relaxed text-neutral-500">
+      <span className="font-semibold text-neutral-700">Prepared by Rohit Kohli</span>
+      <br />
+      Personal reference, based on the source noted above. Some source articles are
+      subscription/paywalled content — please respect the original publisher&rsquo;s terms
+      before sharing this further.
     </p>
   );
 }
@@ -100,7 +131,7 @@ function PrintItemShare({ item }: { item: SavedItem }) {
       <OriginalTextSection item={item} />
 
       <footer className="mt-10 border-t border-neutral-200 pt-3">
-        <AppFooterText light />
+        <PrintFooterText />
       </footer>
     </article>
   );
@@ -134,13 +165,13 @@ function PrintItemFull({ item }: { item: SavedItem }) {
         <div className="mt-4 grid grid-cols-2 gap-4 break-inside-avoid">
           {item.detail?.firstOrder ? (
             <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">First-order</p>
+              <p className={`mb-1 ${LABEL_CLASS}`}>First-order</p>
               <p className="text-[13px] leading-relaxed text-neutral-800">{item.detail.firstOrder}</p>
             </div>
           ) : null}
           {item.detail?.secondOrder ? (
             <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Second-order</p>
+              <p className={`mb-1 ${LABEL_CLASS}`}>Second-order</p>
               <p className="text-[13px] leading-relaxed text-neutral-800">{item.detail.secondOrder}</p>
             </div>
           ) : null}
@@ -155,8 +186,8 @@ function PrintItemFull({ item }: { item: SavedItem }) {
 
       {item.detail?.keyTakeaway ? (
         <div className="mt-4 break-inside-avoid rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5">
-          <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Key takeaway</p>
-          <p className="text-[13px] leading-relaxed text-neutral-900">{item.detail.keyTakeaway}</p>
+          <p className={`mb-0.5 ${LABEL_CLASS}`}>Key takeaway</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-neutral-900">{item.detail.keyTakeaway}</p>
         </div>
       ) : null}
 
@@ -184,7 +215,7 @@ function PrintItemFull({ item }: { item: SavedItem }) {
 
       {lens && (lens.context || lens.interpretation) ? (
         <div className="mt-4 break-inside-avoid rounded-lg border border-neutral-200 px-3.5 py-3">
-          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+          <p className={`mb-1.5 ${LABEL_CLASS}`}>
             Through Mizuho&rsquo;s lens {lens.repoVersion ? `· repository v${lens.repoVersion}` : ""}
           </p>
           {lens.context ? <p className="text-[13px] leading-relaxed text-neutral-800">{lens.context}</p> : null}
@@ -209,7 +240,7 @@ function PrintItemFull({ item }: { item: SavedItem }) {
       <OriginalTextSection item={item} />
 
       <footer className="mt-10 border-t border-neutral-200 pt-3">
-        <AppFooterText light />
+        <PrintFooterText />
       </footer>
     </article>
   );
