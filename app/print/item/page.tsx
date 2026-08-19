@@ -59,7 +59,11 @@ function PrintItemInner() {
   const params = useSearchParams();
   const id = params.get("id") || "";
   const [state, setState] = useState<LoadState>({ status: "loading" });
-  const [mode, setMode] = useState<"full" | "share">("full");
+  // V5.11.1 — the export links now pick a mode up front (?mode=full|share) rather than
+  // relying on the user to notice the toggle below after landing here; that toggle stays
+  // as a way to change their mind once on the page, but no longer decides silently by
+  // being the thing nobody clicked. Falls back to "full" for any other/missing value.
+  const [mode, setMode] = useState<"full" | "share">(params.get("mode") === "share" ? "share" : "full");
 
   const load = useCallback(() => {
     if (!id) {

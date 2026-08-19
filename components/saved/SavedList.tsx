@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import type { SavedItem } from "@/lib/savedStore";
-import { FocusBlock } from "@/components/research/ResearchWorkspace";
+import { FocusBlock, CollapsibleNote } from "@/components/research/ResearchWorkspace";
 import { MizuhoLensBlock } from "@/components/intel/MizuhoLensBlock";
 
 const KIND_LABEL: Record<SavedItem["kind"], string> = {
@@ -137,6 +137,13 @@ function SavedCard({
 }) {
   const [open, setOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(false); // collapsed by default — tap the title to expand
+  // V5.11.1 — same two sections as the live Research result view (components/research/
+  // ResearchWorkspace.tsx), reopened here for a saved analysis. Analysis-kind items only —
+  // originalText only ever exists on those, and this exact "Simple explanation" pairing
+  // (layman.whatHappened + whatToUnderstand together) is specifically the Research format;
+  // other kinds already show whatToUnderstand within their own "Full detail" section below.
+  const [showSimple, setShowSimple] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
   const show = (exec?: string, lay?: string) => (learning && lay ? lay : exec) || "";
   const showList = (exec?: string[], lay?: string[]) =>
     (learning && lay && lay.length ? lay : exec) ?? [];
@@ -210,13 +217,23 @@ function SavedCard({
                 Read article ↗
               </a>
             ) : null}
+            {/* V5.11.1 — two explicit links (was one, defaulting silently to Full) — see the
+                matching note in ResearchWorkspace.tsx. */}
             <a
-              href={`/print/item?id=${encodeURIComponent(it.id)}`}
+              href={`/print/item?id=${encodeURIComponent(it.id)}&mode=full`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-2xs font-semibold text-fg-muted active:bg-ink-700"
             >
-              🖨️ Print / Export PDF
+              🖨️ Export — Full
+            </a>
+            <a
+              href={`/print/item?id=${encodeURIComponent(it.id)}&mode=share`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-2xs font-semibold text-fg-muted active:bg-ink-700"
+            >
+              🔗 Export — Share
             </a>
           </div>
 
@@ -261,6 +278,40 @@ function SavedCard({
           <FocusBlock items={it.focus} />
 
           <MizuhoLensBlock lens={it.mizuhoLens} />
+
+          {it.kind === "analysis" && (it.layman?.whatHappened || it.detail?.whatToUnderstand) ? (
+            <div className="mt-2">
+              <CollapsibleNote
+                label="Simple explanation"
+                hint="what happened, in plain terms — plus the mechanics"
+                open={showSimple}
+                onToggle={() => setShowSimple((v) => !v)}
+              >
+                {it.layman?.whatHappened ? (
+                  <p className="text-[12px] leading-relaxed text-fg-muted">{it.layman.whatHappened}</p>
+                ) : null}
+                {it.detail?.whatToUnderstand ? (
+                  <p className="mt-2 text-[12px] leading-relaxed text-fg-muted">
+                    <span className="font-semibold text-fg">The mechanics — </span>
+                    {it.detail.whatToUnderstand}
+                  </p>
+                ) : null}
+              </CollapsibleNote>
+            </div>
+          ) : null}
+
+          {it.kind === "analysis" && it.originalText ? (
+            <div className="mt-2">
+              <CollapsibleNote
+                label="Original text"
+                hint={it.sourceType === "image" ? "what was read from your image" : "saved as submitted"}
+                open={showOriginal}
+                onToggle={() => setShowOriginal((v) => !v)}
+              >
+                <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-fg-muted">{it.originalText}</p>
+              </CollapsibleNote>
+            </div>
+          ) : null}
 
           {hasDetail ? (
             <>
