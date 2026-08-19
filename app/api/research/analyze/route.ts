@@ -138,7 +138,7 @@ export async function POST(req: Request) {
           { status: 422 }
         );
       }
-      const analysis = await analyzeContent(extracted.text, { sourceType: "image" });
+      const analysis = await analyzeContent(extracted.text, { sourceType: "image", sourceLabel: body.sourceLabel });
       const used = await incrementResearchCount();
       return NextResponse.json({
         ok: true,
@@ -159,7 +159,7 @@ export async function POST(req: Request) {
           { status: 422 }
         );
       }
-      const analysis = await analyzeContent(fetched.text, { sourceType: "url", originalUrl: url });
+      const analysis = await analyzeContent(fetched.text, { sourceType: "url", originalUrl: url, sourceLabel: body.sourceLabel });
       const used = await incrementResearchCount();
       return NextResponse.json({ ok: true, analysis, quota: { ...quota, used, remaining: Math.max(0, quota.cap - used) } });
     }

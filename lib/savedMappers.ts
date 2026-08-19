@@ -35,6 +35,7 @@ export function savedFromAnalysis(a: ResearchAnalysis): SavedItem {
     originalUrl: a.originalUrl,
     relatedConcepts: a.relatedConcepts,
     focus: a.focus,
+    originalText: a.originalText,
     layman: {
       whatHappened: L?.whatHappened,
       interpretation: L?.whyItMatters,

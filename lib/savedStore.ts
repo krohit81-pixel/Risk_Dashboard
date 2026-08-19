@@ -62,6 +62,10 @@ export interface SavedItem {
   // ── V4.1a — full-piece + Learning-view parity in Learn ──
   whatHappened?: string;                    // factual summary (editorial / research)
   bankingImpactAreas?: BankingImpactArea[]; // bulleted impact, each with its own layman twin
+  /** V5.11 — the full original source content (pasted text / fetched URL text / image
+   *  transcript), untruncated. Research analyses only. Lets "share externally" print exports
+   *  include the actual article without the Mizuho/risk-lens interpretation on top. */
+  originalText?: string;
   layman?: {
     whatHappened?: string;
     interpretation?: string; // why-it-matters twin

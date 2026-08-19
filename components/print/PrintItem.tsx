@@ -2,6 +2,13 @@
 // V5.3 — full-detail, always-expanded, light-themed rendering of ONE saved item for print/PDF
 // export. Unlike the in-app card (collapsed by default, dark theme), this shows everything —
 // print/export is explicitly "for reading later," so nothing should be hidden behind a toggle.
+//
+// V5.11 — added a second render path: `mode="share"`. The full version above includes the
+// Mizuho Top-Risk alignment and "Through Mizuho's lens" sections, which the user explicitly
+// doesn't want to hand to someone outside the bank when sharing "an interesting read" — share
+// mode renders ONLY the title/date/source, the plain-English "Simple explanation," and the
+// original article text. Both modes pull from fields already on SavedItem; share mode adds
+// nothing new, it just omits the Mizuho/risk-lens sections.
 
 import type { SavedItem } from "@/lib/savedStore";
 import { AppFooterText } from "@/components/shared/AppFooter";
@@ -32,7 +39,74 @@ function BulletList({ items }: { items: string[] }) {
   );
 }
 
-export function PrintItem({ item }: { item: SavedItem }) {
+/** Shared by both modes: the plain-English "what happened + mechanics" section, built from
+ *  fields already on SavedItem (layman.whatHappened, detail.whatToUnderstand). */
+function SimpleExplanationSection({ item }: { item: SavedItem }) {
+  const simple = item.layman?.whatHappened;
+  const mechanics = item.detail?.whatToUnderstand;
+  if (!simple && !mechanics) return null;
+  return (
+    <Section label="Simple explanation">
+      {simple ? <p>{simple}</p> : null}
+      {mechanics ? (
+        <p className={simple ? "mt-2" : undefined}>
+          <span className="font-semibold text-neutral-900">The mechanics — </span>
+          {mechanics}
+        </p>
+      ) : null}
+    </Section>
+  );
+}
+
+function OriginalTextSection({ item }: { item: SavedItem }) {
+  if (!item.originalText) return null;
+  return (
+    <Section label="Original article text">
+      <p className="whitespace-pre-wrap">{item.originalText}</p>
+    </Section>
+  );
+}
+
+function SourceLine({ item }: { item: SavedItem }) {
+  return (
+    <p className="mt-1.5 text-[11px] text-neutral-500">
+      {item.articleDate ? `Published ${fmt(item.articleDate)}` : item.analysisDateISO ? `Analyzed ${fmt(item.analysisDateISO)}` : ""}
+      {item.sourceLabel ? ` · ${item.sourceLabel}` : item.sources ? ` · ${item.sources}` : ""}
+      {item.originalUrl ? (
+        <>
+          {" · "}
+          <a href={item.originalUrl} className="underline">
+            {item.originalUrl}
+          </a>
+        </>
+      ) : null}
+    </p>
+  );
+}
+
+/** V5.11 — deliberately minimal: no category/severity/kind chips, no bank-risk framing, no
+ *  Mizuho anything. Just what the user asked for — "the original article text, source name,
+ *  and the simple version" — so a recipient outside the bank sees an article + a plain-English
+ *  take, not Mizuho's internal risk categorization of it. */
+function PrintItemShare({ item }: { item: SavedItem }) {
+  return (
+    <article className="mx-auto max-w-2xl px-6 py-10 print:px-0 print:py-0">
+      <header className="mb-6 border-b border-neutral-200 pb-4">
+        <h1 className="text-[22px] font-bold leading-snug text-neutral-900">{item.title}</h1>
+        <SourceLine item={item} />
+      </header>
+
+      <SimpleExplanationSection item={item} />
+      <OriginalTextSection item={item} />
+
+      <footer className="mt-10 border-t border-neutral-200 pt-3">
+        <AppFooterText light />
+      </footer>
+    </article>
+  );
+}
+
+function PrintItemFull({ item }: { item: SavedItem }) {
   const lens = item.mizuhoLens;
   return (
     <article className="mx-auto max-w-2xl px-6 py-10 print:px-0 print:py-0">
@@ -43,18 +117,7 @@ export function PrintItem({ item }: { item: SavedItem }) {
           <span className="rounded-full border border-neutral-300 px-2 py-0.5">{item.kind}</span>
         </div>
         <h1 className="text-[22px] font-bold leading-snug text-neutral-900">{item.title}</h1>
-        <p className="mt-1.5 text-[11px] text-neutral-500">
-          {item.articleDate ? `Published ${fmt(item.articleDate)}` : item.analysisDateISO ? `Analyzed ${fmt(item.analysisDateISO)}` : ""}
-          {item.sourceLabel ? ` \u00b7 ${item.sourceLabel}` : item.sources ? ` \u00b7 ${item.sources}` : ""}
-          {item.originalUrl ? (
-            <>
-              {" \u00b7 "}
-              <a href={item.originalUrl} className="underline">
-                {item.originalUrl}
-              </a>
-            </>
-          ) : null}
-        </p>
+        <SourceLine item={item} />
       </header>
 
       {item.whatHappened ? (
@@ -122,7 +185,7 @@ export function PrintItem({ item }: { item: SavedItem }) {
       {lens && (lens.context || lens.interpretation) ? (
         <div className="mt-4 break-inside-avoid rounded-lg border border-neutral-200 px-3.5 py-3">
           <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-            Through Mizuho&rsquo;s lens {lens.repoVersion ? `\u00b7 repository v${lens.repoVersion}` : ""}
+            Through Mizuho&rsquo;s lens {lens.repoVersion ? `· repository v${lens.repoVersion}` : ""}
           </p>
           {lens.context ? <p className="text-[13px] leading-relaxed text-neutral-800">{lens.context}</p> : null}
           {lens.interpretation ? <p className="mt-2 text-[13px] leading-relaxed text-neutral-800">{lens.interpretation}</p> : null}
@@ -140,9 +203,18 @@ export function PrintItem({ item }: { item: SavedItem }) {
         </Section>
       ) : null}
 
+      {/* V5.11 — appended last: collapsed-by-default in the live app, but this print view
+          never hides anything, so both render in full here too. */}
+      <SimpleExplanationSection item={item} />
+      <OriginalTextSection item={item} />
+
       <footer className="mt-10 border-t border-neutral-200 pt-3">
         <AppFooterText light />
       </footer>
     </article>
   );
+}
+
+export function PrintItem({ item, mode = "full" }: { item: SavedItem; mode?: "full" | "share" }) {
+  return mode === "share" ? <PrintItemShare item={item} /> : <PrintItemFull item={item} />;
 }

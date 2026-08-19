@@ -20,10 +20,46 @@ import { ProgressRing } from "@/components/shared/ProgressRing";
 
 type LoadState = { status: "loading" } | { status: "not_found" } | { status: "error"; message: string } | { status: "ok"; item: SavedItem };
 
+/** V5.11 — on-screen only (`print:hidden`), lets the user pick which version actually prints
+ *  before they hit "Print / Save as PDF". Defaults to Full; Share omits the Mizuho/risk-lens
+ *  sections — see components/print/PrintItem.tsx for what each mode renders. */
+function ViewModeToggle({ mode, onChange }: { mode: "full" | "share"; onChange: (m: "full" | "share") => void }) {
+  return (
+    <div className="print:hidden sticky top-0 z-10 border-b border-neutral-200 bg-white/95 px-4 py-2.5 backdrop-blur">
+      <div className="mx-auto flex max-w-2xl items-center gap-2">
+        <span className="text-[11px] font-semibold text-neutral-500">Export as:</span>
+        {(
+          [
+            ["full", "Full version", "incl. Mizuho & risk lens"],
+            ["share", "Share version", "article + simple summary only"],
+          ] as const
+        ).map(([id, label, hint]) => (
+          <button
+            key={id}
+            onClick={() => onChange(id)}
+            title={hint}
+            className={`rounded-lg border px-2.5 py-1 text-[12px] font-semibold transition ${
+              mode === id
+                ? "border-neutral-900 bg-neutral-900 text-white"
+                : "border-neutral-300 text-neutral-600 active:bg-neutral-100"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <span className="hidden text-[11px] text-neutral-500 sm:inline">
+          {mode === "full" ? "Includes Mizuho alignment & risk-lens interpretation." : "Just the article, its source, and your plain-English take."}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function PrintItemInner() {
   const params = useSearchParams();
   const id = params.get("id") || "";
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [mode, setMode] = useState<"full" | "share">("full");
 
   const load = useCallback(() => {
     if (!id) {
@@ -80,7 +116,8 @@ function PrintItemInner() {
 
   return (
     <>
-      <PrintItem item={state.item} />
+      <ViewModeToggle mode={mode} onChange={setMode} />
+      <PrintItem item={state.item} mode={mode} />
       <PrintActionBarSpacer />
       <PrintActionBar />
     </>
