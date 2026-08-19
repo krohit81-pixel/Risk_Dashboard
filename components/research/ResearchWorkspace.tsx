@@ -35,8 +35,12 @@ export function ResearchWorkspace({
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
   const [images, setImages] = useState<ImageInput[]>([]);
-  const [transcript, setTranscript] = useState<string | null>(null);
-  const [showTranscript, setShowTranscript] = useState(false);
+  // V5.11 — optional manual source label (e.g. "Financial Times"). Mainly useful for pasted
+  // text/images, which have no automatic source detection the way a URL fetch does; falls
+  // back to the existing "Pasted text"/URL default when left blank (savedFromAnalysis).
+  const [sourceName, setSourceName] = useState("");
+  const [showOriginal, setShowOriginal] = useState(false); // V5.11 — collapsed by default in-app
+  const [showSimple, setShowSimple] = useState(false);     // V5.11 — collapsed by default in-app
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<ResearchAnalysis | null>(null);
@@ -76,8 +80,8 @@ export function ResearchWorkspace({
     setLoading(true);
     setError(null);
     setAnalysis(null);
-    setTranscript(null);
-    setShowTranscript(false);
+    setShowOriginal(false);
+    setShowSimple(false);
     try {
       const res = await fetch("/api/research/analyze", {
         method: "POST",
@@ -92,7 +96,6 @@ export function ResearchWorkspace({
         return false;
       }
       setAnalysis(j.analysis as ResearchAnalysis);
-      if (j.transcript) setTranscript(j.transcript as string);
       setLearning(false);
       return true;
     } catch {
@@ -104,8 +107,13 @@ export function ResearchWorkspace({
   }
 
   async function analyze() {
+    const sourceLabel = sourceName.trim() || undefined;
     const payload =
-      mode === "url" ? { mode, url } : mode === "image" ? { mode, images } : { mode, text };
+      mode === "url"
+        ? { mode, url, sourceLabel }
+        : mode === "image"
+        ? { mode, images, sourceLabel }
+        : { mode, text, sourceLabel };
     await runAnalyze(payload);
   }
 
@@ -146,8 +154,9 @@ export function ResearchWorkspace({
     setText("");
     setUrl("");
     setImages([]);
-    setTranscript(null);
-    setShowTranscript(false);
+    setSourceName("");
+    setShowOriginal(false);
+    setShowSimple(false);
   }
 
   const savedItem: SavedItem | null = analysis ? savedFromAnalysis(analysis) : null;
@@ -197,6 +206,16 @@ export function ResearchWorkspace({
               </button>
             ))}
           </div>
+
+          {/* V5.11 — optional; mainly fills the gap for pasted text/images, which (unlike a
+              URL fetch) have no automatic source to show on a "share externally" export. */}
+          <input
+            type="text"
+            value={sourceName}
+            onChange={(e) => setSourceName(e.target.value)}
+            placeholder="Source name (optional) — e.g. Financial Times, Bloomberg"
+            className="w-full rounded-xl border border-line bg-ink-800 px-3.5 py-2.5 text-[13px] text-fg placeholder:text-fg-faint focus:border-steel/50 focus:outline-none"
+          />
 
           {mode === "text" ? (
             <textarea
@@ -347,21 +366,6 @@ export function ResearchWorkspace({
             </span>
           </div>
 
-          {transcript ? (
-            <div className="rounded-xl border border-line bg-ink-800 px-3.5 py-2.5">
-              <button
-                onClick={() => setShowTranscript((v) => !v)}
-                className="flex w-full items-center gap-1.5 text-left text-2xs font-semibold text-steel"
-              >
-                {showTranscript ? "\u25be Hide transcribed text" : "\u2192 Transcribed text"}
-                <span className="font-normal text-fg-faint">(what was read from your image)</span>
-              </button>
-              {showTranscript ? (
-                <p className="mt-2 whitespace-pre-wrap text-[12px] leading-relaxed text-fg-muted">{transcript}</p>
-              ) : null}
-            </div>
-          ) : null}
-
           <div className="rounded-xl border border-line bg-ink-800 px-4 py-3.5">
             <div className="mb-1.5 flex flex-wrap items-center gap-2">
               {analysis.category ? <Chip>{analysis.category}</Chip> : null}
@@ -457,6 +461,41 @@ export function ResearchWorkspace({
             ) : null}
           </div>
 
+          {/* V5.11 — "Simple explanation" + "Original text": collapsed here (reference
+              material, not the main read), but always fully expanded in the print/PDF export
+              — same collapsed-in-app/expanded-in-print convention as everywhere else in this
+              app. Also what the "share externally" export is built from, so someone can read
+              the article + a plain-English take without the Mizuho/risk-lens layer. */}
+          {analysis.layman?.whatHappened || analysis.whatToUnderstand ? (
+            <CollapsibleNote
+              label="Simple explanation"
+              hint="what happened, in plain terms — plus the mechanics"
+              open={showSimple}
+              onToggle={() => setShowSimple((v) => !v)}
+            >
+              {analysis.layman?.whatHappened ? (
+                <p className="text-[12px] leading-relaxed text-fg-muted">{analysis.layman.whatHappened}</p>
+              ) : null}
+              {analysis.whatToUnderstand ? (
+                <p className="mt-2 text-[12px] leading-relaxed text-fg-muted">
+                  <span className="font-semibold text-fg">The mechanics — </span>
+                  {analysis.whatToUnderstand}
+                </p>
+              ) : null}
+            </CollapsibleNote>
+          ) : null}
+
+          {analysis.originalText ? (
+            <CollapsibleNote
+              label="Original text"
+              hint={analysis.sourceType === "image" ? "what was read from your image" : "saved as submitted"}
+              open={showOriginal}
+              onToggle={() => setShowOriginal((v) => !v)}
+            >
+              <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-fg-muted">{analysis.originalText}</p>
+            </CollapsibleNote>
+          ) : null}
+
           {/* ── Actions ── */}
           <div className="flex gap-2">
             {onToggleSave && savedItem ? (
@@ -496,6 +535,34 @@ export function ResearchWorkspace({
         </>
       )}
     </section>
+  );
+}
+
+/** V5.11 — small inline collapsed-by-default block, same shape as the old "Transcribed
+ *  text" toggle it replaced. Local (session) state only — deliberately not persisted to
+ *  localStorage like CollapsibleSection, since a fresh analysis should always start
+ *  collapsed rather than remembering the last one's open/closed state. */
+function CollapsibleNote({
+  label,
+  hint,
+  open,
+  onToggle,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-line bg-ink-800 px-3.5 py-2.5">
+      <button onClick={onToggle} className="flex w-full items-center gap-1.5 text-left text-2xs font-semibold text-steel">
+        {open ? "▾" : "→"} {label}
+        {hint ? <span className="font-normal text-fg-faint">&nbsp;({hint})</span> : null}
+      </button>
+      {open ? <div className="mt-2">{children}</div> : null}
+    </div>
   );
 }
 

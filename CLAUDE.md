@@ -153,6 +153,24 @@ these rather than re-deriving color from `trend` directly.
   newsletter ingestion, deployed as its own Vercel function (see `vercel.json` `functions`);
   `requirements.txt` at repo root is for this script, not the Next.js app.
 
+### Research workspace export — Full vs Share (v5.11)
+`analyzeContent()` (`lib/analyze.ts`) persists the full original source content (pasted text /
+fetched URL text / image transcript, untruncated) as `ResearchAnalysis.originalText` →
+`SavedItem.originalText` (`lib/savedMappers.ts`). This, plus the already-existing
+`layman.whatHappened` and `detail.whatToUnderstand`, feed a "Simple explanation" + "Original
+text" pair that's collapsed by default in the live Research card
+(`components/research/ResearchWorkspace.tsx`) but always fully expanded in print/PDF, matching
+the existing collapsed-in-app/expanded-in-print convention.
+
+`components/print/PrintItem.tsx` takes a `mode: "full" | "share"` prop: `"full"` is the
+established always-everything render (now with those two sections appended); `"share"` is
+deliberately minimal — title/date/source, Simple explanation, Original text, **nothing else**
+(no category/severity chips, no bank risk, no Mizuho alignment, no Mizuho lens, no focus) — for
+sharing an analysis outside the bank without exposing Mizuho-specific framing. The choice is a
+toggle on the print page itself (`app/print/item/page.tsx`, `print:hidden` so it doesn't appear
+in the PDF), not a separate link — whichever is selected when "Print / Save as PDF" is pressed
+is what prints.
+
 ### Bank Earnings suite (Settings → 05, 06, 07)
 Grown across V5.7.0–V5.10.1 into several files that each have a distinct, non-overlapping job.
 Read this before touching any of them — it's easy to update the wrong layer.

@@ -285,5 +285,6 @@ Return ONE JSON object (no prose outside it):
     mizuhoLens,
     truncated,
     provider,
+    originalText: trimmed,
   };
 }

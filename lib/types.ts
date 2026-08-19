@@ -348,6 +348,11 @@ export interface ResearchAnalysis {
   mizuhoLens?: import("./mizuhoKnowledgeData").MizuhoLens; // V5.0 — interpretation through Mizuho's disclosed repository
   truncated?: boolean;
   provider?: string;
+  /** V5.11 — the full original content that was analyzed (pasted text, fetched URL text, or
+   *  image transcript) — untruncated, unlike what's actually sent to the LLM when `truncated`
+   *  is true. Persisted so "share externally" exports can include the source article itself
+   *  without the Mizuho/risk-lens interpretation layered on top. */
+  originalText?: string;
 }
 
 export interface ThemeLayman {
