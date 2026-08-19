@@ -11,17 +11,38 @@
 // nothing new, it just omits the Mizuho/risk-lens sections.
 //
 // V5.11.2 — section headers ("What happened", "Simple explanation", …) bumped from a faint
-// 10px/neutral-500 label to a bolder, more prominent 11px/bold/neutral-700 one per feedback
-// that the original read as too subtle in the printed output. Also: the "Original article
-// text" section strips a leading URL (stripLeadingUrl) since the source line above already
-// shows it — showing it twice was flagged as redundant. Footer replaced with a short,
-// print-specific one (was reusing the live app's data-provider credits, which don't apply to
-// a single article export).
+// 10px/neutral-500 label to a bolder, more prominent 11px/bold/neutral-700 one. Also: the
+// "Original article text" section strips a leading URL (stripLeadingUrl) since the source line
+// above already shows it. Footer replaced with a short, print-specific one.
+//
+// V5.11.3 — Share mode rebuilt as its own visual treatment (PrintItemFull's plain-document
+// styling is untouched — Share needed a different job: something a recipient outside the bank
+// would actually enjoy opening, not a report). "Simple explanation" is now the dominant visual
+// element (large colored card, its own header), "The mechanics" nested inside with its own
+// accent, "Original article text" deliberately recedes (bold label, muted body, gray card) per
+// explicit feedback that it should read as reference material, not the main event. Colored
+// backgrounds need `print-color-adjust: exact` or Chrome/Safari's print dialog can silently
+// drop them if "Background graphics" isn't ticked — applied once on each article root, inherited
+// by everything inside rather than repeated per element.
+//
+// Note on the browser's own print header/footer (URL + date + "Page X of Y"): that's injected
+// by the browser's print engine into its own reserved margin, not by this component tree — no
+// `@page` rule exists in this codebase and PrintFooterText below never includes a URL. It can't
+// be suppressed from page CSS; it's a print-dialog-level toggle ("Headers and footers") on the
+// browser/OS side.
 
 import type { SavedItem } from "@/lib/savedStore";
 import { stripLeadingUrl } from "@/lib/format";
 
 const LABEL_CLASS = "text-[11px] font-bold uppercase tracking-wide text-neutral-700";
+
+/** Chrome/Safari print dialogs often default "Background graphics" off, which silently drops
+ *  any bg-color/gradient — this forces them to print regardless. Inheritable, so setting it
+ *  once on the article root covers every colored block inside. */
+const FORCE_PRINT_COLORS: React.CSSProperties = {
+  WebkitPrintColorAdjust: "exact",
+  printColorAdjust: "exact",
+} as React.CSSProperties;
 
 function fmt(iso?: string): string {
   if (!iso) return "";
@@ -49,8 +70,7 @@ function BulletList({ items }: { items: string[] }) {
   );
 }
 
-/** Shared by both modes: the plain-English "what happened + mechanics" section, built from
- *  fields already on SavedItem (layman.whatHappened, detail.whatToUnderstand). */
+/** Full mode only — plain-document styling, matching every other Section on this page. */
 function SimpleExplanationSection({ item }: { item: SavedItem }) {
   const simple = item.layman?.whatHappened;
   const mechanics = item.detail?.whatToUnderstand;
@@ -68,11 +88,8 @@ function SimpleExplanationSection({ item }: { item: SavedItem }) {
   );
 }
 
-/** V5.11.2 — strips a leading URL line: it's already shown on the source line above (and,
- *  when saved from a URL-mode analysis, doubled up with the "Read article" link in-app), so
- *  repeating it inside the article body was redundant. `break-words` guards against a long
- *  unbroken token (a tracking-parameter-laden URL, an unbroken hashtag string, etc.) forcing
- *  the page wider than print allows if one ever slips through. */
+/** Full mode only. `break-words` guards against a long unbroken token (a tracking-parameter-
+ *  laden URL, etc.) forcing the page wider than print allows if one ever slips through. */
 function OriginalTextSection({ item }: { item: SavedItem }) {
   if (!item.originalText) return null;
   return (
@@ -99,10 +116,10 @@ function SourceLine({ item }: { item: SavedItem }) {
   );
 }
 
-/** V5.11.2 — replaces the live app's AppFooterText (data-provider credits — meaningless for a
- *  single-article export). Short, and states the thing that actually matters for something
- *  the user might forward: this is a personal read + take, and some source articles are
- *  subscription content, so the original publisher's own terms govern re-sharing it further. */
+/** States the thing that actually matters for something the user might forward: this is a
+ *  personal read + take, and some source articles are subscription content, so the original
+ *  publisher's own terms govern re-sharing it further. No data-provider credits — meaningless
+ *  for a single-article export. */
 function PrintFooterText() {
   return (
     <p className="text-2xs leading-relaxed text-neutral-500">
@@ -115,22 +132,79 @@ function PrintFooterText() {
   );
 }
 
-/** V5.11 — deliberately minimal: no category/severity/kind chips, no bank-risk framing, no
- *  Mizuho anything. Just what the user asked for — "the original article text, source name,
- *  and the simple version" — so a recipient outside the bank sees an article + a plain-English
- *  take, not Mizuho's internal risk categorization of it. */
+/** V5.11.3 — deliberately minimal on WHAT it includes (no category/severity/kind chips, no
+ *  bank-risk framing, no Mizuho anything — same scope as before), but no longer minimal on HOW
+ *  it looks: this is the version meant to actually be forwarded and read, so it gets the
+ *  visual treatment — a prominent colored "Simple explanation" card up top (the actual value:
+ *  what happened + why), "The mechanics" nested inside with its own accent, and the original
+ *  article text deliberately receding below as reference material (bold label, muted body,
+ *  gray card) rather than competing for attention. */
 function PrintItemShare({ item }: { item: SavedItem }) {
+  const source = item.sourceLabel || item.sources;
+  const dateLabel = item.articleDate
+    ? `Published ${fmt(item.articleDate)}`
+    : item.analysisDateISO
+    ? `Analyzed ${fmt(item.analysisDateISO)}`
+    : "";
+  const simple = item.layman?.whatHappened;
+  const mechanics = item.detail?.whatToUnderstand;
+
   return (
-    <article className="mx-auto max-w-2xl px-6 py-10 print:px-0 print:py-0">
-      <header className="mb-6 border-b border-neutral-200 pb-4">
-        <h1 className="text-[22px] font-bold leading-snug text-neutral-900">{item.title}</h1>
-        <SourceLine item={item} />
+    <article className="mx-auto max-w-2xl px-6 py-10 print:px-0 print:py-0" style={FORCE_PRINT_COLORS}>
+      <header className="mb-7">
+        <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-blue-600">
+          <span aria-hidden>📊</span> Risk Intelligence · Worth a read
+        </p>
+        <h1 className="text-[27px] font-extrabold leading-[1.2] text-neutral-900">{item.title}</h1>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {source ? (
+            <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-bold text-blue-700">{source}</span>
+          ) : null}
+          {dateLabel ? <span className="text-[12px] text-neutral-500">{dateLabel}</span> : null}
+        </div>
+        {item.originalUrl ? (
+          <p className="mt-2 break-all text-[10px] text-neutral-400">
+            <a href={item.originalUrl} className="underline">
+              {item.originalUrl}
+            </a>
+          </p>
+        ) : null}
+        <div className="mt-5 h-[3px] w-16 rounded-full bg-gradient-to-r from-blue-500 to-indigo-400" />
       </header>
 
-      <SimpleExplanationSection item={item} />
-      <OriginalTextSection item={item} />
+      {simple || mechanics ? (
+        <div className="mb-6 overflow-hidden rounded-2xl border border-blue-200 bg-blue-50 break-inside-avoid">
+          <div className="border-b border-blue-200/80 bg-blue-100/70 px-6 py-3">
+            <p className="text-[13px] font-extrabold uppercase tracking-wide text-blue-800">
+              <span aria-hidden>💡</span> Simple Explanation
+            </p>
+          </div>
+          <div className="px-6 py-5">
+            {simple ? <p className="text-[15px] leading-relaxed text-neutral-800">{simple}</p> : null}
+            {mechanics ? (
+              <div className={`${simple ? "mt-4" : ""} rounded-xl border-l-4 border-indigo-400 bg-white px-4 py-3`}>
+                <p className="mb-1 text-[11px] font-extrabold uppercase tracking-wide text-indigo-600">
+                  <span aria-hidden>⚙️</span> The Mechanics
+                </p>
+                <p className="text-[13.5px] leading-relaxed text-neutral-700">{mechanics}</p>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
-      <footer className="mt-10 border-t border-neutral-200 pt-3">
+      {item.originalText ? (
+        <div className="mb-6 break-inside-avoid rounded-xl border border-neutral-200 bg-neutral-50 px-5 py-4">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-neutral-600">
+            <span aria-hidden>📰</span> Original Article Text
+          </p>
+          <p className="whitespace-pre-wrap break-words text-[12px] leading-relaxed text-neutral-500">
+            {stripLeadingUrl(item.originalText)}
+          </p>
+        </div>
+      ) : null}
+
+      <footer className="mt-8 border-t-2 border-blue-100 pt-4">
         <PrintFooterText />
       </footer>
     </article>
@@ -140,7 +214,7 @@ function PrintItemShare({ item }: { item: SavedItem }) {
 function PrintItemFull({ item }: { item: SavedItem }) {
   const lens = item.mizuhoLens;
   return (
-    <article className="mx-auto max-w-2xl px-6 py-10 print:px-0 print:py-0">
+    <article className="mx-auto max-w-2xl px-6 py-10 print:px-0 print:py-0" style={FORCE_PRINT_COLORS}>
       <header className="mb-6 border-b border-neutral-200 pb-4">
         <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
           {item.category ? <span className="rounded-full border border-neutral-300 px-2 py-0.5">{item.category}</span> : null}

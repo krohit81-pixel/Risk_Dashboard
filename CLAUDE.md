@@ -196,6 +196,25 @@ a one-line note that source articles may be paywalled and the publisher's own te
 re-sharing. `SavedList.tsx`'s action row (Read/Export Full/Export Share) compacted to fit one
 line at phone width — shorter labels, no emoji, tighter padding.
 
+**v5.11.3 — Share PDF visual redesign, and the "vercel.com footer" non-fix.** Two more rounds
+of feedback on the same export:
+- The reported "footer with the vercel link" is the *browser's own* print header/footer (URL +
+  date + "Page X of Y"), injected into its own reserved margin by Chrome/Safari's print engine
+  — not this app. Confirmed by checking: no `@page` rule exists anywhere in this codebase, and
+  `PrintFooterText` never includes a URL. It cannot be suppressed from page CSS; it's a
+  print-dialog toggle ("Headers and footers") on the browser/OS side, off by the user for future
+  exports if unwanted. Don't waste time hunting for an app-side fix if this comes up again.
+- Share mode's flat/textual look WAS a real, fixable thing, and got its own visual treatment in
+  `PrintItemShare` (`components/print/PrintItem.tsx`) — separate from `PrintItemFull`, which is
+  untouched and keeps its plain-document styling on purpose (different job: internal reference,
+  not something forwarded). Hierarchy now: "Simple Explanation" is a large colored card (the
+  actual value — dominant), "The Mechanics" nests inside it with its own accent border, "Original
+  Article Text" deliberately recedes below (bold label, muted/gray body — reference material,
+  not the main event). **Gotcha for any future colored print element:** Chrome/Safari print
+  dialogs often default "Background graphics" off, which silently drops bg-colors/gradients with
+  no error — set `print-color-adjust: exact` (+ `-webkit-` prefix) to force them. Applied once on
+  each article root (inheritable) rather than repeated per colored element.
+
 ### Bank Earnings suite (Settings → 05, 06, 07)
 Grown across V5.7.0–V5.10.1 into several files that each have a distinct, non-overlapping job.
 Read this before touching any of them — it's easy to update the wrong layer.
