@@ -120,9 +120,11 @@ function SourceLine({ item }: { item: SavedItem }) {
  *  personal read + take, and some source articles are subscription content, so the original
  *  publisher's own terms govern re-sharing it further. No data-provider credits — meaningless
  *  for a single-article export. */
-function PrintFooterText() {
+/** `large` — Share mode's bumped type scale (v5.11.4); Full mode keeps the original compact
+ *  size, unchanged. */
+function PrintFooterText({ large = false }: { large?: boolean }) {
   return (
-    <p className="text-2xs leading-relaxed text-neutral-500">
+    <p className={`leading-relaxed text-neutral-500 ${large ? "text-[13px]" : "text-2xs"}`}>
       <span className="font-semibold text-neutral-700">Prepared by Rohit Kohli</span>
       <br />
       Personal reference, based on the source noted above. Some source articles are
@@ -151,42 +153,47 @@ function PrintItemShare({ item }: { item: SavedItem }) {
 
   return (
     <article className="mx-auto max-w-2xl px-6 py-10 print:px-0 print:py-0" style={FORCE_PRINT_COLORS}>
-      <header className="mb-7">
-        <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-blue-600">
+      <header className="mb-8">
+        <p className="mb-3 flex items-center gap-1.5 text-[13px] font-extrabold uppercase tracking-[0.12em] text-blue-600">
           <span aria-hidden>📊</span> Risk Intelligence · Worth a read
         </p>
-        <h1 className="text-[27px] font-extrabold leading-[1.2] text-neutral-900">{item.title}</h1>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <h1 className="text-[30px] font-extrabold leading-[1.25] text-neutral-900">{item.title}</h1>
+        <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
           {source ? (
-            <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-bold text-blue-700">{source}</span>
+            <span className="rounded-full bg-blue-100 px-3.5 py-1.5 text-[14px] font-bold text-blue-700">{source}</span>
           ) : null}
-          {dateLabel ? <span className="text-[12px] text-neutral-500">{dateLabel}</span> : null}
+          {dateLabel ? <span className="text-[14px] text-neutral-500">{dateLabel}</span> : null}
         </div>
         {item.originalUrl ? (
-          <p className="mt-2 break-all text-[10px] text-neutral-400">
+          <p className="mt-2.5 break-all text-[12px] text-neutral-400">
             <a href={item.originalUrl} className="underline">
               {item.originalUrl}
             </a>
           </p>
         ) : null}
-        <div className="mt-5 h-[3px] w-16 rounded-full bg-gradient-to-r from-blue-500 to-indigo-400" />
+        <div className="mt-6 h-[4px] w-20 rounded-full bg-gradient-to-r from-blue-500 to-indigo-400" />
       </header>
 
+      {/* V5.11.4 — every size in this block bumped meaningfully (not by a px or two): these
+          PDFs are read on a phone screen, usually fit-to-page-width, which visually shrinks
+          print-point sizes a lot more than they look reviewing on a laptop. "A bit bigger"
+          undersells it at that scale — sized so the actual explanation is comfortably readable
+          with no pinch-zoom. */}
       {simple || mechanics ? (
-        <div className="mb-6 overflow-hidden rounded-2xl border border-blue-200 bg-blue-50 break-inside-avoid">
-          <div className="border-b border-blue-200/80 bg-blue-100/70 px-6 py-3">
-            <p className="text-[13px] font-extrabold uppercase tracking-wide text-blue-800">
+        <div className="mb-7 overflow-hidden rounded-2xl border border-blue-200 bg-blue-50 break-inside-avoid">
+          <div className="border-b border-blue-200/80 bg-blue-100/70 px-6 py-4">
+            <p className="text-[17px] font-extrabold uppercase tracking-wide text-blue-800">
               <span aria-hidden>💡</span> Simple Explanation
             </p>
           </div>
-          <div className="px-6 py-5">
-            {simple ? <p className="text-[15px] leading-relaxed text-neutral-800">{simple}</p> : null}
+          <div className="px-6 py-6">
+            {simple ? <p className="text-[19px] leading-[1.65] text-neutral-800">{simple}</p> : null}
             {mechanics ? (
-              <div className={`${simple ? "mt-4" : ""} rounded-xl border-l-4 border-indigo-400 bg-white px-4 py-3`}>
-                <p className="mb-1 text-[11px] font-extrabold uppercase tracking-wide text-indigo-600">
+              <div className={`${simple ? "mt-5" : ""} rounded-xl border-l-4 border-indigo-400 bg-white px-5 py-4`}>
+                <p className="mb-1.5 text-[14px] font-extrabold uppercase tracking-wide text-indigo-600">
                   <span aria-hidden>⚙️</span> The Mechanics
                 </p>
-                <p className="text-[13.5px] leading-relaxed text-neutral-700">{mechanics}</p>
+                <p className="text-[17px] leading-[1.6] text-neutral-700">{mechanics}</p>
               </div>
             ) : null}
           </div>
@@ -194,18 +201,18 @@ function PrintItemShare({ item }: { item: SavedItem }) {
       ) : null}
 
       {item.originalText ? (
-        <div className="mb-6 break-inside-avoid rounded-xl border border-neutral-200 bg-neutral-50 px-5 py-4">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-neutral-600">
+        <div className="mb-7 break-inside-avoid rounded-xl border border-neutral-200 bg-neutral-50 px-6 py-5">
+          <p className="mb-2.5 text-[14px] font-bold uppercase tracking-wide text-neutral-600">
             <span aria-hidden>📰</span> Original Article Text
           </p>
-          <p className="whitespace-pre-wrap break-words text-[12px] leading-relaxed text-neutral-500">
+          <p className="whitespace-pre-wrap break-words text-[16px] leading-[1.65] text-neutral-500">
             {stripLeadingUrl(item.originalText)}
           </p>
         </div>
       ) : null}
 
-      <footer className="mt-8 border-t-2 border-blue-100 pt-4">
-        <PrintFooterText />
+      <footer className="mt-8 border-t-2 border-blue-100 pt-5">
+        <PrintFooterText large />
       </footer>
     </article>
   );

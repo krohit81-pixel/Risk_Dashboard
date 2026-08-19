@@ -215,6 +215,19 @@ of feedback on the same export:
   no error — set `print-color-adjust: exact` (+ `-webkit-` prefix) to force them. Applied once on
   each article root (inheritable) rather than repeated per colored element.
 
+**v5.11.4 — Share PDF type scale, sized for how it's actually read.** These PDFs are opened on
+a phone, almost always fit-to-page-width — which shrinks a print-point font size much more than
+it looks reviewing the same PDF on a laptop. A "bump it a little" pass would have undersold the
+fix; Share mode's sizes went up meaningfully across the board (body copy in the Simple
+Explanation card to 19px, Original Article Text body to 16px — was 12px, the smallest thing on
+the page despite usually being the longest block anyone reads — headers scaled up to match).
+`PrintItemFull` untouched, still the original compact size (internal reference document, not
+optimized for phone reading the same way). `PrintFooterText` took a `large` prop rather than a
+second component, so Share and Full can each get the right size from one shared source of the
+actual copy. General note for this print surface: when sizing anything meant to be read on a
+phone from a fit-to-width PDF, size for that shrink — verifying by eye on a laptop-width preview
+undersells how small it'll actually read.
+
 ### Bank Earnings suite (Settings → 05, 06, 07)
 Grown across V5.7.0–V5.10.1 into several files that each have a distinct, non-overlapping job.
 Read this before touching any of them — it's easy to update the wrong layer.
