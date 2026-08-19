@@ -153,23 +153,34 @@ these rather than re-deriving color from `trend` directly.
   newsletter ingestion, deployed as its own Vercel function (see `vercel.json` `functions`);
   `requirements.txt` at repo root is for this script, not the Next.js app.
 
-### Research workspace export — Full vs Share (v5.11)
+### Research workspace export — Full vs Share (v5.11, entry point fixed in v5.11.1)
 `analyzeContent()` (`lib/analyze.ts`) persists the full original source content (pasted text /
 fetched URL text / image transcript, untruncated) as `ResearchAnalysis.originalText` →
 `SavedItem.originalText` (`lib/savedMappers.ts`). This, plus the already-existing
 `layman.whatHappened` and `detail.whatToUnderstand`, feed a "Simple explanation" + "Original
-text" pair that's collapsed by default in the live Research card
-(`components/research/ResearchWorkspace.tsx`) but always fully expanded in print/PDF, matching
-the existing collapsed-in-app/expanded-in-print convention.
+text" pair — collapsed by default wherever an analysis renders live (the Research result card
+in `components/research/ResearchWorkspace.tsx`, **and** a re-opened saved analysis in
+`components/saved/SavedList.tsx`'s `SavedCard` — both import the identical `CollapsibleNote`
+component from ResearchWorkspace rather than each rolling their own, specifically so Learn can't
+drift out of sync with Research the way it initially did), but always fully expanded in
+print/PDF, matching the existing collapsed-in-app/expanded-in-print convention.
 
 `components/print/PrintItem.tsx` takes a `mode: "full" | "share"` prop: `"full"` is the
 established always-everything render (now with those two sections appended); `"share"` is
 deliberately minimal — title/date/source, Simple explanation, Original text, **nothing else**
 (no category/severity chips, no bank risk, no Mizuho alignment, no Mizuho lens, no focus) — for
-sharing an analysis outside the bank without exposing Mizuho-specific framing. The choice is a
-toggle on the print page itself (`app/print/item/page.tsx`, `print:hidden` so it doesn't appear
-in the PDF), not a separate link — whichever is selected when "Print / Save as PDF" is pressed
-is what prints.
+sharing an analysis outside the bank without exposing Mizuho-specific framing.
+
+**v5.11.1 lesson:** the mode choice first shipped as a toggle discovered only after already
+landing on the print page (defaulting to `"full"`) — which in practice meant nobody ever saw a
+choice at all; they just always got Full, indistinguishable from the toggle not existing. Fixed
+by moving the decision to where the user actually acts: both export entry points (the Research
+result card and the Learn saved-card action row) are now two explicit links,
+`/print/item?id=…&mode=full` and `&mode=share`, which `app/print/item/page.tsx` reads to set the
+print page's initial mode. The on-page toggle still exists as a way to change your mind once
+there, but it's no longer the *only* place the choice is offered. General lesson: a default that
+silently wins whenever a control goes unnoticed is indistinguishable from that control not
+existing — for a real choice, decide at the point of action, not after.
 
 ### Bank Earnings suite (Settings → 05, 06, 07)
 Grown across V5.7.0–V5.10.1 into several files that each have a distinct, non-overlapping job.

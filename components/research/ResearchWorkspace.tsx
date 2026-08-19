@@ -517,17 +517,34 @@ export function ResearchWorkspace({
           </div>
 
           {/* Print / Export — active once saved (print reads from Supabase, so it needs a
-              persisted id); visible either way so the option is discoverable, not hidden. */}
+              persisted id); visible either way so the option is discoverable, not hidden.
+              V5.11.1 — the choice between versions now happens HERE, as two distinct links
+              (?mode=full / ?mode=share), not as an easy-to-miss toggle discovered only after
+              already landing on the print page. The print page still has that toggle too (as
+              a way to change your mind once there), but the default entry point no longer
+              silently defaults to Full without the user ever being asked. */}
           {savedItem ? (
             isSaved ? (
-              <a
-                href={`/print/item?id=${encodeURIComponent(savedItem.id)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 flex items-center justify-center gap-1.5 rounded-xl border border-line bg-ink-800 px-4 py-2.5 text-2xs font-semibold text-fg-muted active:bg-ink-700"
-              >
-                🖨️ Print / Export PDF
-              </a>
+              <div className="mt-2 flex gap-2">
+                <a
+                  href={`/print/item?id=${encodeURIComponent(savedItem.id)}&mode=full`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-line bg-ink-800 px-3 py-2.5 text-center text-2xs font-semibold text-fg-muted active:bg-ink-700"
+                >
+                  <span>🖨️ Export — Full</span>
+                  <span className="text-[10px] font-normal text-fg-faint">incl. Mizuho &amp; risk lens</span>
+                </a>
+                <a
+                  href={`/print/item?id=${encodeURIComponent(savedItem.id)}&mode=share`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border border-line bg-ink-800 px-3 py-2.5 text-center text-2xs font-semibold text-fg-muted active:bg-ink-700"
+                >
+                  <span>🔗 Export — Share</span>
+                  <span className="text-[10px] font-normal text-fg-faint">article + simple summary</span>
+                </a>
+              </div>
             ) : (
               <p className="mt-2 text-center text-[10px] text-fg-faint">Save this analysis to enable Print / Export PDF</p>
             )
@@ -541,8 +558,11 @@ export function ResearchWorkspace({
 /** V5.11 — small inline collapsed-by-default block, same shape as the old "Transcribed
  *  text" toggle it replaced. Local (session) state only — deliberately not persisted to
  *  localStorage like CollapsibleSection, since a fresh analysis should always start
- *  collapsed rather than remembering the last one's open/closed state. */
-function CollapsibleNote({
+ *  collapsed rather than remembering the last one's open/closed state.
+ *  V5.11.1 — exported so components/saved/SavedList.tsx can render the identical "Simple
+ *  explanation"/"Original text" blocks for a re-opened saved analysis in Learn, not a
+ *  lookalike — same component, same props, so the two can't visually drift apart. */
+export function CollapsibleNote({
   label,
   hint,
   open,
