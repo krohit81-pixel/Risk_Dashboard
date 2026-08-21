@@ -109,17 +109,20 @@ instead of stacking two paddings.
 This was a deliberate visual-cleanup request; don't reintroduce a header logo without checking
 first. `public/icons/logo-header.png` was deleted as part of that (it had no other consumer).
 
-The OS-level icons are untouched by that change and still exist: `app/icon.png`,
-`app/apple-icon.png`, `public/icons/icon-192.png`, `public/icons/icon-512.png` (browser tab /
-home-screen / PWA manifest) are a globe+"R"+chart illustration with flat, opaque shading, sourced
-from `public/icons/global_risk_intelligence_attached_logo.svg` — which despite the extension is
-**not a real vector**: it's an `<svg>` wrapper around one base64-embedded PNG (check before
-assuming any future replacement is actually vector — `grep -o "image/png" <file>` is enough to
-tell). Its embedded alpha channel is real and usable (correlates with visible content — checked
-directly, ~87% brightness/alpha correlation, transparent corners read true `(0,0,0,0)`), flattened
-onto solid black by deliberate choice (this asset actually keys cleanly onto white too, unlike an
-earlier glow-style attempt — black was kept to match the established brand default, not a
-technical limitation).
+**OS-level icons (v5.11.5, supersedes v5.10.7):** `app/icon.png`, `app/apple-icon.png`,
+`public/icons/icon-192.png`, `public/icons/icon-512.png` (browser tab / home-screen / PWA
+manifest) are now the "RisK Intel" radar/magnifying-glass mark, sourced from
+`public/icons/risk intel app icon.png` (note the space in the filename — quote/escape it in any
+shell command). That source is a **combined lockup**: the icon glyph sits in the top ~78% with a
+"RisK Intel" wordmark stacked below it, on a pre-rounded white "squircle" card baked into the
+pixels. None of that is usable as-is for an OS icon — text is illegible at icon sizes, and a
+pre-baked rounded-corner card would double up oddly against the corner-mask iOS/Android already
+apply themselves — so the glyph was cropped out on its own (bbox-detected by scanning row-density
+of non-white pixels for the gap between glyph and text, `y≈975` in the source), re-padded onto a
+fresh plain white square, and only *that* gets OS-mask-rounded. Background is white, not black —
+a deliberate reversal of the v5.10.7 "black by default" call, because this asset's dark-navy/red
+mark is designed for a light backdrop and would go low-contrast on black; the black-default
+reasoning was specific to that *previous* asset's own light-on-dark styling, not a fixed rule.
 
 Historical note, kept in case a future logo swap hits the same failure mode: the very first
 brand-mark attempt was a soft glow-on-black illustration whose own alpha channel was unusable
@@ -128,8 +131,9 @@ not a real cutout mask), AND whose visual style (letterform shading at similar b
 own ambient glow falloff) made luminance-based key reconstruction structurally unable to produce
 a crisp result on white, no matter how the threshold/gamma curve was tuned. Always check a
 supplied logo's actual alpha data before trusting it (`numpy` histogram + brightness/alpha
-correlation, same as done here), and don't assume "transparent" or "sharp" without verifying —
-both were wrong on the first attempt.
+correlation), and don't assume "transparent" or "sharp" without verifying — both were wrong on
+the first attempt. (The v5.11.5 asset sidesteps this entirely — it's opaque-on-white, no alpha
+channel involved, so the only real work was cropping the glyph away from the wordmark.)
 
 ### Risk color semantics (repo-wide convention)
 Color always encodes the **direction of risk**, never the raw sign of the number. A falling
