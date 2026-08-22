@@ -6,4 +6,8 @@ out
 *.log
 .vercel
 .env*
+# V5.13 — .env* above was silently also excluding .env.local.example, which is meant to be a
+# committed, shared template (unlike .env.local itself, which holds real secrets) — it had
+# never actually been tracked in git despite CLAUDE.md pointing to it as the reference.
+!.env.local.example
 .claude/settings.local.json

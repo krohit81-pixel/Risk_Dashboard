@@ -11,7 +11,7 @@ import {
   HEAT_MAP_BASE,
   IMPLICATIONS_BASE,
 } from "@/lib/fallbackData";
-import { buildBrief, deriveDevelopments, usHeatFromData } from "@/lib/riskEngine";
+import { buildBrief, buildDevelopments, usHeatFromData } from "@/lib/riskEngine";
 import {
   getLatestSnapshot,
   istDateKey,
@@ -34,28 +34,7 @@ export async function GET() {
   const brief = buildBrief(indicators, updatedISO);
 
   // Top developments: data-derived first, then curated geopolitics/banking.
-  const derived = deriveDevelopments(indicators).slice(0, 4);
-  const curated = [
-    {
-      id: "dev-geo",
-      headline: "Geopolitical and trade friction remains a live tail risk",
-      category: "Geopolitics" as const,
-      severity: "Elevated" as const,
-      whyItMatters:
-        "Conflict and tariff escalation can spike energy prices and disrupt supply chains at short notice.",
-      derived: false,
-    },
-    {
-      id: "dev-bank",
-      headline: "CRE and private-credit exposures stay on the supervisory radar",
-      category: "Banking" as const,
-      severity: "Moderate" as const,
-      whyItMatters:
-        "Refinancing at higher rates and opaque private-credit leverage warrant close portfolio monitoring.",
-      derived: false,
-    },
-  ];
-  const developments = [...derived, ...curated].slice(0, 5);
+  const developments = buildDevelopments(indicators);
 
   const usBase = HEAT_MAP_BASE.find((h) => h.region === "United States")!;
 
