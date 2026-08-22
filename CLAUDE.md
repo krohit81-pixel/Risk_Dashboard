@@ -76,7 +76,9 @@ bar only lists the first four (labelled Home/Markets/Research/Learn); `"settings
 only via the header's hamburger button and isn't in the nav bar — that's intentional, not a bug.
 Executive/Learning view toggle lives in the sticky header itself (not page content) so it's
 "fixed at the top," and only applies to Home-tab sections 03+ (CRO Conversation, Editorial
-Intelligence, Japan & Asia Watch) — Markets/Research/Learn always render in default wording.
+Intelligence, Japan & Asia Watch) — the header toggle itself doesn't render outside Home at all.
+Markets/Research/Learn each own a **local** Executive/Learning toggle instead where they need
+one (`MarketsRiskThemes`, `ResearchWorkspace`, `SavedList`), independent of the header state.
 
 **`CollapsibleSection` id gotcha:** open/closed state persists in `localStorage` keyed by the
 `id` prop (`collapse:<id>`). If you relocate a section between tabs, give it a **new** id — reusing
@@ -231,6 +233,45 @@ second component, so Share and Full can each get the right size from one shared 
 actual copy. General note for this print surface: when sizing anything meant to be read on a
 phone from a fit-to-width PDF, size for that shrink — verifying by eye on a laptop-width preview
 undersells how small it'll actually read.
+
+**v5.12.0 — source-name derivation fixed at both write and read time.** `savedFromAnalysis()`
+used to store `sourceLabel || originalUrl || "Pasted text"` in `SavedItem.sources` — when the
+optional manual source-name field (Research paste form) was left blank for a URL-mode analysis,
+the raw URL landed in `sources` verbatim, surfacing as an unbroken URL string filling the Share
+PDF's source pill (and the equivalent line in Full mode / SavedList). The in-app source *chip*
+(`sourceChip()` in `components/saved/SavedList.tsx`) never had this bug — it always derived a
+friendly site name (`cnbc.com` → "CNBC") via its own `siteName()` helper — so the fix was to
+extract that helper to `lib/format.ts` as `siteNameFromUrl()` and use it everywhere `sources` is
+read or written, not just in the one place that already worked. Fixed at the mapper (new saves
+get a clean `sources` value) AND at every display site (`PrintItem.tsx`'s `SourceLine` and Share
+header, `SavedList.tsx`'s "Source:" line) — the display-site fix matters because it also rescues
+*already-saved* items whose `sources` still has the old raw-URL value baked into their stored
+JSONB payload; the mapper fix alone wouldn't have touched those.
+
+### Markets tab — Emerging Risks & Implications, merged (v5.12.0)
+Used to be two separately-scrolled sections, `EmergingRisks.tsx` (id `"emerging"`) and
+`BankImplications.tsx` (id `"implications"`), that always covered the exact same 5 themes —
+`BankImplication.riskId` is a documented 1:1 link to `EmergingRisk.id`, guaranteed by
+`lib/weeklyEngine.ts`'s `mergeMarkets()`, which builds `implications` FROM the emerging-risks
+list (`EMERGING_RISKS.map(...)`) rather than as an independent array. Reading them meant
+cross-referencing "Persistent Inflation" in one list against "Persistent Inflation" again in the
+other. Both retired; `components/MarketsRiskThemes.tsx` renders one card per theme (risk read up
+top, its five bank-implication lenses underneath), wired in under a **new** `CollapsibleSection`
+id (`"riskthemes"`, neither of the two old ones — see the id gotcha above).
+
+This also added the section's first-ever Learning path: `EmergingRisk.noteLayman` and
+`BankImplication.layman.*` already existed on the type (unused — `lib/weeklyEngine.ts`'s
+generation prompt never asked for them, and no UI read them), so the actual work was (1)
+prompting for `noteLayman` + a `layman` twin of all five implication areas in the weekly re-rate
+call, with every field falling back through model → curated base's own layman → executive text
+if even that's missing, so a cell is never blank; (2) rewriting `IMPLICATIONS_BASE`
+(`lib/fallbackData.ts`) — previously 3 generic market-scenario entries with no `riskId` at all,
+usable only before the first weekly job had ever run — into the same 5-entry, risk-keyed shape
+`mergeMarkets()` produces, each with a full layman twin; (3) giving `MarketsRiskThemes` its own
+local Executive/Learning toggle, matching the established pattern (`ResearchWorkspace`,
+`SavedList` each own their state rather than reaching for the header's) rather than wiring into
+the header toggle, which per the Navigation structure note above deliberately doesn't reach
+Markets at all.
 
 ### Bank Earnings suite (Settings → 05, 06, 07)
 Grown across V5.7.0–V5.10.1 into several files that each have a distinct, non-overlapping job.

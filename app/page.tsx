@@ -8,11 +8,10 @@ import { APP_VERSION } from "@/lib/version";
 import { MorningBrief } from "@/components/MorningBrief";
 import { TopDevelopments } from "@/components/TopDevelopments";
 import { WhatChanged } from "@/components/WhatChanged";
-import { EmergingRisks } from "@/components/EmergingRisks";
+import { MarketsRiskThemes } from "@/components/MarketsRiskThemes";
 import { RiskHeatMap } from "@/components/RiskHeatMap";
 import { CroDashboard } from "@/components/CroDashboard";
 import { JapanWatch } from "@/components/JapanWatch";
-import { BankImplications } from "@/components/BankImplications";
 import { CroConversation } from "@/components/intel/CroConversation";
 import { EditorialIntelligence } from "@/components/intel/EditorialIntelligence";
 import { JapanAsiaWatchSection } from "@/components/intel/JapanAsiaWatch";
@@ -82,7 +81,9 @@ export default function Page() {
 
   // Learning view applies only to the Today intelligence sections (03+).
   const intel = data ? resolveIntelligence(data.intelligence, learning) : null;
-  // Markets sections (implications, emerging risks) are not affected by the toggle.
+  // Markets data is not affected by the header's Executive/Learning toggle (that's Home-tab
+  // only, sections 03+) — MarketsRiskThemes below owns its own local toggle instead, same
+  // pattern as ResearchWorkspace/SavedList.
   const implications = data ? data.implications : [];
   const emergingRisks = data ? data.emergingRisks : [];
 
@@ -369,11 +370,13 @@ export default function Page() {
                   ) : null}
                   <RiskHeatMap regions={data.heatMap} />
                 </CollapsibleSection>
-                <CollapsibleSection id="emerging" n="04" title="Top Emerging Risks" hint="watchlist" defaultOpen={false}>
-                  <EmergingRisks risks={emergingRisks} />
-                </CollapsibleSection>
-                <CollapsibleSection id="implications" n="05" title="Implications for a Global Bank" hint="CRO playbook" defaultOpen={false}>
-                  <BankImplications items={implications} />
+                {/* V5.11.6 — merged from two separately-scrolled sections ("Top Emerging
+                    Risks" id="emerging" + "Implications for a Global Bank" id="implications")
+                    that always covered the same 5 themes 1:1. New id (neither of the old
+                    ones) per the CollapsibleSection id gotcha — reusing either would carry
+                    over that section's old open/closed state onto this different section. */}
+                <CollapsibleSection id="riskthemes" n="04" title="Emerging Risks & Implications" hint="CRO playbook" defaultOpen={false}>
+                  <MarketsRiskThemes risks={emergingRisks} implications={implications} />
                 </CollapsibleSection>
               </>
             ) : null}

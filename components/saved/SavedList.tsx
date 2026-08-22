@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { SavedItem } from "@/lib/savedStore";
 import { FocusBlock, CollapsibleNote } from "@/components/research/ResearchWorkspace";
 import { MizuhoLensBlock } from "@/components/intel/MizuhoLensBlock";
-import { stripLeadingUrl } from "@/lib/format";
+import { stripLeadingUrl, siteNameFromUrl } from "@/lib/format";
 
 const KIND_LABEL: Record<SavedItem["kind"], string> = {
   theme: "CRO Conversation",
@@ -21,25 +21,6 @@ const KIND_COLOR: Record<SavedItem["kind"], string> = {
   japan: "#F5A524", // Japan & Asia — amber
   analysis: "#2DD4A7", // Research — calm green
 };
-
-/** Friendly site name from a URL host, e.g. cnbc.com → "CNBC". */
-const SITE_NAMES: Record<string, string> = {
-  cnbc: "CNBC", reuters: "Reuters", bloomberg: "Bloomberg", ft: "FT", wsj: "WSJ",
-  nytimes: "NYT", waPo: "WaPo", washingtonpost: "WaPo", economist: "Economist",
-  bbc: "BBC", cnn: "CNN", apnews: "AP", marketwatch: "MarketWatch", barrons: "Barron's",
-  nikkei: "Nikkei", scmp: "SCMP", guardian: "Guardian", politico: "Politico",
-  axios: "Axios", forbes: "Forbes", businessinsider: "BI", yahoo: "Yahoo",
-};
-function siteName(url?: string): string | null {
-  if (!url) return null;
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    const core = (host.split(".").slice(-2, -1)[0] || host).toLowerCase();
-    return SITE_NAMES[core] || core.charAt(0).toUpperCase() + core.slice(1);
-  } catch {
-    return null;
-  }
-}
 
 /** For a Research analysis, derive a short source label + its own accent color. */
 /** Short publisher chip for a newsletter edition/label. */
@@ -62,7 +43,7 @@ function sourceChip(it: SavedItem): { label: string; color: string } | null {
   if (label.startsWith("bloomberg")) return { label: "Bloomberg", color: "#F5A524" }; // legacy plain "Bloomberg"
   if (label.startsWith("newsletter")) return { label: "Newsletter", color: "#F5A524" };
   if (it.originalUrl || it.sourceType === "url") {
-    const site = siteName(it.originalUrl);
+    const site = siteNameFromUrl(it.originalUrl);
     return { label: site ? `${site} URL` : "URL", color: "#5B8DEF" };
   }
   if (it.sourceType === "image") return { label: "Screenshot", color: "#A78BFA" };
@@ -420,7 +401,13 @@ function SavedCard({
             </>
           ) : null}
 
-          {it.sourceLabel || it.sources ? <p className="mt-2 text-2xs text-fg-faint">Source: {it.sourceLabel || it.sources}</p> : null}
+          {(() => {
+            // V5.11.6 — prefer a derived site name over a raw URL that may have landed in
+            // `sources` for pre-fix saved items (savedFromAnalysis used to store the URL
+            // verbatim when no manual source name was given).
+            const src = it.sourceLabel || siteNameFromUrl(it.originalUrl) || it.sources;
+            return src ? <p className="mt-2 text-2xs text-fg-faint">Source: {src}</p> : null;
+          })()}
 
           {it.kind === "analysis" ? (
             <p className="mt-1 text-2xs text-fg-faint">

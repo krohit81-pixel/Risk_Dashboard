@@ -8,6 +8,7 @@
 
 import type { CroTheme, EditorialCard, JapanAsiaWatch, ResearchAnalysis } from "./types";
 import type { SavedItem } from "./savedStore";
+import { siteNameFromUrl } from "./format";
 
 const mizuhoLine = (m: { riskName: string; scenarioLabel: string }) =>
   `${m.riskName} · ${m.scenarioLabel}`;
@@ -25,7 +26,11 @@ export function savedFromAnalysis(a: ResearchAnalysis): SavedItem {
     bankingImpact: a.bankRisk || a.bankingImpact, // single bank-risk line, like editorial
     whatHappened: a.whatHappened,
     whyMizuho: (a.mizuhoAlignment ?? []).map(mizuhoLine),
-    sources: a.sourceLabel || a.originalUrl || "Pasted text",
+    // V5.11.6 — was `a.sourceLabel || a.originalUrl || "Pasted text"`, which stored the raw
+    // URL verbatim whenever no manual source name was given for a URL-mode analysis (surfaced
+    // as a full unbroken URL filling the Share PDF's source pill). Prefer the same
+    // friendly-site-name derivation the in-app source chip already used correctly.
+    sources: a.sourceLabel || siteNameFromUrl(a.originalUrl) || "Pasted text",
     savedAtISO: "",
     sourceType: a.sourceType,
     sourceLabel: a.sourceLabel,

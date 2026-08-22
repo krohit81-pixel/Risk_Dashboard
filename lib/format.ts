@@ -81,3 +81,27 @@ export function stripLeadingUrl(text: string): string {
   }
   return lines.join("\n");
 }
+
+/** V5.11.6 — moved from components/saved/SavedList.tsx (its `sourceChip()` was already using
+ *  this correctly) so lib/savedMappers.ts and components/print/PrintItem.tsx can use the exact
+ *  same derivation instead of falling back to a raw URL string. */
+const SITE_NAMES: Record<string, string> = {
+  cnbc: "CNBC", reuters: "Reuters", bloomberg: "Bloomberg", ft: "FT", wsj: "WSJ",
+  nytimes: "NYT", waPo: "WaPo", washingtonpost: "WaPo", economist: "Economist",
+  bbc: "BBC", cnn: "CNN", apnews: "AP", marketwatch: "MarketWatch", barrons: "Barron's",
+  nikkei: "Nikkei", scmp: "SCMP", guardian: "Guardian", politico: "Politico",
+  axios: "Axios", forbes: "Forbes", businessinsider: "BI", yahoo: "Yahoo",
+};
+
+/** Friendly site name from a URL host, e.g. cnbc.com → "CNBC". Falls back to a capitalized
+ *  domain segment for unlisted sites; null if the URL doesn't parse or isn't given. */
+export function siteNameFromUrl(url?: string): string | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    const core = (host.split(".").slice(-2, -1)[0] || host).toLowerCase();
+    return SITE_NAMES[core] || core.charAt(0).toUpperCase() + core.slice(1);
+  } catch {
+    return null;
+  }
+}

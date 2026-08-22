@@ -32,7 +32,7 @@
 // browser/OS side.
 
 import type { SavedItem } from "@/lib/savedStore";
-import { stripLeadingUrl } from "@/lib/format";
+import { stripLeadingUrl, siteNameFromUrl } from "@/lib/format";
 
 const LABEL_CLASS = "text-[11px] font-bold uppercase tracking-wide text-neutral-700";
 
@@ -100,10 +100,14 @@ function OriginalTextSection({ item }: { item: SavedItem }) {
 }
 
 function SourceLine({ item }: { item: SavedItem }) {
+  // V5.11.6 — prefer a derived site name over item.sources verbatim: pre-fix saved items can
+  // have the raw URL baked into `sources` (savedFromAnalysis used to store it verbatim when no
+  // manual source name was given). The URL itself still renders below as its own link.
+  const source = item.sourceLabel || siteNameFromUrl(item.originalUrl) || item.sources;
   return (
     <p className="mt-1.5 text-[11px] text-neutral-500">
       {item.articleDate ? `Published ${fmt(item.articleDate)}` : item.analysisDateISO ? `Analyzed ${fmt(item.analysisDateISO)}` : ""}
-      {item.sourceLabel ? ` · ${item.sourceLabel}` : item.sources ? ` · ${item.sources}` : ""}
+      {source ? ` · ${source}` : ""}
       {item.originalUrl ? (
         <>
           {" · "}
@@ -142,7 +146,10 @@ function PrintFooterText({ large = false }: { large?: boolean }) {
  *  article text deliberately receding below as reference material (bold label, muted body,
  *  gray card) rather than competing for attention. */
 function PrintItemShare({ item }: { item: SavedItem }) {
-  const source = item.sourceLabel || item.sources;
+  // V5.11.6 — was `item.sourceLabel || item.sources`, which showed the full raw URL in this
+  // pill for a URL-mode analysis saved without a manual source name (item.sources held the
+  // URL verbatim for pre-fix saves). Same derivation as SourceLine below.
+  const source = item.sourceLabel || siteNameFromUrl(item.originalUrl) || item.sources;
   const dateLabel = item.articleDate
     ? `Published ${fmt(item.articleDate)}`
     : item.analysisDateISO

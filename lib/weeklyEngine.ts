@@ -72,7 +72,7 @@ async function buildWeekContext(): Promise<{ ctx: string; indicators: Awaited<Re
 /** ONE Anthropic call re-rating the whole Markets spine. Returns null on failure. */
 async function reRateMarkets(ctx: string): Promise<{
   heatMap?: { region: string; heat: string; reason: string }[];
-  emergingRisks?: { id: string; probability: string; impact: string; trend: string; note: string }[];
+  emergingRisks?: { id: string; probability: string; impact: string; trend: string; note: string; noteLayman?: string }[];
   implications?: {
     riskId: string;
     creditRisk: string;
@@ -80,6 +80,13 @@ async function reRateMarkets(ctx: string): Promise<{
     liquidityRisk: string;
     capital: string;
     profitability: string;
+    layman?: {
+      creditRisk?: string;
+      marketRisk?: string;
+      liquidityRisk?: string;
+      capital?: string;
+      profitability?: string;
+    };
   }[];
 } | null> {
   const spine = {
@@ -107,14 +114,14 @@ ${ctx}
 Return ONE JSON object with updated values only:
 {
   "heatMap": [{ "region": "<unchanged>", "heat": "Green|Amber|Red", "reason": "<one-line read, <=140 chars>" }],
-  "emergingRisks": [{ "id": "<unchanged>", "probability": "Low|Medium|High", "impact": "Low|Moderate|Severe", "trend": "up|down|stable", "note": "<one-line, <=160 chars>" }],
-  "implications": [{ "riskId": "<one of the emergingRisks ids above>", "creditRisk": "...", "marketRisk": "...", "liquidityRisk": "...", "capital": "...", "profitability": "..." }]
+  "emergingRisks": [{ "id": "<unchanged>", "probability": "Low|Medium|High", "impact": "Low|Moderate|Severe", "trend": "up|down|stable", "note": "<one-line, <=160 chars>", "noteLayman": "<the same note in plain English, minimal jargon, <=160 chars>" }],
+  "implications": [{ "riskId": "<one of the emergingRisks ids above>", "creditRisk": "...", "marketRisk": "...", "liquidityRisk": "...", "capital": "...", "profitability": "...", "layman": { "creditRisk": "<plain English>", "marketRisk": "<plain English>", "liquidityRisk": "<plain English>", "capital": "<plain English>", "profitability": "<plain English>" } }]
 }
-For "implications", produce EXACTLY ONE entry per emerging risk (same ids), describing what THAT risk means for a global bank across the five areas. Keep every region/id from the spine; do not add or drop any. JSON only.`;
+For "implications", produce EXACTLY ONE entry per emerging risk (same ids), describing what THAT risk means for a global bank across the five areas. "layman" is a plain-English twin of the same five fields — same facts, no jargon, for a reader without a banking background — not a summary or a different claim. Keep every region/id from the spine; do not add or drop any. JSON only.`;
 
   const { data } = await interpretWithProvider<{
     heatMap?: { region: string; heat: string; reason: string }[];
-    emergingRisks?: { id: string; probability: string; impact: string; trend: string; note: string }[];
+    emergingRisks?: { id: string; probability: string; impact: string; trend: string; note: string; noteLayman?: string }[];
     implications?: {
       riskId: string;
       creditRisk: string;
@@ -122,6 +129,13 @@ For "implications", produce EXACTLY ONE entry per emerging risk (same ids), desc
       liquidityRisk: string;
       capital: string;
       profitability: string;
+      layman?: {
+        creditRisk?: string;
+        marketRisk?: string;
+        liquidityRisk?: string;
+        capital?: string;
+        profitability?: string;
+      };
     }[];
   }>(system, user, { forceProvider: "anthropic" });
 
@@ -172,6 +186,10 @@ function mergeMarkets(rr: NonNullable<Awaited<ReturnType<typeof reRateMarkets>>>
       impact: (IMPACTS as string[]).includes(u.impact) ? (u.impact as EmergingRisk["impact"]) : base.impact,
       trend: (TRENDS as string[]).includes(u.trend) ? (u.trend as Trend) : base.trend,
       note: typeof u.note === "string" && u.note.trim() ? u.note.trim() : base.note,
+      // V5.11.6 — plain-English twin, for the Markets tab's Learning toggle. Falls back to the
+      // curated base's own noteLayman (always populated) rather than the executive note, so a
+      // model that omits it doesn't silently downgrade Learning mode to executive text.
+      noteLayman: typeof u.noteLayman === "string" && u.noteLayman.trim() ? u.noteLayman.trim() : base.noteLayman,
       reviewedISO,
     };
   });
@@ -184,6 +202,11 @@ function mergeMarkets(rr: NonNullable<Awaited<ReturnType<typeof reRateMarkets>>>
     const u = implByRisk.get(risk.id);
     const pick = (next: string | undefined) =>
       typeof next === "string" && next.trim() ? next.trim() : risk.note;
+    // V5.11.6 — same idea as noteLayman above: fall back through the model's layman field,
+    // then the risk's own noteLayman, then (only if that's somehow missing too) the
+    // executive note — every cell always has SOMETHING, never blank.
+    const pickLayman = (next: string | undefined) =>
+      (typeof next === "string" && next.trim() ? next.trim() : undefined) ?? risk.noteLayman ?? risk.note;
     return {
       development: risk.name,
       riskId: risk.id,
@@ -193,6 +216,14 @@ function mergeMarkets(rr: NonNullable<Awaited<ReturnType<typeof reRateMarkets>>>
       liquidityRisk: pick(u?.liquidityRisk),
       capital: pick(u?.capital),
       profitability: pick(u?.profitability),
+      layman: {
+        development: risk.name,
+        creditRisk: pickLayman(u?.layman?.creditRisk),
+        marketRisk: pickLayman(u?.layman?.marketRisk),
+        liquidityRisk: pickLayman(u?.layman?.liquidityRisk),
+        capital: pickLayman(u?.layman?.capital),
+        profitability: pickLayman(u?.layman?.profitability),
+      },
     };
   });
 
