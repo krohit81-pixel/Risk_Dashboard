@@ -50,6 +50,44 @@ This is the single most important thing to understand before changing data flow:
 Don't wire new editorial-style content into the live per-request path; it belongs in the
 generation pipeline (`lib/intelligence.ts`, `lib/snapshotEngine.ts`) so it stays frozen/cheap.
 
+### Daily Risk Brief email (V5.13)
+After the daily cron (`app/api/cron/editorial/route.ts`) saves a snapshot successfully, it
+best-effort-builds a PDF covering the same content as the Home tab (Daily Risk Brief, What
+Changed, Top Developments, CRO Conversation, Editorial Intelligence, Japan & Asia Watch, Radar)
+and emails it to `DAILY_BRIEF_RECIPIENT_EMAIL`. Two deliberate design choices worth knowing:
+
+- **PDF engine is `@react-pdf/renderer`, not headless Chromium.** A real browser printing an
+  actual app page would have matched the app's Tailwind styling exactly, but adds a ~50MB
+  Chromium dependency and a browser-launch step to a serverless cron function — explicitly
+  traded away for a smaller/faster/more reliable deploy. `lib/dailyBriefPdf.tsx` is therefore a
+  **separate** layout in react-pdf's own styling API (`StyleSheet.create`, not Tailwind), hand-
+  matched to the same light-theme color tokens `app/globals.css`'s `.light` block uses (so it
+  reads as the same visual family, not a re-skin) — any future palette change there should be
+  mirrored here by hand, there's no shared source.
+- **Content depth matches a card's default-open state, not every nested "Go deeper" toggle**
+  (lenses/questions/talking-points are omitted) — keeps a daily email a sane length rather than
+  reproducing literally everything the live UI can expand to.
+
+**Gotcha hit once already:** `lib/overnight.ts`'s `fmtDelta()` uses the proper Unicode minus
+sign (`−`, U+2212) for negative deltas — correct and intentional for the live app (renders fine
+in the Inter webfont), but `@react-pdf/renderer`'s standard Helvetica silently drops that glyph
+entirely, so every negative "What Changed" mover rendered with **no sign at all** ("6 bps"
+instead of "−6 bps") until caught. `dailyBriefPdf.tsx`'s `pdfSafeText()` swaps it for a plain
+ASCII hyphen, scoped to this PDF path only — don't "fix" it in `lib/overnight.ts` itself, that
+would be the wrong direction (the live app is the one rendering correctly). If a future
+generated field ever contains other non-WinAnsi Unicode (rare symbols, unusual dashes), expect
+the same silent-drop failure mode and route it through `pdfSafeText()` too.
+
+**Sender identity**: reuses `IMAP_EMAIL`/`IMAP_PASSWORD` — the SAME mailbox
+`api/cron-bloomberg.py` already fetches newsletters from via IMAP — for SMTP send instead of
+provisioning separate credentials (AOL accepts the same email + app-password for both). Vercel
+env vars are shared across the Python and Next.js functions in one project, so no duplication
+needed. `lib/dailyBriefEmail.ts` fails soft — returns `{ok:false, reason}`, never throws — a
+PDF/email problem must never turn an already-successful snapshot save into a failed cron run.
+Manual "Regenerate" (`/api/regenerate`, Settings → Generation History) is a **separate** route
+that does NOT send this email — only the actual scheduled cron does — so testing/re-running the
+editorial generation from the UI can't accidentally spam the recipient.
+
 ### LLM provider chain
 `lib/llm.ts` tries **Gemini first** (free tier, `GEMINI_API_KEY`), and only falls back to
 Anthropic (`ANTHROPIC_API_KEY`) if Gemini errors or returns nothing. Neither key present →

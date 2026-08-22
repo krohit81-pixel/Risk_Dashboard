@@ -1,8 +1,8 @@
 {
   "name": "global-risk-dashboard",
-  "version": "5.12.0",
+  "version": "5.13.0",
   "private": true,
-  "description": "Global Risk Intelligence Dashboard \u2014 a morning risk briefing for a global-bank CRO.",
+  "description": "Global Risk Intelligence Dashboard — a morning risk briefing for a global-bank CRO.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,15 +10,18 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.6.1",
     "@supabase/supabase-js": "^2.110.1",
     "next": "^14.2.35",
     "next-themes": "^0.4.6",
+    "nodemailer": "^9.0.5",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "recharts": "2.12.7"
   },
   "devDependencies": {
     "@types/node": "20.14.10",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
     "autoprefixer": "10.4.19",

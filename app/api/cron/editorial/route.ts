@@ -8,10 +8,50 @@ import { fetchIndicators } from "@/lib/marketData";
 import { generateSnapshot } from "@/lib/snapshotEngine";
 import { saveSnapshot, slotForNow } from "@/lib/snapshotStore";
 import { recordRun } from "@/lib/runStore";
+import { buildBrief, buildDevelopments } from "@/lib/riskEngine";
+import { buildOvernight } from "@/lib/overnight";
+import { renderDailyBriefPdf } from "@/lib/dailyBriefPdf";
+import { sendDailyBriefEmail } from "@/lib/dailyBriefEmail";
 import type { SnapshotSlot } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 180; // Vercel Pro (up to 300s)
+
+/** V5.13 — best-effort: builds and emails the Daily Risk Brief PDF after a successful snapshot
+ *  save. Deliberately swallows its own errors (logged, never thrown) — a PDF/email failure must
+ *  never turn a successful snapshot generation into a failed cron run. Mirrors the SAME "live
+ *  data spine" computation app/api/dashboard/route.ts uses (buildBrief/buildDevelopments/
+ *  buildOvernight on the same `indicators`), so the PDF matches what the Home tab shows right
+ *  now, not a stale/different view. */
+async function sendDailyBriefBestEffort(
+  indicators: Awaited<ReturnType<typeof fetchIndicators>>,
+  snapshot: Awaited<ReturnType<typeof generateSnapshot>>
+): Promise<{ attempted: boolean; ok: boolean; note: string }> {
+  const dateLabel = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  try {
+    const pdf = await renderDailyBriefPdf({
+      dateLabel,
+      brief: buildBrief(indicators, new Date().toISOString()),
+      overnight: buildOvernight(indicators),
+      developments: buildDevelopments(indicators),
+      themes: snapshot.intelligence.themes,
+      editorial: snapshot.intelligence.editorial,
+      japanAsia: snapshot.intelligence.japanAsia,
+      radar: snapshot.intelligence.radar,
+    });
+    const sent = await sendDailyBriefEmail(pdf, dateLabel);
+    if (sent.skipped) return { attempted: false, ok: false, note: `email skipped: ${sent.reason}` };
+    if (!sent.ok) return { attempted: true, ok: false, note: `email failed: ${sent.reason}` };
+    return { attempted: true, ok: true, note: "email sent" };
+  } catch (e) {
+    return { attempted: true, ok: false, note: `PDF build failed: ${String(e)}` };
+  }
+}
 
 function authorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -35,6 +75,12 @@ export async function GET(req: Request) {
     const snapshot = await generateSnapshot(slot, indicators); // throws on invalid
     await saveSnapshot(snapshot);
     console.log(`[cron] slot=${slot} saved · degradeReason=${snapshot.meta.degradeReason} · provider=${snapshot.meta.llmProvider}`);
+
+    // V5.13 — best-effort Daily Risk Brief PDF email. Never lets a PDF/email problem turn this
+    // already-successful snapshot save into a failed cron run — see the function's own comment.
+    const brief = await sendDailyBriefBestEffort(indicators, snapshot);
+    console.log(`[cron] daily brief email: ${brief.note}`);
+
     await recordRun({
       ranISO: new Date().toISOString(),
       trigger: "scheduled",
@@ -43,6 +89,7 @@ export async function GET(req: Request) {
       fallbackUsed: snapshot.meta.llmProvider === "anthropic",
       degradeReason: snapshot.meta.degradeReason,
       themes: snapshot.meta.themesGenerated,
+      note: brief.attempted ? `daily brief: ${brief.note}` : undefined,
     });
     return NextResponse.json({
       ok: true,
@@ -54,6 +101,7 @@ export async function GET(req: Request) {
       degradeReason: snapshot.meta.degradeReason,
       provider: snapshot.meta.llmProvider,
       stale: snapshot.meta.stale,
+      dailyBrief: brief,
       sources: snapshot.meta.sources,
     });
   } catch (err) {

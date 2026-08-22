@@ -211,6 +211,35 @@ export function deriveDevelopments(indicators: Indicator[]): Development[] {
   return out;
 }
 
+/** V5.13 — extracted from app/api/dashboard/route.ts so lib/dailyBriefPdf.tsx (the cron-
+ *  generated Daily Risk Brief email) shows the EXACT same "Top Developments" as the live
+ *  dashboard, rather than a second hand-copy of this curated pair that could drift out of
+ *  sync. Data-derived first, then curated geopolitics/banking, capped at 5. */
+export function buildDevelopments(indicators: Indicator[]): Development[] {
+  const derived = deriveDevelopments(indicators).slice(0, 4);
+  const curated: Development[] = [
+    {
+      id: "dev-geo",
+      headline: "Geopolitical and trade friction remains a live tail risk",
+      category: "Geopolitics",
+      severity: "Elevated",
+      whyItMatters:
+        "Conflict and tariff escalation can spike energy prices and disrupt supply chains at short notice.",
+      derived: false,
+    },
+    {
+      id: "dev-bank",
+      headline: "CRE and private-credit exposures stay on the supervisory radar",
+      category: "Banking",
+      severity: "Moderate",
+      whyItMatters:
+        "Refinancing at higher rates and opaque private-credit leverage warrant close portfolio monitoring.",
+      derived: false,
+    },
+  ];
+  return [...derived, ...curated].slice(0, 5);
+}
+
 /** Data-driven heat for the United States from inflation + rates + volatility. */
 export function usHeatFromData(
   indicators: Indicator[],
