@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { fetchIndicators } from "@/lib/marketData";
+import { fetchIndianMetals } from "@/lib/indianMetals";
 import {
   EMERGING_RISKS,
   HEAT_MAP_BASE,
@@ -29,7 +30,10 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET() {
-  const indicators = await fetchIndicators();
+  const [indicators, indianMetals] = await Promise.all([
+    fetchIndicators(),
+    fetchIndianMetals(),
+  ]);
   const updatedISO = new Date().toISOString();
   const brief = buildBrief(indicators, updatedISO);
 
@@ -84,6 +88,7 @@ export async function GET() {
     heatMap,
     implications,
     japanWatch,
+    indianMetals,
     overnight: buildOvernight(indicators),
     conceptSeen: await getConceptSeen(),
     intelligence,

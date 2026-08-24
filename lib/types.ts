@@ -23,7 +23,7 @@ export interface Indicator {
   section?: "market" | "release";
   value: number | null;
   previous: number | null;
-  unit: "%" | "pts" | "index" | "usd" | "yen" | "ratio";
+  unit: "%" | "pts" | "index" | "usd" | "yen" | "inr" | "ratio";
   /** Whole-number decimals to display. */
   decimals: number;
   /** Cadence of the "change" figure. */
@@ -126,6 +126,8 @@ export interface DashboardData {
   implications: BankImplication[];
   /** Japan deep-dive: USD/JPY, JGB 10Y, BOJ rate, Nikkei, Japan CPI. */
   japanWatch: Indicator[];
+  /** V5.14 — Indian Market: gold/silver/copper, global spot converted to INR. */
+  indianMetals: Indicator[];
   /** Top risk-relevant movers since yesterday (data-only, always live). */
   overnight: OvernightChange[];
   /** Phase 3 — CRO intelligence layer (sections 09–13). */

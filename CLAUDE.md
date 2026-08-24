@@ -340,6 +340,37 @@ local Executive/Learning toggle, matching the established pattern (`ResearchWork
 the header toggle, which per the Navigation structure note above deliberately doesn't reach
 Markets at all.
 
+### Markets tab — Indian Market: Metals (v5.14.0)
+New section 05, `components/IndianMetals.tsx`, rendering gold/silver/copper in the exact same
+card/grid format as section 01's "Market Indicators" (`components/CroDashboard.tsx`'s `Grid`,
+now exported specifically so this section could reuse it instead of duplicating card markup).
+
+**Data source, and why it's an approximation, not an exact quote:** there's no free/no-key
+Indian commodity-exchange (MCX) feed available to this app. `lib/indianMetals.ts` instead reuses
+the same no-key Yahoo Finance `quote()` (`lib/markets.ts`) the rest of the app already relies on
+— COMEX Gold (`GC=F`, USD/troy oz), COMEX Silver (`SI=F`, USD/troy oz), COMEX Copper (`HG=F`,
+USD/lb), plus a live USD/INR quote (`INR=X`) — and converts to the units India's metal market
+actually quotes in: gold ₹/10g, silver & copper ₹/kg. A single latest FX rate is applied
+uniformly across value/previous/history (isolates the metal's own price move rather than
+compounding day-by-day FX drift; a constant multiplier doesn't change % deltas or trend
+direction either). This tracks the same international benchmark MCX prices are set off of, but
+is **not** the literal MCX print — real domestic prices run higher once import duty, GST and
+dealer premium stack on top. Said plainly in the section's own copy rather than presented as an
+exact quote.
+
+Kept deliberately **out of** the main `Indicator[]` (`fetchIndicators()`/`data.indicators`) —
+these aren't risk-engine inputs (`computeScore`, the Mizuho CRO framing, etc. never touch them),
+just a standalone price ticker, so they travel as their own `DashboardData.indianMetals` field
+and render in their own section rather than folding into (and re-sorting) the general Market
+Indicators grid. `riskUpIsBad` still follows this app's usual risk-color convention even though
+the section itself isn't risk-framed: gold/silver `true` (rising precious metals = flight to
+safety, matching the existing `gold` indicator's own convention), copper `false` ("Dr. Copper" —
+rising copper reads as industrial-demand/risk-on).
+
+Added a new `Indicator.unit` value, `"inr"` (₹ prefix in `lib/format.ts`'s `fmtValue`) —
+alongside the existing `"usd"`/`"yen"`, not replacing them; the original `gold` indicator (global
+USD spot, Commodities group, section 01) is untouched.
+
 ### Bank Earnings suite (Settings → 05, 06, 07)
 Grown across V5.7.0–V5.10.1 into several files that each have a distinct, non-overlapping job.
 Read this before touching any of them — it's easy to update the wrong layer.
