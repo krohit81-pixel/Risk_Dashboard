@@ -64,9 +64,21 @@ and emails it to `DAILY_BRIEF_RECIPIENT_EMAIL`. Two deliberate design choices wo
   matched to the same light-theme color tokens `app/globals.css`'s `.light` block uses (so it
   reads as the same visual family, not a re-skin) — any future palette change there should be
   mirrored here by hand, there's no shared source.
-- **Content depth matches a card's default-open state, not every nested "Go deeper" toggle**
-  (lenses/questions/talking-points are omitted) — keeps a daily email a sane length rather than
-  reproducing literally everything the live UI can expand to.
+- **Content depth (V5.13.1):** the first version matched a card's default-open state only
+  (lenses/questions/talking-points omitted, to keep the email short) — reverted after explicit
+  feedback that the omission wasn't wanted. `GoDeeperBlock` in `lib/dailyBriefPdf.tsx` now renders
+  the full "Go deeper" layer (lenses, signals-to-watch chips, questions leadership may ask, the
+  talking-point/follow-up pair, and "what I should understand") for both CRO Conversation
+  (`ThemeCardPdf`) and Japan & Asia Watch (`JapanSection`), styled with the same left-accent-border
+  treatment as the print/PDF convention elsewhere in the app — always fully expanded, nothing
+  behind a toggle, matching the rest of this codebase's collapsed-in-app/expanded-in-print rule.
+  Also V5.13.1: "Also on the Radar" items (`RadarSectionPdf`) hyperlink out to `RadarItem.url`
+  via `@react-pdf/renderer`'s `Link` component when a URL exists, falling back to plain text when
+  it doesn't — matching the in-app radar chip behavior, previously plain unlinked text in the PDF
+  regardless. Note `curatedSnapshot()` (the no-network/offline seed) never populates `radar` —
+  that array only fills from the live news pipeline (`buildRadar` in `lib/snapshotEngine.ts`) — so
+  section 06 legitimately doesn't appear when previewing against curated fallback data; that's not
+  a bug in the link logic.
 
 **Gotcha hit once already:** `lib/overnight.ts`'s `fmtDelta()` uses the proper Unicode minus
 sign (`−`, U+2212) for negative deltas — correct and intentional for the live app (renders fine

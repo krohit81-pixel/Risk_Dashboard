@@ -7,12 +7,14 @@
 // app/globals.css's `.light` block (same values PrintItem.tsx's print pages use), so it reads
 // as the same family, not a re-skin — any future palette change there should be mirrored here.
 //
-// Content mirrors the Home tab's default-visible depth (a card's main content once tapped
-// open), not literally every nested "Go deeper" toggle (lenses/questions/talking points) —
-// keeps a daily email to a sane length. Say the word if you want that deeper layer included too.
+// V5.13.1 — now includes the "Go deeper" layer too (lenses, signals, questions, talking
+// points, what-to-understand) for CRO Conversation and Japan & Asia Watch, per explicit
+// request after the first version left it out to keep the email shorter. Also: "Also on the
+// Radar" items link out to their source article when a URL exists (RadarItem.url), matching
+// the in-app behavior — previously plain, unlinked text.
 
 import React from "react";
-import { Document, Page, Text, View, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Page, Text, View, Link, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import type {
   MorningBrief,
   Development,
@@ -20,6 +22,7 @@ import type {
   CroTheme,
   EditorialCard,
   JapanAsiaWatch,
+  Lens,
   RadarItem,
   Severity,
 } from "./types";
@@ -93,6 +96,16 @@ const styles = StyleSheet.create({
   footerLine: { fontSize: 8.5, color: COLOR.fgFaint, lineHeight: 1.4 },
   footerName: { fontFamily: "Helvetica-Bold", color: COLOR.fgMuted },
   sourceLine: { fontSize: 8.5, color: COLOR.fgFaint, marginTop: 6 },
+
+  // "Go deeper" — lenses / signals / questions / talking points / what-to-understand.
+  accentBox: { marginTop: 8, paddingLeft: 8, borderLeftWidth: 2 },
+  lensLine: { fontSize: 9.5, lineHeight: 1.4, color: COLOR.fgMuted, marginBottom: 3 },
+  signalsLabel: { fontSize: 8, fontFamily: "Helvetica-Bold", textTransform: "uppercase", color: COLOR.fgFaint, marginTop: 8, marginBottom: 3 },
+  signalsRow: { flexDirection: "row", flexWrap: "wrap" },
+  signalChip: { fontSize: 8.5, color: COLOR.fgMuted, borderWidth: 1, borderColor: COLOR.line, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2, marginRight: 4, marginBottom: 4 },
+  questionItem: { fontSize: 9.5, lineHeight: 1.4, color: COLOR.fgMuted, marginBottom: 2 },
+
+  radarLink: { fontSize: 9.5, lineHeight: 1.4, color: COLOR.steel, textDecoration: "underline", flex: 1 },
 });
 
 function Chip({ text, color }: { text: string; color: string }) {
@@ -201,6 +214,89 @@ function DevelopmentsSection({ items }: { items: Development[] }) {
   );
 }
 
+// ── "Go deeper" — mirrors CroConversation.tsx's own toggle content (lenses, signals,
+// questions, talking point/follow-up, what-to-understand) and JapanAsiaWatch.tsx's
+// lens/signals/questions/whatToUnderstand. Print/PDF convention throughout this app is
+// "collapsed in the live UI, always expanded in print" — same idea here. */
+function GoDeeperBlock({
+  lenses,
+  signals,
+  questions,
+  talkingPoint,
+  followUp,
+  whatToUnderstand,
+}: {
+  lenses?: Lens[];
+  signals?: string[];
+  questions?: string[];
+  talkingPoint?: string;
+  followUp?: string;
+  whatToUnderstand?: string;
+}) {
+  const hasAny =
+    lenses?.length || signals?.length || questions?.length || talkingPoint || followUp || whatToUnderstand;
+  if (!hasAny) return null;
+  return (
+    <View wrap={false}>
+      {lenses?.length ? (
+        <View style={[styles.accentBox, { borderLeftColor: COLOR.steel }]}>
+          {lenses.map((l, i) => (
+            <Text key={i} style={styles.lensLine}>
+              <Text style={{ fontFamily: "Helvetica-Bold", color: COLOR.steel }}>{l.kind} — </Text>
+              {l.question}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
+      {signals?.length ? (
+        <>
+          <Text style={styles.signalsLabel}>Signals to watch</Text>
+          <View style={styles.signalsRow}>
+            {signals.map((s, i) => (
+              <Text key={i} style={styles.signalChip}>
+                {s}
+              </Text>
+            ))}
+          </View>
+        </>
+      ) : null}
+
+      {questions?.length ? (
+        <View style={{ marginTop: 8 }}>
+          <Text style={[styles.signalsLabel, { color: COLOR.steel, marginTop: 0 }]}>Questions leadership may ask</Text>
+          {questions.map((q, i) => (
+            <Text key={i} style={styles.questionItem}>
+              {"• "}
+              {q}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
+      {talkingPoint || followUp ? (
+        <View style={[styles.accentBox, { borderLeftColor: COLOR.elevated }]}>
+          <Text style={[styles.signalsLabel, { color: COLOR.elevated, marginTop: 0 }]}>If this comes up in a meeting</Text>
+          {talkingPoint ? <Text style={[styles.body, { marginBottom: 4 }]}>{talkingPoint}</Text> : null}
+          {followUp ? (
+            <>
+              <Text style={[styles.signalsLabel, { color: COLOR.elevated }]}>Follow-up question</Text>
+              <Text style={styles.body}>{followUp}</Text>
+            </>
+          ) : null}
+        </View>
+      ) : null}
+
+      {whatToUnderstand ? (
+        <View style={[styles.accentBox, { borderLeftColor: COLOR.calm }]}>
+          <Text style={[styles.signalsLabel, { color: COLOR.calm, marginTop: 0 }]}>What I should understand</Text>
+          <Text style={styles.body}>{whatToUnderstand}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 // ── Today's CRO Conversation ──
 function ThemeCardPdf({ t }: { t: CroTheme }) {
   return (
@@ -228,6 +324,15 @@ function ThemeCardPdf({ t }: { t: CroTheme }) {
           <Bullets items={t.mizuho} />
         </>
       ) : null}
+
+      <GoDeeperBlock
+        lenses={t.lenses}
+        signals={t.signals}
+        questions={t.questions}
+        talkingPoint={t.talkingPoint}
+        followUp={t.followUp}
+        whatToUnderstand={t.whatToUnderstand}
+      />
 
       <SourceFooter source={t.source} confidence={t.confidence} />
     </View>
@@ -307,6 +412,14 @@ function JapanSection({ data }: { data: JapanAsiaWatch }) {
               <Bullets items={data.mizuho} />
             </>
           ) : null}
+
+          <GoDeeperBlock
+            lenses={data.lens ? [data.lens] : undefined}
+            signals={data.signals}
+            questions={data.questions}
+            whatToUnderstand={data.whatToUnderstand}
+          />
+
           <SourceFooter source={data.source} confidence={data.confidence} />
         </>
       ) : null}
@@ -321,10 +434,17 @@ function RadarSectionPdf({ items }: { items: RadarItem[] }) {
       {items.map((r, i) => (
         <View key={i} style={styles.bulletRow}>
           <Text style={styles.bulletDot}>{"•"}</Text>
-          <Text style={styles.bulletText}>
-            {r.title}
-            {r.source ? `  —  ${r.source}` : ""}
-          </Text>
+          {r.url ? (
+            <Link src={r.url} style={styles.radarLink}>
+              {r.title}
+              {r.source ? `  —  ${r.source}` : ""}
+            </Link>
+          ) : (
+            <Text style={styles.bulletText}>
+              {r.title}
+              {r.source ? `  —  ${r.source}` : ""}
+            </Text>
+          )}
         </View>
       ))}
     </View>
