@@ -67,7 +67,9 @@ function IndicatorCard({ ind }: { ind: Indicator }) {
   );
 }
 
-function Grid({ items }: { items: Indicator[] }) {
+/** V5.14 — exported so components/IndianMetals.tsx can render its own indicators in the exact
+ *  same card/grid format as this section ("Market Indicators"), rather than duplicating markup. */
+export function Grid({ items }: { items: Indicator[] }) {
   return (
     <div className="grid grid-cols-2 gap-2.5">
       {items.map((ind) => (

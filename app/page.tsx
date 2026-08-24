@@ -12,6 +12,7 @@ import { MarketsRiskThemes } from "@/components/MarketsRiskThemes";
 import { RiskHeatMap } from "@/components/RiskHeatMap";
 import { CroDashboard } from "@/components/CroDashboard";
 import { JapanWatch } from "@/components/JapanWatch";
+import { IndianMetals } from "@/components/IndianMetals";
 import { CroConversation } from "@/components/intel/CroConversation";
 import { EditorialIntelligence } from "@/components/intel/EditorialIntelligence";
 import { JapanAsiaWatchSection } from "@/components/intel/JapanAsiaWatch";
@@ -377,6 +378,9 @@ export default function Page() {
                     over that section's old open/closed state onto this different section. */}
                 <CollapsibleSection id="riskthemes" n="04" title="Emerging Risks & Implications" hint="CRO playbook" defaultOpen={false}>
                   <MarketsRiskThemes risks={emergingRisks} implications={implications} />
+                </CollapsibleSection>
+                <CollapsibleSection id="indianmetals" n="05" title="Indian Market — Metals" hint="gold, silver, copper · INR" defaultOpen={false}>
+                  <IndianMetals items={data.indianMetals} />
                 </CollapsibleSection>
               </>
             ) : null}

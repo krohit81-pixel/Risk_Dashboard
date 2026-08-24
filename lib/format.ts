@@ -19,6 +19,8 @@ export function fmtValue(value: number | null, ind: Indicator): string {
       return `$${base}`;
     case "yen":
       return `¥${base}`;
+    case "inr":
+      return `₹${base}`;
     case "pts":
     case "index":
     case "ratio":
