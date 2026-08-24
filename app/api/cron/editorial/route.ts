@@ -27,6 +27,15 @@ async function sendDailyBriefBestEffort(
   indicators: Awaited<ReturnType<typeof fetchIndicators>>,
   snapshot: Awaited<ReturnType<typeof generateSnapshot>>
 ): Promise<{ attempted: boolean; ok: boolean; note: string }> {
+  // V5.13.2 — on hold. PDF gen + email send are fully built and left in place, just gated
+  // behind this switch so the daily cron stops doing the work by default. Flip
+  // DAILY_BRIEF_ENABLED=true in Vercel env vars to turn it back on for testing — no code
+  // changes or redeploy of this file needed to re-enable. Don't remove this code path;
+  // it's parked, not dead.
+  if (process.env.DAILY_BRIEF_ENABLED !== "true") {
+    return { attempted: false, ok: false, note: "on hold (DAILY_BRIEF_ENABLED not set to true)" };
+  }
+
   const dateLabel = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     day: "numeric",
