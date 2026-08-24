@@ -50,11 +50,28 @@ This is the single most important thing to understand before changing data flow:
 Don't wire new editorial-style content into the live per-request path; it belongs in the
 generation pipeline (`lib/intelligence.ts`, `lib/snapshotEngine.ts`) so it stays frozen/cheap.
 
-### Daily Risk Brief email (V5.13)
+### Daily Risk Brief email (V5.13, ON HOLD as of V5.13.2)
 After the daily cron (`app/api/cron/editorial/route.ts`) saves a snapshot successfully, it
 best-effort-builds a PDF covering the same content as the Home tab (Daily Risk Brief, What
 Changed, Top Developments, CRO Conversation, Editorial Intelligence, Japan & Asia Watch, Radar)
-and emails it to `DAILY_BRIEF_RECIPIENT_EMAIL`. Two deliberate design choices worth knowing:
+and emails it to `DAILY_BRIEF_RECIPIENT_EMAIL`.
+
+**V5.13.2 — parked, not deleted.** All of the code below is still fully built and working (it
+shipped and was verified sending real emails), but the feature is switched off by default —
+explicit request to hold it before deciding whether to keep it. Gated by a single check at the
+top of `sendDailyBriefBestEffort()` in `app/api/cron/editorial/route.ts`:
+`process.env.DAILY_BRIEF_ENABLED !== "true"` short-circuits with `{attempted:false, ok:false,
+note:"on hold..."}` before building the PDF or touching email at all — the daily snapshot
+generation itself is completely unaffected either way. To resume (even just to test): set
+`DAILY_BRIEF_ENABLED=true` in Vercel env vars (alongside the existing
+`DAILY_BRIEF_RECIPIENT_EMAIL`/`IMAP_*` vars, which don't need to change) and redeploy — no code
+edits needed. If this is ever confirmed as permanently unwanted, the deletable surface is:
+`lib/dailyBriefPdf.tsx`, `lib/dailyBriefEmail.ts`, the `sendDailyBriefBestEffort` helper + its
+call site in `app/api/cron/editorial/route.ts`, the `nodemailer`/`@react-pdf/renderer`
+dependencies, and the `DAILY_BRIEF_*`/`SMTP_*`/`IMAP_*` env vars (the latter only if
+`api/cron-bloomberg.py` no longer needs them either — check that first, it's a shared mailbox).
+
+Two deliberate design choices worth knowing about the parked implementation itself:
 
 - **PDF engine is `@react-pdf/renderer`, not headless Chromium.** A real browser printing an
   actual app page would have matched the app's Tailwind styling exactly, but adds a ~50MB
