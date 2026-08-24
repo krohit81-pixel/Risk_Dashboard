@@ -379,7 +379,7 @@ export default function Page() {
                 <CollapsibleSection id="riskthemes" n="04" title="Emerging Risks & Implications" hint="CRO playbook" defaultOpen={false}>
                   <MarketsRiskThemes risks={emergingRisks} implications={implications} />
                 </CollapsibleSection>
-                <CollapsibleSection id="indianmetals" n="05" title="Indian Market — Metals" hint="gold, silver, copper · INR" defaultOpen={false}>
+                <CollapsibleSection id="indianmetals" n="05" title="Indian Market — Metals" hint="gold, silver, copper, aluminium, uranium" defaultOpen={false}>
                   <IndianMetals items={data.indianMetals} />
                 </CollapsibleSection>
               </>

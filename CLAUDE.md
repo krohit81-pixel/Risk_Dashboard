@@ -371,6 +371,31 @@ Added a new `Indicator.unit` value, `"inr"` (₹ prefix in `lib/format.ts`'s `fm
 alongside the existing `"usd"`/`"yen"`, not replacing them; the original `gold` indicator (global
 USD spot, Commodities group, section 01) is untouched.
 
+**V5.14.1 — overflow fix + aluminium/uranium, tin skipped.** Six-figure INR values (gold/silver,
+₹100,000+) overflowed past the card's own rounded border in the 2-column grid: `IndicatorCard`'s
+top row (`components/CroDashboard.tsx`) packed the value + a fixed-width 56px sparkline + trend
+arrow onto one unwrapped flex line via `justify-between`, sized fine for shorter US-market values
+(`"7,674"`, `"$4,691"`) but not six-digit rupee figures. Fixed generically (benefits every
+section using this shared card, not just this one) by adding `flex-wrap` to both rows and
+`shrink-0` to the sparkline/arrow group — a value that doesn't fit now drops that group to its
+own line at full size instead of spilling outside the card.
+
+Also added while fixing that: **aluminium** (COMEX `ALI=F`, USD/tonne → ₹/kg, same treatment as
+copper — reliable daily data) and **uranium**, which needed its own, stronger caveat rather than
+the standard "approximation of MCX" one above — India has **no open retail/commodity market for
+uranium at all** (government-controlled, Dept. of Atomic Energy; never traded on MCX like the
+other four), so its row is labelled "(global, ₹/kg equiv.)" rather than "(India, …)" specifically
+to avoid implying a real domestic price exists. The only working Yahoo ticker (`UX=F`, the
+CME/UxC U3O8 assessment) is thin — `regularMarketVolume` was 1 on inspection and it carries no
+daily close history, only a single `meta.chartPreviousClose` fallback — so its sparkline is
+absent even when the row is live; not a bug if it looks static for days, the underlying price is
+a periodic industry assessment, not a continuously-traded print.
+
+**Tin was requested too but has no working free ticker** — neither `SN=F` nor `TIN=F` resolve on
+Yahoo's chart endpoint (tin has no COMEX/CME futures contract; it's LME-only, which this no-key
+source doesn't carry). Left out rather than faked with a synthetic value; would need a paid
+metals-data provider to add for real.
+
 ### Bank Earnings suite (Settings → 05, 06, 07)
 Grown across V5.7.0–V5.10.1 into several files that each have a distinct, non-overlapping job.
 Read this before touching any of them — it's easy to update the wrong layer.
