@@ -54,18 +54,25 @@ curated content when its keys are absent.
 
 ---
 
-## What's on the screen (current, v5.10.2)
+## What's on the screen (current, v5.14.2)
 
 Bottom nav has four tabs; a fifth area (**Settings**) is reached via the hamburger button in
-the header, not the nav bar.
+the header, not the nav bar. The app is responsive (v5.10.4+) — full-width on phones, a wider
+shell on iPad/macOS Safari at standard breakpoints.
 
 | Tab | Sections |
 |---|---|
 | **Home** | Executive/Learning toggle (sticky, in the header) · Daily Risk Brief (risk meter) · What Changed (top movers + "show all indicators", both as colour-tile grids) · Top Developments · Today's CRO Conversation · Editorial Intelligence · Japan & Asia Watch · Also on the Radar |
-| **Markets** | Key CRO Dashboard (live indicators) · Japan Watch · Global Risk Heat Map (tappable regions) · Top Emerging Risks · Implications for a Global Bank |
-| **Research** | Research Workspace — paste text or a URL, analyzed through the same CRO framework as the daily editorial; save results to Learn |
-| **Learn** | Saved Analyses · Saved for Later · Concept Library (Your Concepts + All Concepts, both collapsible, pinned items grouped to the top) · Weekly Summary |
+| **Markets** | Key CRO Dashboard (live indicators) · Japan Watch · Global Risk Heat Map (tappable regions) · Emerging Risks & Implications (merged, one card per theme, v5.12.0) · **Indian Market — Metals** (gold/silver/copper/aluminium/uranium, global spot converted to live INR, v5.14.0) |
+| **Research** | Research Workspace — paste text or a URL, analyzed through the same CRO framework as the daily editorial; every result includes a collapsible "Simple explanation" + "Original text" pair (v5.11.0); save results to Learn |
+| **Learn** | Saved Analyses · Saved for Later (both with the same Simple-explanation/Original-text pair as Research, plus Export Full/Export Share PDF options) · Concept Library (Your Concepts + All Concepts, both collapsible, pinned items grouped to the top) · Weekly Summary |
 | **Settings** (hamburger) | 01 Appearance (dark/light) · 02 Briefing Books (print/PDF) · 03 Add Concept (paste → analyze → save; editing a saved concept opens here pre-filled) · 04 Mizuho Reference · 05 Bank Earnings (15-bank baseline+live-overlay, plain-English summaries, "📊 Compare Banks" USD charts screen) · 06 Generation History (Refresh / Regenerate / Refresh Earnings / Reset Earnings) · 07 Mizuho Q1 Earnings (single-bank USD deep-dive, hand-drawn charts) |
+
+**Daily Risk Brief email** (not a tab/section — a background pipeline): after the daily cron
+generates the Home-tab content, it can email a matching PDF to one recipient from the same
+mailbox used for newsletter ingestion. Built and verified (v5.13.0), currently **on hold**
+behind an env var (`DAILY_BRIEF_ENABLED`, v5.13.2) — fully working, deliberately paused, not
+reachable from any UI button. See `CLAUDE.md` for how to resume it.
 
 The risk colours (green / amber / red) are **functional**: they always reflect the
 *risk* direction of a move, not just whether a number went up or down. A falling
@@ -82,8 +89,11 @@ app/
   page.tsx                      Client page: tabs, header, all section wiring
   globals.css                   Tailwind + dark/light theme tokens + safe-area
   api/
-    dashboard/route.ts          Live indicators (FRED + Yahoo) + reads the frozen snapshot
-    cron/editorial/route.ts     Scheduled daily editorial generation (CRON_SECRET-protected)
+    dashboard/route.ts          Live indicators (FRED + Yahoo) + Indian Metals (Yahoo, v5.14.0)
+                                 + reads the frozen snapshot
+    cron/editorial/route.ts     Scheduled daily editorial generation (CRON_SECRET-protected);
+                                 also best-effort builds+emails the Daily Risk Brief PDF after a
+                                 successful save — ON HOLD by default, see DAILY_BRIEF_ENABLED
     cron/weekly/route.ts        Scheduled weekly summary generation
     regenerate/route.ts         Manual on-demand editorial re-run
     research/analyze/route.ts   Research Workspace: analyze pasted text/URL
@@ -105,9 +115,21 @@ components/
                                  entry point), BankEarningsCompare.tsx (USD comparison charts),
                                  MizuhoQ1Earnings.tsx (07 single-bank USD deep-dive)
   research/, saved/, print/, shared/, ui.tsx
+  MarketsRiskThemes.tsx         Markets 04 — Emerging Risks & Implications, merged one card
+                                 per theme (replaces the old EmergingRisks.tsx/BankImplications.tsx)
+  IndianMetals.tsx              Markets 05 — gold/silver/copper/aluminium/uranium price cards,
+                                 reuses CroDashboard's exported Grid for the same visual format
 lib/
-  riskEngine.ts                 Composite score/status/brief from live deltas
+  riskEngine.ts                 Composite score/status/brief from live deltas; buildDevelopments()
+                                 shared by the live dashboard AND the Daily Risk Brief PDF
   overnight.ts                  Top-mover ranking + risk-direction colour logic
+  indianMetals.ts                Markets 05 data: Yahoo Finance quote() (no key) for gold/silver/
+                                 copper/aluminium/uranium futures + USD/INR, converted to the
+                                 units India's metal market quotes in
+  dailyBriefPdf.tsx              Daily Risk Brief PDF layout (@react-pdf/renderer, own styling
+                                 API — separate from the app's Tailwind styling, hand-matched)
+  dailyBriefEmail.ts             SMTP send via nodemailer, reusing the newsletter mailbox's
+                                 IMAP_EMAIL/IMAP_PASSWORD — fails soft, never throws
   intelligence.ts               The single theme engine (THEMES) — radar + CRO Conversation
                                  both draw from this one set
   snapshotEngine.ts / snapshotStore.ts   Daily editorial generation + freeze/read
@@ -689,6 +711,41 @@ earnings-data feed yet; update the file by hand (or wire a real provider) to ref
 
 ---
 
+## Version 5.9.0 — Mizuho Q1 Earnings (Settings → 07)
+
+New standalone **Mizuho Q1 Earnings** section in Settings (`07`, closed by default, purple
+accent) — a full-detail, USD-converted companion to the Mizuho card in `05 Bank Earnings`,
+built directly from the primary results deck ("Summary of Financial Results for the First
+Quarter of FY2026 (Under Japanese GAAP)", Jul 30, 2026) rather than compiled from news.
+
+- **Resolves the gap the 05 card flags.** That card's `riskWatch` explicitly notes this
+  quarter's CET1/credit-cost figures "were not cleanly confirmed from available sources" —
+  this section supplies the actual credit-related-cost (−$0.04B) and NPL-ratio (0.70%) figures
+  from the filing. CET1/capital ratio still isn't broken out in this particular release and is
+  left unstated rather than guessed.
+- **Static, one-off, not fetched.** Data lives in `lib/mizuhoQ1Earnings.ts` as typed constants —
+  same "curated snapshot, update by hand" posture as `lib/bankEarnings.ts`, but this one isn't
+  wired to the Refresh Earnings pipeline (single-quarter reference, not a recurring feed).
+- **Content:** headline P&L (What Changed), 6-year trajectory (NBP/expense ratio, profit/ROE),
+  full segment engine (RBC/CIBC/GCIBC/AMC/Markets — table + chart), a dedicated Mizuho Americas
+  deep-dive (regional loan book, deposit share, GCIBC non-interest income, U.S. securities
+  entities), balance sheet snapshot, asset quality (credit costs + NPL trend), and FY26 outlook
+  — each with a "Plain English" box in the same style as Bank Earnings cards.
+- **FX conversion is explicit and two-tier:** quarterly P&L and the Jun-2026 balance sheet use
+  the report's own disclosed spot rate (USD/JPY 162.45); the FY26 outlook uses Mizuho's own
+  planned FY26 rate (USD/JPY 150.00). Historical FY20–FY25 trajectory figures are shown at the
+  *current* spot rate throughout (not each year's actual rate) so the trend line reflects
+  business volume, not currency drift — noted inline wherever it applies.
+- **New files:** `lib/mizuhoQ1Earnings.ts` (data), `components/learn/MizuhoQ1Earnings.tsx`
+  (display — reuses the existing `Pill`/card/"Plain English" idiom from `BankEarnings.tsx`).
+  Charts are hand-drawn inline SVG, no new dependency — colors reference the theme CSS
+  variables directly (`style={{ stroke: "rgb(var(--stress))" }}`), the same pattern
+  `RiskGauge.tsx` already uses, so dark/light mode both work without extra handling.
+- Verified with `tsc --noEmit` and a full `next build` against the actual repo before
+  shipping — both compiled clean.
+
+---
+
 ## Version 5.10.0 — Compare Banks
 
 A **"📊 Compare Banks"** button at the top of 05 Bank Earnings opens a separate, chart-heavy
@@ -769,36 +826,245 @@ file gets an accurate map of the repo before writing any code:
 - Version-number examples in both docs updated to the actual current version rather than a
   stale example from several releases back.
 
-+## Version 5.9.0 — Mizuho Q1 Earnings (Settings → 07)
-+
-+New standalone **Mizuho Q1 Earnings** section in Settings (`07`, closed by default, purple
-+accent) — a full-detail, USD-converted companion to the Mizuho card in `05 Bank Earnings`,
-+built directly from the primary results deck ("Summary of Financial Results for the First
-+Quarter of FY2026 (Under Japanese GAAP)", Jul 30, 2026) rather than compiled from news.
-+
-+- **Resolves the gap the 05 card flags.** That card's `riskWatch` explicitly notes this
-+  quarter's CET1/credit-cost figures "were not cleanly confirmed from available sources" —
-+  this section supplies the actual credit-related-cost (−$0.04B) and NPL-ratio (0.70%) figures
-+  from the filing. CET1/capital ratio still isn't broken out in this particular release and is
-+  left unstated rather than guessed.
-+- **Static, one-off, not fetched.** Data lives in `lib/mizuhoQ1Earnings.ts` as typed constants —
-+  same "curated snapshot, update by hand" posture as `lib/bankEarnings.ts`, but this one isn't
-+  wired to the Refresh Earnings pipeline (single-quarter reference, not a recurring feed).
-+- **Content:** headline P&L (What Changed), 6-year trajectory (NBP/expense ratio, profit/ROE),
-+  full segment engine (RBC/CIBC/GCIBC/AMC/Markets — table + chart), a dedicated Mizuho Americas
-+  deep-dive (regional loan book, deposit share, GCIBC non-interest income, U.S. securities
-+  entities), balance sheet snapshot, asset quality (credit costs + NPL trend), and FY26 outlook
-+  — each with a "Plain English" box in the same style as Bank Earnings cards.
-+- **FX conversion is explicit and two-tier:** quarterly P&L and the Jun-2026 balance sheet use
-+  the report's own disclosed spot rate (USD/JPY 162.45); the FY26 outlook uses Mizuho's own
-+  planned FY26 rate (USD/JPY 150.00). Historical FY20–FY25 trajectory figures are shown at the
-+  *current* spot rate throughout (not each year's actual rate) so the trend line reflects
-+  business volume, not currency drift — noted inline wherever it applies.
-+- **New files:** `lib/mizuhoQ1Earnings.ts` (data), `components/learn/MizuhoQ1Earnings.tsx`
-+  (display — reuses the existing `Pill`/card/"Plain English" idiom from `BankEarnings.tsx`).
-+  Charts are hand-drawn inline SVG, no new dependency — colors reference the theme CSS
-+  variables directly (`style={{ stroke: "rgb(var(--stress))" }}`), the same pattern
-+  `RiskGauge.tsx` already uses, so dark/light mode both work without extra handling.
-+- Verified with `tsc --noEmit` and a full `next build` against the actual repo before
-+  shipping — both compiled clean.
+*(This entry originally shipped with a duplicated, diff-marker-corrupted copy of the 5.9.0
+section pasted after it, out of chronological order — fixed in the 5.14.2 documentation pass;
+5.9.0's actual content now sits in its correct place above, between 5.8.0 and 5.10.0.)*
+
+---
+
+## Version 5.10.3 — Bank Earnings refresh, made diagnosable
+
+A real Refresh Earnings run reported "15 checked · 6 with news · 0 updated" with no way to tell
+whether the model genuinely couldn't confirm a newer quarter from thin news snippets, or a real
+extraction came back but failed validation for a bank that clearly did report (DBS). Root cause:
+the extraction prompt told the model to **omit** any bank it couldn't confirm from its results
+entirely — so even when the model formed a reason, it was never captured. Fixed by requiring
+every qualified bank back either way (`hasNewQuarter: boolean` + a short `notConfirmedNote` when
+false), and giving the "returned true but failed schema validation" path its own explicit reason
+instead of a silent drop. Both reasons now show up as a secondary line under the run row in
+Generation History.
+
+---
+
+## Version 5.10.4 — Responsive iPad/macOS shell + iOS safe-area fix
+
+- **Responsive shell.** Despite being "mobile-first," the app had been fixed at 560px width on
+  *every* viewport — phone, iPad, or a full-width macOS Safari window — since the beginning, with
+  zero responsive Tailwind classes (`md:`/`lg:`/`xl:`) anywhere in the codebase. Now widens
+  progressively at standard breakpoints (`max-w-app md:max-w-2xl lg:max-w-4xl xl:max-w-5xl`),
+  applied consistently to the main content area, the fixed bottom nav, and the Concept Library
+  full-screen overlay.
+- **iOS bottom-nav gap fix.** The fixed tab bar and the scrollable content below it had been
+  sharing one `.safe-bottom` CSS class, which stacked an extra 1.5rem of padding on top of the
+  home-indicator inset the nav already gets from `env(safe-area-inset-bottom)` — a visibly
+  oversized gap below the tab labels on notched iPhones in standalone/add-to-homescreen mode.
+  Split into `.safe-bottom-nav` (inset only) and `.safe-bottom-content` (inset + just enough to
+  clear the nav's own rendered height).
+
+---
+
+## Version 5.10.5 – 5.10.8 — App identity: four rounds to a text-only header
+
+- **5.10.5**: new app icon from a supplied "glow on black" source image.
+- **5.10.6**: made the *header* logo theme-adaptive (transparent) while keeping the app icon
+  itself black-background; the source image's own alpha channel turned out to be genuinely
+  corrupted on inspection (pixels of identical visible brightness randomly reading fully
+  transparent or nearly opaque right next to each other), so this round used reconstructed
+  transparency rather than the source file's own alpha data.
+- **5.10.7**: replaced the blurry glow-based mark with a sharper globe+R+chart logo from a
+  different supplied SVG source.
+- **5.10.8**: per explicit request, **removed the header logo entirely** — the header is now
+  just the "Risk Intelligence" title text, no icon — and the app was renamed from "Global Risk
+  Dashboard"/"Risk Dashboard" to **Risk Intelligence**. `public/icons/logo-header.png` deleted
+  (no other consumer). This is a deliberate visual-cleanup decision; don't reintroduce a header
+  logo without checking first.
+
+---
+
+## Version 5.11.0 — Research: plain-English summary + Original text + Share export (v1)
+
+- **Two new fields on every analysis**: a collapsible "Simple explanation" (plain-English what-
+  happened + mechanics, reusing fields the analysis engine already produced) and "Original text"
+  (the full pasted/fetched/transcribed source content, previously discarded after analysis —
+  now persisted verbatim on `SavedItem.originalText`). Both collapsed by default in the live UI,
+  always fully expanded in print/PDF exports.
+- **Export choice: Full vs. Share.** Full is the existing always-everything export (Mizuho
+  framing, risk lens, category/severity — for internal reference). Share is new and deliberately
+  minimal — title/date/source, Simple explanation, Original text, nothing else — for sending an
+  interesting read to someone outside the bank without exposing Mizuho-specific analysis.
+- Shipped as a toggle on the print page itself, defaulting to Full — turned out to be a real UX
+  miss, fixed the next release (5.11.1).
+
+---
+
+## Version 5.11.1 — Fix the export choice + bring Learn to parity
+
+- **The Full/Share choice moved to the point of export**, not after landing on the print page:
+  both the Research result card and the Learn saved-item action row now show two explicit links
+  (`/print/item?id=…&mode=full` and `&mode=share`) instead of a same-page toggle nobody was
+  actually seeing. A default that silently wins whenever a control goes unnoticed is
+  indistinguishable from that control not existing — worth remembering for any future two-choice
+  feature in this app.
+- **Learn tab brought up to Research's format.** The new Simple-explanation/Original-text
+  sections had only landed in the live Research result view — a re-opened Saved Analysis in
+  Learn didn't show them. Fixed by extracting the shared `CollapsibleNote` component out of
+  `ResearchWorkspace.tsx` and reusing it identically in `SavedList.tsx`, so the two surfaces
+  can't drift apart the way they briefly did here.
+
+---
+
+## Version 5.11.2 — Export polish: layout, URL dedup, PDF headers
+
+- Simple-explanation label no longer wraps onto two lines at phone width (dropped a
+  parenthetical hint that was pushing it over).
+- Original Text no longer duplicates the source URL when pasted content starts with it (very
+  common with iOS share-sheet pastes) — stripped at display time only; the stored text stays a
+  verbatim, untouched copy.
+- Read/Export Full/Export Share compacted onto one line at phone width.
+- PDF section headers (Simple Explanation, Original Text, What Happened, etc.) made bolder/more
+  prominent.
+- PDF footer simplified to "Prepared by Rohit Kohli" plus a short paywall/re-sharing caveat,
+  replacing the live-app's data-provider credits line (meaningless on a single-article export).
+
+---
+
+## Version 5.11.3 — Share PDF visual redesign + a non-fix worth documenting
+
+- **The reported "vercel.com footer"** turned out to be the *browser's own* print header/footer
+  (URL + date + "Page X of Y"), not anything this app renders — confirmed by checking there's no
+  `@page` rule anywhere in the codebase and the app's own footer text never includes a URL. Not
+  fixable from app code; it's a "Headers and footers" toggle in the browser's print dialog.
+- **Share mode's actual visual problem** — flat and dry, unlikely to make anyone want to read a
+  forwarded PDF — got a real redesign: Simple Explanation is now a large colored card (the
+  dominant element), a nested "Mechanics" box sits inside it, and Original Article Text
+  deliberately recedes below in muted styling (reference material, not the main event). Chrome/
+  Safari print dialogs default "Background graphics" off, which silently drops colored
+  backgrounds — fixed with `print-color-adjust: exact` (+ `-webkit-` prefix).
+
+---
+
+## Version 5.11.4 — Share PDF sized for how it's actually read
+
+These PDFs are opened on a phone, almost always fit-to-page-width — which shrinks a print-point
+font size much more than the same PDF looks reviewing at laptop width. Share mode's type scale
+went up meaningfully across the board (body copy in the Simple Explanation card to 19px,
+Original Article Text body to 16px — was 12px, the smallest thing on the page despite usually
+being the longest block anyone reads). `PrintItemFull` untouched — still sized for its own job
+as a compact internal reference document, not phone reading.
+
+---
+
+## Version 5.11.5 — New "RisK Intel" app icon (final)
+
+Replaces all four 5.10.5–5.10.8 icon attempts. Sourced from a supplied combined icon+wordmark
+image (glyph over a "RisK Intel" wordmark on a pre-rounded white card) — none of that is usable
+as-is for an OS icon (text illegible at icon sizes, a pre-baked rounded corner would double up
+against the OS's own corner-mask), so the glyph alone was cropped out (row-density scan to find
+the gap between glyph and text), re-padded onto a fresh plain white square, and only that square
+gets OS-mask-rounded. White background is deliberate — this mark's dark-navy/red glyph needs a
+light backdrop, a reversal of the earlier "black by default" call which was specific to that
+*previous* asset's own light-on-dark styling.
+
+---
+
+## Version 5.12.0 — Markets tab merge + a source-name display bug fixed everywhere
+
+- **"Top Emerging Risks" and "Implications for a Global Bank" merged** into one section,
+  `Emerging Risks & Implications` — they always covered the exact same 5 themes (a documented
+  1:1 link), so reading them meant cross-referencing the same theme name in two separately-
+  scrolled lists. Now one card per theme: the risk read up top, its five bank-implication lenses
+  underneath. This section also got its first-ever Learning-view translation (plain-English
+  twins for both the risk notes and all five implication areas).
+- **Source-name bug, fixed at both write and read time.** When the optional manual source-name
+  field was left blank for a URL-mode Research analysis, the raw URL landed verbatim in the
+  saved item's source field — showing as an unbroken URL string in the Share PDF's source pill
+  and the equivalent line elsewhere, instead of a friendly name like "CNBC". The in-app source
+  *chip* never had this bug (it already derived a friendly name); that logic was extracted to a
+  shared `siteNameFromUrl()` helper and applied both where new items are saved (fixes new saves)
+  and everywhere a source is displayed (rescues already-saved items whose stored data has the
+  old raw-URL value baked in).
+
+---
+
+## Version 5.13.0 — Daily Risk Brief email
+
+After the daily cron generates the snapshot, it can now best-effort build a PDF covering the
+entire Home tab (Daily Risk Brief, What Changed, Top Developments, CRO Conversation, Editorial
+Intelligence, Japan & Asia Watch, Also on the Radar) and email it to one recipient, from the
+same mailbox the newsletter-ingestion job already fetches from (no new credentials).
+
+- **PDF engine: `@react-pdf/renderer`, not headless Chromium** — a deliberate trade-off (put to
+  an explicit approve-first question before building) to avoid a ~50MB Chromium dependency and a
+  browser-launch step inside a serverless cron function. The PDF layout lives in its own file
+  (`lib/dailyBriefPdf.tsx`) using react-pdf's own styling API, hand-matched to the app's light-
+  theme color tokens rather than sharing Tailwind classes.
+- **Fails soft.** A PDF or email problem can never turn an already-successful snapshot save into
+  a failed cron run — errors are caught and logged, never thrown.
+- Manual "Regenerate" (Settings → Generation History) deliberately does **not** trigger this
+  email — only the actual scheduled cron does — so re-running editorial generation for testing
+  can't spam the recipient.
+
+---
+
+## Version 5.13.1 — Daily Risk Brief: add the "Go deeper" layer + Radar hyperlinks
+
+The first version matched a card's default-open state only (the nested lenses/signals/
+questions/talking-points were left out, to keep the email shorter) — reverted after explicit
+feedback that the omission wasn't wanted. The PDF now renders the full "Go deeper" layer, always
+fully expanded, for both CRO Conversation and Japan & Asia Watch. "Also on the Radar" items also
+now hyperlink to their source article when a URL exists, matching the in-app radar chip.
+
+---
+
+## Version 5.13.2 — Daily Risk Brief put on hold
+
+Explicit request to pause the feature — built, verified sending real emails, but not needed
+right now — while keeping the option to test it again before deciding whether to delete it.
+Gated behind one env var: `DAILY_BRIEF_ENABLED` must be exactly `"true"` to send; unset (the
+default) short-circuits before touching the PDF or email at all. Daily snapshot generation is
+completely unaffected either way. See `CLAUDE.md` for exactly what to remove if this is ever
+confirmed as permanently unwanted.
+
+---
+
+## Version 5.14.0 — Markets tab: Indian Market — Metals
+
+New section (Markets 05) showing gold, silver, and copper prices in the same card/grid format
+as the Key CRO Dashboard's Market Indicators. There's no free/no-key Indian commodity-exchange
+(MCX) feed available, so this converts the international COMEX benchmark (already fetched via
+the same no-key Yahoo Finance source the rest of the app's market data uses) to INR at the live
+USD/INR rate, in the units India's metal market actually quotes in (gold ₹/10g, silver & copper
+₹/kg) — tracking the same benchmark MCX is set off of, but not the literal domestic print (real
+prices run higher once import duty, GST, and dealer premium are added — said plainly in the
+section's own copy).
+
+---
+
+## Version 5.14.1 — Card-overflow fix + aluminium/uranium added
+
+Six-figure INR values (gold/silver, ₹100,000+) were overflowing past the card's own rounded
+border in the 2-column grid — the shared indicator card packed the value, a fixed-width
+sparkline, and the trend arrow onto one unwrapped line, sized fine for shorter US-market values
+but not six-digit rupee figures. Fixed generically in the shared card component (benefits every
+section reusing it, not just this one): a value that doesn't fit now drops the sparkline/arrow
+group to its own line instead of spilling outside the card.
+
+Also added **aluminium** (reliable daily data, same treatment as copper) and **uranium** — the
+latter with its own, stronger caveat: India has no open retail/commodity market for uranium at
+all (government-controlled), so its row reads "(global, ₹/kg equiv.)" rather than "(India, …)",
+and the only working data ticker is thin enough that its sparkline is legitimately absent most
+days. **Tin was requested too but has no working free ticker** (LME-only, no COMEX/CME
+contract) — left out rather than faked; would need a paid metals-data provider to add for real.
+
+---
+
+## Version 5.14.2 — Documentation pass (no code changes)
+
+`CLAUDE.md`, this README, and the `documents/` reference pair (`engineering-reference` +
+`risk-dashboard-master-context`) were twelve release-lines behind (v5.10.3–v5.14.1 undocumented
+outside CLAUDE.md's inline history, and the `documents/` pair specifically was still pinned at
+v5.10.2). Brought current, plus one real bug fixed along the way: this README's own "Version
+5.9.0" section had been duplicated and appended out of chronological order with literal `+`
+diff-marker artifacts left in from a botched patch apply — moved to its correct place between
+5.8.0 and 5.10.0, artifacts stripped.
 
