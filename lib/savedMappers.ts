@@ -6,7 +6,7 @@
 // Learning view is on, so mapping from a resolved object would lose the executive
 // original — always pass the raw item from `data.intelligence`.
 
-import type { CroTheme, EditorialCard, JapanAsiaWatch, ResearchAnalysis } from "./types";
+import type { CroTheme, EditorialCard, JapanAsiaWatch, ResearchAnalysis, StockHealthAssessment } from "./types";
 import type { SavedItem } from "./savedStore";
 import { siteNameFromUrl } from "./format";
 
@@ -53,6 +53,36 @@ export function savedFromAnalysis(a: ResearchAnalysis): SavedItem {
       keyTakeaway: a.keyTakeaway,
       whatToUnderstand: a.whatToUnderstand,
     },
+  };
+}
+
+const RATING_LABEL: Record<StockHealthAssessment["overall"]["rating"], string> = {
+  attractive: "Attractive",
+  reasonable: "Reasonable",
+  caution: "Caution",
+  highRisk: "High Risk",
+};
+
+/** V5.15 — Stock Health assessment → SavedItem. Kept as one nested `stockHealth` blob (see
+ *  SavedItem's own comment) rather than flattened — its shape (a metrics table + positives/
+ *  risks/investigate lists) doesn't map onto the prose fields the rest of SavedItem is built
+ *  around, so this mapper only fills those with light, render-safe defaults; the live/saved
+ *  card content actually comes from `stockHealth` (rendered by StockHealthCard). */
+export function savedFromStockHealth(s: StockHealthAssessment): SavedItem {
+  const name = s.companyName || s.ticker || "Stock";
+  return {
+    id: `stockhealth-${s.analyzedISO}`,
+    kind: "stockHealth",
+    title: `${name} — Stock Health${s.ticker && s.companyName ? ` (${s.ticker})` : ""}`,
+    interpretation: `Overall: ${RATING_LABEL[s.overall.rating]}. ${s.overall.valuation}`,
+    bankingImpact: "",
+    whyMizuho: [],
+    sources: s.sourceLabel || "Screenshot",
+    savedAtISO: "",
+    sourceType: "image",
+    sourceLabel: s.sourceLabel,
+    analysisDateISO: s.analyzedISO,
+    stockHealth: s,
   };
 }
 

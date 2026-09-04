@@ -15,7 +15,7 @@
 // so Learn can reproduce the piece with a working Learning toggle.
 
 import { getSupabase, supabaseAvailable } from "./supabase";
-import type { BankingImpactArea, FocusItem } from "./types";
+import type { BankingImpactArea, FocusItem, StockHealthAssessment } from "./types";
 
 /** Deeper "Go deeper" content captured for full-piece recall (V4.1a). Each field has an optional layman twin. */
 export interface SavedDetail {
@@ -40,7 +40,7 @@ export interface SavedDetail {
 
 export interface SavedItem {
   id: string; // stable id from the source item (topicId/editorial id/"japan"/analysis id)
-  kind: "theme" | "editorial" | "japan" | "analysis";
+  kind: "theme" | "editorial" | "japan" | "analysis" | "stockHealth";
   title: string;
   category?: string; // V5.2 — for future filtering (briefing packs: Credit Risk, Japan Macro, ...)
   severity?: string;  // V5.2 — ditto
@@ -73,6 +73,10 @@ export interface SavedItem {
     whyMizuho?: string[];
   };
   detail?: SavedDetail;
+  /** V5.15 — Stock Health mode (Research, image-only). One nested typed blob rather than
+   *  flattened fields, since its shape (a metrics table + positives/risks/investigate lists)
+   *  doesn't map onto the prose fields the rest of SavedItem is built around. */
+  stockHealth?: StockHealthAssessment;
 }
 
 const SCHEMA = "risk_dashboard"; // isolated from other tools sharing this Supabase project

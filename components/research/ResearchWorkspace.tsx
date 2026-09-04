@@ -2,10 +2,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { ResearchAnalysis, FocusItem, BloombergDigest, BloombergStory } from "@/lib/types";
+import type { ResearchAnalysis, FocusItem, BloombergDigest, BloombergStory, StockHealthAssessment } from "@/lib/types";
 import type { ImageInput } from "@/lib/llm";
 import type { SavedItem } from "@/lib/savedStore";
-import { savedFromAnalysis } from "@/lib/savedMappers";
+import { savedFromAnalysis, savedFromStockHealth } from "@/lib/savedMappers";
+import { StockHealthResultView } from "@/components/research/StockHealthCard";
 import { CONCEPTS } from "@/lib/concepts";
 import { MizuhoAlignmentBlock } from "@/components/intel/MizuhoAlignment";
 import { Card, SeverityPill, Chip } from "@/components/ui";
@@ -45,6 +46,10 @@ export function ResearchWorkspace({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<ResearchAnalysis | null>(null);
+  // V5.15 — Stock Health: a screenshot-only sub-mode of "image". Kept as a separate result
+  // state (not folded into `analysis`, whose shape is unrelated) — see StockHealthCard.tsx.
+  const [stockScreenshot, setStockScreenshot] = useState(false);
+  const [stockHealth, setStockHealth] = useState<StockHealthAssessment | null>(null);
   const [learning, setLearning] = useState(false);
   const [quota, setQuota] = useState<{ used: number; cap: number; remaining: number } | null>(null);
   const [bloombergDigests, setBloombergDigests] = useState<BloombergDigest[]>([]);
@@ -107,7 +112,36 @@ export function ResearchWorkspace({
     }
   }
 
+  // V5.15 — separate POST path for Stock Health (different endpoint, different result shape).
+  async function runAnalyzeStock() {
+    setLoading(true);
+    setError(null);
+    setStockHealth(null);
+    try {
+      const res = await fetch("/api/research/analyze-stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images, sourceLabel: sourceName.trim() || undefined }),
+      });
+      const j = await res.json();
+      if (j.quota) setQuota(j.quota);
+      if (!res.ok || !j.ok) {
+        setError(j.error || "Stock Health analysis failed. Please try again.");
+        return;
+      }
+      setStockHealth(j.assessment as StockHealthAssessment);
+    } catch {
+      setError("Couldn't reach the analyzer. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function analyze() {
+    if (mode === "image" && stockScreenshot) {
+      await runAnalyzeStock();
+      return;
+    }
     const sourceLabel = sourceName.trim() || undefined;
     const payload =
       mode === "url"
@@ -151,6 +185,7 @@ export function ResearchWorkspace({
 
   function reset() {
     setAnalysis(null);
+    setStockHealth(null);
     setError(null);
     setText("");
     setUrl("");
@@ -162,12 +197,13 @@ export function ResearchWorkspace({
 
   const savedItem: SavedItem | null = analysis ? savedFromAnalysis(analysis) : null;
   const isSaved = savedItem ? Boolean(savedIds?.has(savedItem.id)) : false;
+  const stockSavedItem: SavedItem | null = stockHealth ? savedFromStockHealth(stockHealth) : null;
 
   const show = (exec: string, lay?: string) => (learning && lay ? lay : exec);
 
   return (
     <section className="rise space-y-3">
-      {!analysis ? (
+      {!analysis && !stockHealth ? (
         <>
           <BloombergPanel
             digests={bloombergDigests}
@@ -249,6 +285,23 @@ export function ResearchWorkspace({
                   ? `${images.length} image${images.length > 1 ? "s" : ""} added · tap to add more (up to 4)`
                   : "Tap to add screenshots (up to 4) — photo, library, or paste a clipping"}
               </label>
+              {/* V5.15 — what kind of screenshot this is. Reuses the same upload UI/state above
+                  either way; only the submit route + result renderer differ (see analyze()). */}
+              {images.length ? (
+                <div className="flex gap-1.5">
+                  {([[false, "News / Article"], [true, "📊 Stock Statistics"]] as const).map(([v, label]) => (
+                    <button
+                      key={label}
+                      onClick={() => setStockScreenshot(v)}
+                      className={`flex-1 rounded-lg border px-2.5 py-1.5 text-2xs font-semibold transition ${
+                        stockScreenshot === v ? "border-steel/50 bg-steel/10 text-steel" : "border-line bg-ink-800 text-fg-faint"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {images.length ? (
                 <div className="flex flex-wrap gap-2">
                   {images.map((img, i) => (
@@ -271,8 +324,9 @@ export function ResearchWorkspace({
                 </div>
               ) : null}
               <p className="text-[10px] leading-relaxed text-fg-faint">
-                The image is read for its visible text and run through the same analysis. Long articles can span
-                several screenshots.
+                {stockScreenshot
+                  ? "Extracts every metric visible in the screenshot and builds a benchmarked Stock Health assessment."
+                  : "The image is read for its visible text and run through the same analysis. Long articles can span several screenshots."}
               </p>
             </div>
           )}
@@ -305,7 +359,9 @@ export function ResearchWorkspace({
                     active={loading}
                     estimateSeconds={mode === "image" ? 34 : 24}
                     stages={
-                      mode === "image"
+                      mode === "image" && stockScreenshot
+                        ? ["Reading the screenshot…", "Extracting metrics…", "Benchmarking against typical ranges…", "Building the assessment…"]
+                        : mode === "image"
                         ? ["Reading the image…", "Interpreting through the CRO lens…", "Aligning to Mizuho Top Risks…", "Checking the Mizuho repository…"]
                         : undefined
                     }
@@ -320,10 +376,14 @@ export function ResearchWorkspace({
                 >
                   {loading
                     ? mode === "image"
-                      ? "Reading & analyzing…"
+                      ? stockScreenshot
+                        ? "Reading & extracting…"
+                        : "Reading & analyzing…"
                       : "Analyzing…"
                     : capped
                     ? "Paused until tomorrow"
+                    : mode === "image" && stockScreenshot
+                    ? "Analyze Stock Health"
                     : "Analyze"}
                 </button>
               </>
@@ -338,7 +398,7 @@ export function ResearchWorkspace({
             </>
           ) : null}
         </>
-      ) : (
+      ) : analysis ? (
         <>
           {/* ── Result header + view toggle ── */}
           <div className="flex items-center justify-between gap-2">
@@ -543,7 +603,15 @@ export function ResearchWorkspace({
             )
           ) : null}
         </>
-      )}
+      ) : stockHealth && stockSavedItem ? (
+        <StockHealthResultView
+          assessment={stockHealth}
+          savedItem={stockSavedItem}
+          onToggleSave={onToggleSave}
+          savedIds={savedIds}
+          onReset={reset}
+        />
+      ) : null}
     </section>
   );
 }
