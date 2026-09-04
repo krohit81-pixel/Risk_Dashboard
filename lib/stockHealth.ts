@@ -48,7 +48,9 @@ function isValidResult(r: any): r is LlmStockHealthResult {
         ["High", "Medium", "Low"].includes(m.relevance) &&
         ASSESSMENTS.includes(m.assessment) &&
         typeof m?.assessmentWhy === "string" &&
-        typeof m?.caveat === "string"
+        typeof m?.caveat === "string" &&
+        typeof m?.updateFrequency === "string" &&
+        m.updateFrequency
     )
   )
     return false;
@@ -96,6 +98,7 @@ function explainInvalid(r: any): string {
     if (!ASSESSMENTS.includes(m.assessment)) return `metrics[${i}] (${m?.label}) bad assessment ${JSON.stringify(m.assessment)}`;
     if (typeof m?.assessmentWhy !== "string") return `metrics[${i}] (${m?.label}) missing assessmentWhy`;
     if (typeof m?.caveat !== "string") return `metrics[${i}] (${m?.label}) missing caveat`;
+    if (typeof m?.updateFrequency !== "string" || !m.updateFrequency) return `metrics[${i}] (${m?.label}) missing updateFrequency`;
   }
   if (!Array.isArray(r.keyPositives) || !r.keyPositives.every((x: any) => typeof x === "string"))
     return "keyPositives was not a string array";
@@ -129,7 +132,7 @@ function slug(label: string, i: number): string {
  */
 export async function analyzeStockHealth(images: ImageInput[], sourceLabel?: string): Promise<StockHealthAssessment> {
   const extracted = await extractStockMetrics(images);
-  if (!extracted.data || !extracted.data.length) {
+  if (!extracted.data || !extracted.data.metrics.length) {
     throw new Error(
       extracted.reason === "no_key"
         ? "Stock Health needs GEMINI_API_KEY configured — not available right now."
@@ -137,7 +140,8 @@ export async function analyzeStockHealth(images: ImageInput[], sourceLabel?: str
     );
   }
 
-  const raw: RawStockMetric[] = extracted.data;
+  const raw: RawStockMetric[] = extracted.data.metrics;
+  const extractedTitle = extracted.data.title; // ticker/company header text, if any was visible
   const rawList = raw.map((m) => `- ${m.label}: ${m.value}`).join("\n");
 
   const system =
@@ -150,13 +154,13 @@ export async function analyzeStockHealth(images: ImageInput[], sourceLabel?: str
     "market heuristic instead of guessing a sector. This is a screening/educational assessment only, not " +
     "investment advice. JSON only.";
 
-  const user = `Extracted metrics (verbatim from a stock summary screenshot):
+  const user = `Extracted metrics (verbatim from a stock summary screenshot)${extractedTitle ? `, header text "${extractedTitle}"` : ""}:
 ${rawList}
 
 Return ONE JSON object (no prose outside it):
 {
-  "ticker": "<ticker if identifiable from a label, else empty string>",
-  "companyName": "<company name if identifiable, else empty string>",
+  "ticker": "<ticker if identifiable${extractedTitle ? ` — the header text above is "${extractedTitle}", use it if it looks like a ticker` : ""}, else empty string>",
+  "companyName": "<company name if identifiable${extractedTitle ? ` (the header text above may be a company name instead of a ticker)` : ""}, else empty string>",
   "sectorBasis": "sector" | "broad-market",
   "metrics": [
     {
@@ -171,7 +175,8 @@ Return ONE JSON object (no prose outside it):
       "assessmentWhy": "<one sentence: why this assessment, in THIS company's likely context>",
       "benchmarkRange": "<an indicative typical/benchmark range, if meaningful for this metric>",
       "caveat": "<when this metric can mislead or needs more context>",
-      "checkNext": "<only for caution/negative rows: the single most useful thing to check next>"
+      "checkNext": "<only for caution/negative rows: the single most useful thing to check next>",
+      "updateFrequency": "<how often this metric's underlying value actually changes — a short phrase like \"Daily\", \"Real-time (intraday)\", \"Quarterly (with earnings)\", \"Annual\", \"As of last declared dividend\", \"Event-based (scheduled date)\">"
     }
   ],
   "keyPositives": ["<3-5 most important positive signals>"],
@@ -210,8 +215,12 @@ Return ONE JSON object (no prose outside it):
     throw new Error("Couldn't produce a reliable assessment from that screenshot. Try again, or a clearer image.");
   }
 
+  // V5.16 — the interpretation call sometimes leaves ticker/companyName blank even when the
+  // screenshot's own header clearly had one (that header text isn't part of the metrics list
+  // this call actually sees) — fall back to what extraction found directly, so the name at the
+  // top of the assessment doesn't go missing just because the second call didn't echo it.
   return {
-    ticker: data.ticker || undefined,
+    ticker: data.ticker || extractedTitle || undefined,
     companyName: data.companyName || undefined,
     sectorBasis: data.sectorBasis,
     metrics: data.metrics.map((m, i) => ({ ...m, id: m.id || slug(m.label, i) })) as StockMetric[],

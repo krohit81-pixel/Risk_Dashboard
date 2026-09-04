@@ -519,6 +519,30 @@ and then repeated here. Fixed in two parts:
    fence-strip/extraction recovery in `lib/llm.ts` is the same philosophy applied one layer up
    (recover instead of reject), worth reusing again anywhere a new grounded-JSON field is added.
 
+**v5.16.0 — name/date at the top, per-metric update cadence.**
+- **Ticker/company name + "as of" date now render at the top of every Stock Health view**
+  (`StockHealthCard.tsx` itself, not its wrappers — so it's identical across the live Research
+  result, a re-opened saved item, and the print/PDF export). "As of" is `analyzedISO` — when the
+  screenshot was analyzed, not a live market timestamp, since the screenshot itself carries no
+  visible data-freshness marker; said that way rather than implying real-time.
+- **Name reliability fix**: the interpretation call often left `ticker`/`companyName` blank even
+  when the screenshot's own page header clearly had one (e.g. "8411:JP") — because that header
+  text isn't part of the Key Statistics table the interpretation call actually sees, only the
+  extraction call sees the full image. Fixed by having `extractStockMetrics()` (`lib/llm.ts`)
+  also report a `title` field (any ticker/company text visible ANYWHERE in the screenshot, not
+  just inside the stats table) alongside the metrics, which `analyzeStockHealth()`
+  (`lib/stockHealth.ts`) now falls back to whenever the interpretation call's own ticker/
+  companyName comes back empty.
+- **New `StockMetric.updateFrequency` field** (required, free text — "Daily", "Quarterly (with
+  earnings)", "Real-time (intraday)", "As of last declared dividend", etc.; not a fixed enum,
+  since the right cadence varies too much by metric type for a small closed set) — shown as an
+  "Updates: …" line inside each metric's tap-to-expand detail (`StockHealthCard.tsx`) and folded
+  into the per-row explanation text in the PDF export (`PrintItem.tsx`'s `MetricsTable`).
+- Verified end-to-end against production, not just locally: redeployed, re-ran the user's actual
+  8411:JP screenshot through the live endpoint via curl, confirmed `ticker` now resolves to
+  "8411:JP" and every metric carries a sensible `updateFrequency` (e.g. P/E "Daily", EPS
+  "Quarterly (with earnings)") before shipping the change as final.
+
 ## Style conventions to match
 
 - Tailwind only, via CSS-variable-backed theme colors (`bg-ink-800`, `text-fg-muted`, `text-steel`,

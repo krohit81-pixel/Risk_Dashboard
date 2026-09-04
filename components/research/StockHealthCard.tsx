@@ -24,6 +24,12 @@ const SECTION_ORDER: Exclude<MetricCategory, "other">[] = [
   "shareholderReturns",
 ];
 
+function fmt(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
 const RATING: Record<StockHealthAssessment["overall"]["rating"], { label: string; style: string }> = {
   attractive: { label: "Attractive", style: "border-calm/30 bg-calm/10 text-calm" },
   reasonable: { label: "Reasonable", style: "border-steel/30 bg-steel/10 text-steel" },
@@ -57,6 +63,7 @@ function MetricRow({ m }: { m: StockMetric }) {
           {m.benchmarkRange ? (
             <p className="text-[11px] text-fg-faint">Typical range: {m.benchmarkRange}</p>
           ) : null}
+          <p className="text-[11px] text-fg-faint">Updates: {m.updateFrequency}</p>
           <p className="text-[11px] italic text-fg-faint">{m.caveat}</p>
           {m.checkNext ? (
             <p className="text-[12px] leading-relaxed text-fg-muted">
@@ -88,9 +95,18 @@ function Section({ title, rows }: { title: string; rows: StockMetric[] }) {
 export function StockHealthCard({ assessment: a }: { assessment: StockHealthAssessment }) {
   const byCategory = (cat: MetricCategory) => a.metrics.filter((m) => m.category === cat);
   const rating = RATING[a.overall.rating];
+  const name = a.companyName || a.ticker;
 
   return (
     <div>
+      {/* V5.16 — name + "as of" date at the top. The screenshot itself carries no visible data-
+          freshness timestamp, so "as of" is when this screenshot was analyzed, not necessarily
+          the live market moment — said explicitly rather than implying a real-time quote. */}
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        {name ? <h3 className="text-[15px] font-semibold leading-snug text-fg">{name}{a.ticker && a.companyName ? ` (${a.ticker})` : ""}</h3> : <span />}
+        <span className="shrink-0 text-2xs text-fg-faint">As of {fmt(a.analyzedISO)}</span>
+      </div>
+
       {/* Overall Risk Signal — the prominent top-of-page band the user asked for. */}
       <div className={`rounded-xl border px-3.5 py-3 ${rating.style}`}>
         <p className="text-2xs font-semibold uppercase tracking-wide opacity-80">Overall Stock Health</p>
@@ -194,7 +210,6 @@ export function StockHealthResultView({
   onReset: () => void;
 }) {
   const isSaved = Boolean(savedIds?.has(savedItem.id));
-  const name = assessment.companyName || assessment.ticker;
 
   return (
     <>
@@ -203,8 +218,9 @@ export function StockHealthResultView({
         <span className="text-2xs text-fg-faint">From screenshot</span>
       </div>
 
+      {/* Name + "as of" date render inside StockHealthCard itself (V5.16), so it's identical
+          here, in a re-opened saved item, and (separately) in the PDF export. */}
       <div className="mt-1.5 rounded-xl border border-line bg-ink-800 px-4 py-3.5">
-        {name ? <h3 className="text-[15px] font-semibold leading-snug text-fg">{name}</h3> : null}
         <StockHealthCard assessment={assessment} />
       </div>
 
