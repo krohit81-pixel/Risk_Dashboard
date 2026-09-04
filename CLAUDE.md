@@ -495,6 +495,30 @@ component in that file. **Full and Share render identically for this feature** �
 Research analysis, there's no Mizuho/risk-lens content to strip for an external audience, so the
 usual Full-vs-Share split doesn't apply here.
 
+**v5.15.1 — real bug, hit in production on first real use.** A live extraction on an actual
+stock screenshot (8411:JP — Mizuho itself, as it happens) failed validation with "extraction
+was malformed" — the initial `explainInvalid()` only checked a handful of top-level fields and
+fell through to that generic message for anything else, which is exactly the "always capture
+why, not just that it happened" gap CLAUDE.md already flagged once for `bankEarningsRefresh.ts`
+and then repeated here. Fixed in two parts:
+1. **Diagnosability**: `explainInvalid()` now mirrors `isValidResult()`'s checks field-by-field
+   (including which `metrics[i]` row and label failed), so a future failure is diagnosable from
+   the server log line alone rather than needing a temporary debugging pass.
+2. **The actual bug, found via that improved logging**: the interpretation call's JSON output
+   put a purely-numeric-looking value (`15.59`) as a JSON **number** rather than a string, even
+   though the prompt asked for a string — because this call re-writes `value` fresh from the raw
+   extracted pairs rather than passing the original string through untouched, and a model
+   producing new JSON will often type a numeric-looking field as a number regardless of the
+   schema hint. `extractStockMetrics()` (`lib/llm.ts`, step 1) had the identical latent bug in
+   its own filter. Both now coerce `string | number → string` rather than rejecting the metric
+   outright — the value was perfectly good, only its JSON type was "wrong." **General lesson for
+   any future LLM-JSON field that looks numeric**: validate leniently (accept and coerce) rather
+   than strictly (reject on JSON-type mismatch) — a model asked for `"value": "<string>"` will
+   still sometimes emit a bare number for something that reads as a number, and rejecting good
+   data over its JSON type instead of its content is the wrong failure mode. `parseLlmJson`'s own
+   fence-strip/extraction recovery in `lib/llm.ts` is the same philosophy applied one layer up
+   (recover instead of reject), worth reusing again anywhere a new grounded-JSON field is added.
+
 ## Style conventions to match
 
 - Tailwind only, via CSS-variable-backed theme colors (`bg-ink-800`, `text-fg-muted`, `text-steel`,

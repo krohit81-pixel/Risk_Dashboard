@@ -221,11 +221,17 @@ export async function extractStockMetrics(
   try {
     const json: { candidates?: { content?: { parts?: { text?: string }[] } }[] } = await res.json();
     const text = (json?.candidates?.[0]?.content?.parts ?? []).map((p) => p?.text ?? "").join("\n");
-    const { data } = parseLlmJson<{ metrics?: RawStockMetric[] }>(text);
+    const { data } = parseLlmJson<{ metrics?: { label?: unknown; value?: unknown }[] }>(text);
     const metrics = Array.isArray(data?.metrics) ? data!.metrics : null;
-    const clean = metrics?.filter(
-      (m): m is RawStockMetric => typeof m?.label === "string" && typeof m?.value === "string" && m.label.trim().length > 0
-    );
+    // V5.15.1 — a purely-numeric-looking value ("15.59") is often emitted as a JSON number
+    // rather than a string despite the prompt asking for a string, since it's fresh model
+    // output, not a literal pass-through of the source string. Coerce rather than reject —
+    // rejecting a real metric over its JSON type instead of its content is the wrong failure
+    // mode. label stays string-only (a bare label surviving as a number would be a real
+    // extraction error, not a type quirk).
+    const clean = metrics
+      ?.filter((m) => typeof m?.label === "string" && (m.label as string).trim().length > 0 && (typeof m?.value === "string" || typeof m?.value === "number"))
+      .map((m): RawStockMetric => ({ label: m.label as string, value: String(m.value) }));
     console.log(`[stockhealth] extracted ${clean?.length ?? 0} raw metrics from ${images.length} image(s)`);
     return clean && clean.length
       ? { data: clean, provider: "gemini", reason: "ok" }
