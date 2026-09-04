@@ -170,6 +170,13 @@ export interface RawStockMetric {
   value: string;
 }
 
+/** V5.16 — extraction result: the metrics table plus whatever ticker/company header text (if
+ *  any) was visible ANYWHERE in the screenshot, not just inside the metrics table itself. */
+export interface StockScreenshotExtraction {
+  title?: string; // e.g. "8411:JP", "HCP:IN", or a company name — empty if none was visible
+  metrics: RawStockMetric[];
+}
+
 /**
  * V5.15 — Stock Health mode (Research, image-only). Sibling to extractFromImage, but asks
  * Gemini for structured JSON directly (single vision call) rather than a verbatim transcript —
@@ -179,14 +186,17 @@ export interface RawStockMetric {
  */
 export async function extractStockMetrics(
   images: ImageInput[]
-): Promise<{ data: RawStockMetric[] | null; provider: "gemini" | "none"; reason: LlmReason }> {
+): Promise<{ data: StockScreenshotExtraction | null; provider: "gemini" | "none"; reason: LlmReason }> {
   if (!process.env.GEMINI_API_KEY) return { data: null, provider: "none", reason: "no_key" };
   if (!images.length) return { data: null, provider: "none", reason: "exception" };
 
   const instruction =
     "Extract every identifiable financial/valuation metric and its value from this stock " +
-    'summary screenshot. Return ONLY a JSON object: {"metrics":[{"label":"...","value":"..."}]}. ' +
-    "Rules: use the exact label and number shown (preserve units, %, $, commas, decimals) — do " +
+    'summary screenshot. Return ONLY a JSON object: {"title":"...","metrics":[{"label":"...","value":"..."}]}. ' +
+    '"title" is the stock\'s ticker and/or company name if visible ANYWHERE in the screenshot ' +
+    '(e.g. a page header like "8411:JP" or "HCP:IN", or a company name near the top) — even if ' +
+    "it's not part of the statistics table itself. Empty string if none is visible. " +
+    "For metrics: use the exact label and number shown (preserve units, %, $, commas, decimals) — do " +
     'not invent, estimate, or round anything not visible. If a value is present but illegible, ' +
     'set value to "Unclear". Do not include a metric that is not shown in the image. Preserve ' +
     "the order the metrics appear in. Output JSON only, no commentary.";
@@ -221,7 +231,7 @@ export async function extractStockMetrics(
   try {
     const json: { candidates?: { content?: { parts?: { text?: string }[] } }[] } = await res.json();
     const text = (json?.candidates?.[0]?.content?.parts ?? []).map((p) => p?.text ?? "").join("\n");
-    const { data } = parseLlmJson<{ metrics?: { label?: unknown; value?: unknown }[] }>(text);
+    const { data } = parseLlmJson<{ title?: unknown; metrics?: { label?: unknown; value?: unknown }[] }>(text);
     const metrics = Array.isArray(data?.metrics) ? data!.metrics : null;
     // V5.15.1 — a purely-numeric-looking value ("15.59") is often emitted as a JSON number
     // rather than a string despite the prompt asking for a string, since it's fresh model
@@ -232,9 +242,10 @@ export async function extractStockMetrics(
     const clean = metrics
       ?.filter((m) => typeof m?.label === "string" && (m.label as string).trim().length > 0 && (typeof m?.value === "string" || typeof m?.value === "number"))
       .map((m): RawStockMetric => ({ label: m.label as string, value: String(m.value) }));
-    console.log(`[stockhealth] extracted ${clean?.length ?? 0} raw metrics from ${images.length} image(s)`);
+    const title = typeof data?.title === "string" ? data.title.trim() : "";
+    console.log(`[stockhealth] extracted ${clean?.length ?? 0} raw metrics (title=${title ? JSON.stringify(title) : "none"}) from ${images.length} image(s)`);
     return clean && clean.length
-      ? { data: clean, provider: "gemini", reason: "ok" }
+      ? { data: { title: title || undefined, metrics: clean }, provider: "gemini", reason: "ok" }
       : { data: null, provider: "none", reason: "invalid_json" };
   } catch {
     return { data: null, provider: "none", reason: "exception" };

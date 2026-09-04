@@ -375,6 +375,10 @@ export interface StockMetric {
   benchmarkRange?: string; // sector-aware if possible, else a labeled broad-market heuristic
   caveat: string;
   checkNext?: string; // "what should I check next" — populated for caution/negative rows
+  /** V5.16 — how often this metric's underlying value actually changes, e.g. "Daily",
+   *  "Quarterly (with earnings)", "Real-time (intraday)", "As of last declared dividend" —
+   *  free text since the right cadence varies a lot by metric, not a fixed enum. */
+  updateFrequency: string;
 }
 
 export interface StockHealthAssessment {

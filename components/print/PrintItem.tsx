@@ -410,6 +410,7 @@ function MetricsTable({ title, rows }: { title: string; rows: StockMetric[] }) {
             <span className="font-semibold text-neutral-700">{m.label} — </span>
             {m.meaning} {m.whyItCares} <span className="italic">{m.caveat}</span>
             {m.checkNext ? <span> Check next: {m.checkNext}</span> : null}
+            <span className="text-neutral-400"> · Updates: {m.updateFrequency}</span>
           </p>
         ))}
       </div>
