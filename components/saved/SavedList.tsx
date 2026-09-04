@@ -4,6 +4,7 @@
 import { useState } from "react";
 import type { SavedItem } from "@/lib/savedStore";
 import { FocusBlock, CollapsibleNote } from "@/components/research/ResearchWorkspace";
+import { StockHealthCard } from "@/components/research/StockHealthCard";
 import { MizuhoLensBlock } from "@/components/intel/MizuhoLensBlock";
 import { stripLeadingUrl, siteNameFromUrl } from "@/lib/format";
 
@@ -12,6 +13,7 @@ const KIND_LABEL: Record<SavedItem["kind"], string> = {
   editorial: "Editorial",
   japan: "Japan & Asia",
   analysis: "Research",
+  stockHealth: "Stock Health",
 };
 
 // V4.6 — color-code saved cards by kind (and, for Research, by source).
@@ -20,6 +22,7 @@ const KIND_COLOR: Record<SavedItem["kind"], string> = {
   editorial: "#5B8DEF", // Editorial — steel
   japan: "#F5A524", // Japan & Asia — amber
   analysis: "#2DD4A7", // Research — calm green
+  stockHealth: "#3B6FD1", // Stock Health — steel-blue (v5.15)
 };
 
 /** For a Research analysis, derive a short source label + its own accent color. */
@@ -221,6 +224,15 @@ function SavedCard({
             </a>
           </div>
 
+          {/* V5.15 — Stock Health renders via its own dedicated content component (the same
+              one the live Research result uses) rather than any of the prose blocks below,
+              which assume a very different shape. */}
+          {it.kind === "stockHealth" && it.stockHealth ? (
+            <div className="mt-2">
+              <StockHealthCard assessment={it.stockHealth} />
+            </div>
+          ) : (
+            <>
           {show(it.whatHappened, it.layman?.whatHappened) ? (
             <Line label="What happened">{show(it.whatHappened, it.layman?.whatHappened)}</Line>
           ) : null}
@@ -419,6 +431,8 @@ function SavedCard({
               Saved {fmt(it.savedAtISO)}
               {it.snapshotISO ? ` · from snapshot ${fmt(it.snapshotISO)}` : ""}
             </p>
+          )}
+            </>
           )}
         </>
       ) : null}

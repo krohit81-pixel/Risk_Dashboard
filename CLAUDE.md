@@ -449,6 +449,52 @@ tooltip, same guard shape as `ReactionPill`). Apply the same shape to any future
 repo that can silently accept-or-drop per-item: always capture *why* a drop happened, not just
 that it happened.
 
+### Research — Stock Health mode (v5.15.0)
+A screenshot-only sub-mode of Research's existing `image` mode, not a new tab or Settings
+section (a deliberate placement decision — see the plan this shipped from). Once an image is
+attached, a small toggle asks "What is this a screenshot of?" (News/Article vs. Stock
+Statistics); Stock Statistics routes the submit to a separate endpoint and result renderer
+rather than reusing `analyzeContent()`'s prose-editorial shape, which doesn't fit a benchmarked
+metrics table.
+
+**Pipeline (`lib/stockHealth.ts`, `analyzeStockHealth()`), two grounded calls, mirroring the
+existing image-analysis two-step shape:**
+1. `extractStockMetrics()` (`lib/llm.ts`) — a Gemini-vision call in JSON mode (sibling to
+   `extractFromImage`, which only does verbatim transcription) that extracts every visible
+   `{label, value}` pair verbatim — no interpretation happens here, and the model is told to use
+   `"Unclear"` for illegible values and never invent a metric not shown.
+2. A text-only `interpretWithProvider()` call (Gemini-first/Anthropic-fallback, same as every
+   other analysis in this app) takes ONLY the extracted pairs — never the image again — and
+   produces the full assessment: per-metric meaning/why-it-matters/assessment/benchmark/caveat,
+   category bucketing (`valuation | profitability | financialRisk | shareholderReturns | other`),
+   key positives/risks/things-to-investigate, and an overall rating.
+3. Validated with a `bankEarningsRefresh.ts`-style hand-rolled `isValidResult()`/`explainInvalid()`
+   pair before anything renders — this app never renders an LLM result it hasn't shape-checked.
+No curated/no-key fallback exists (there's no sensible static fallback for "an arbitrary
+user-supplied screenshot") — absent `GEMINI_API_KEY`, the mode returns a clear disabled-state
+error rather than fabricating data.
+
+**Display**: `components/research/StockHealthCard.tsx` — `StockHealthCard` (pure content: an
+Overall Risk Signal band, the four category sections as compact tap-to-expand tables, an "Other"
+bucket for anything uncategorized, then Key Positives/Risks/Things-to-Investigate/Data
+Limitations) is reused as-is by both the live Research result (`StockHealthResultView`, which
+adds the header + Save/Export chrome) and a re-opened saved item in `SavedList.tsx` — same
+one-content-component-two-wrappers pattern already established for `CollapsibleNote`. Tap-to-
+expand keeps a 15+ metric page scannable rather than dumping every explanation inline
+unconditionally. New `AssessmentPill` (`components/ui.tsx`) reuses `SeverityPill`'s exact color-
+token mapping (calm/steel/elevated/stress) for a different label set (positive/neutral/
+caution/negative) — no new colors invented.
+
+**Save/Export**: `SavedItem.kind` gained `"stockHealth"` and a nested `stockHealth?:
+StockHealthAssessment` field (`lib/savedStore.ts`) — one typed blob, not flattened, since the
+shape doesn't map onto the prose fields the rest of `SavedItem` is built around.
+`savedFromStockHealth()` (`lib/savedMappers.ts`) follows the same convention as the three
+existing mappers. `components/print/PrintItem.tsx` gained a `PrintStockHealth` branch (checked
+before the `mode` switch) with a real `<table>`-based `MetricsTable` — the first table-rendering
+component in that file. **Full and Share render identically for this feature** — unlike a
+Research analysis, there's no Mizuho/risk-lens content to strip for an external audience, so the
+usual Full-vs-Share split doesn't apply here.
+
 ## Style conventions to match
 
 - Tailwind only, via CSS-variable-backed theme colors (`bg-ink-800`, `text-fg-muted`, `text-steel`,

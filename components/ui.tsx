@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { Heat, Severity, Trend } from "@/lib/types";
+import type { Assessment, Heat, Severity, Trend } from "@/lib/types";
 
 /* ── Section header: eyebrow number + title, encodes section order ── */
 export function SectionHeader({
@@ -84,6 +84,29 @@ export function SeverityPill({ severity, dense = false }: { severity: Severity; 
       }`}
     >
       {severity}
+    </span>
+  );
+}
+
+// V5.15 — Stock Health's per-metric/overall verdict. Same color-token mapping SeverityPill
+// uses (calm/steel/elevated/stress), just a different label set (investment assessment,
+// not risk severity) — reuse the tokens, don't invent new colors.
+const ASSESSMENT_STYLE: Record<Assessment, { style: string; label: string }> = {
+  positive: { style: "bg-calm/10 text-calm border-calm/25", label: "Positive" },
+  neutral: { style: "bg-steel/10 text-steel border-steel/25", label: "Neutral" },
+  caution: { style: "bg-elevated/10 text-elevated border-elevated/25", label: "Caution" },
+  negative: { style: "bg-stress/10 text-stress border-stress/25", label: "Negative" },
+};
+
+export function AssessmentPill({ assessment, dense = false }: { assessment: Assessment; dense?: boolean }) {
+  const s = ASSESSMENT_STYLE[assessment];
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border font-semibold ${s.style} ${
+        dense ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-2xs"
+      }`}
+    >
+      {s.label}
     </span>
   );
 }

@@ -357,6 +357,48 @@ export interface ResearchAnalysis {
   originalText?: string;
 }
 
+/** V5.15 — "Stock Health" mode inside Research: extracted from a stock key-statistics
+ *  screenshot, grounded strictly on the values actually visible in the image. */
+export type MetricCategory = "valuation" | "profitability" | "financialRisk" | "shareholderReturns" | "other";
+export type Assessment = "positive" | "neutral" | "caution" | "negative";
+
+export interface StockMetric {
+  id: string; // slug
+  label: string; // as shown in the source, e.g. "Current P/E Ratio (TTM)"
+  value: string; // exact extracted value, unit preserved ("54.58", "0.36%")
+  category: MetricCategory;
+  meaning: string; // plain-English explanation
+  whyItCares: string; // why investors care
+  relevance: "High" | "Medium" | "Low";
+  assessment: Assessment;
+  assessmentWhy: string;
+  benchmarkRange?: string; // sector-aware if possible, else a labeled broad-market heuristic
+  caveat: string;
+  checkNext?: string; // "what should I check next" — populated for caution/negative rows
+}
+
+export interface StockHealthAssessment {
+  ticker?: string;
+  companyName?: string;
+  sectorBasis: "sector" | "broad-market"; // whether benchmarks used sector context or a general heuristic
+  metrics: StockMetric[];
+  keyPositives: string[];
+  keyRisks: { risk: string; checkNext: string }[];
+  thingsToInvestigate: { area: string; checkNext: string }[];
+  overall: {
+    rating: "attractive" | "reasonable" | "caution" | "highRisk";
+    valuation: string;
+    profitability: string;
+    financialStrength: string;
+    income: string;
+    redFlags?: string;
+  };
+  dataLimitations: string[]; // e.g. earnings growth, FCF, competitive position — not derivable from a stats screenshot
+  sourceLabel?: string;
+  analyzedISO: string;
+  provider?: string;
+}
+
 export interface ThemeLayman {
   title?: string;
   whyItMatters?: string;

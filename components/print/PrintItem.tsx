@@ -32,6 +32,7 @@
 // browser/OS side.
 
 import type { SavedItem } from "@/lib/savedStore";
+import type { MetricCategory, StockHealthAssessment, StockMetric } from "@/lib/types";
 import { stripLeadingUrl, siteNameFromUrl } from "@/lib/format";
 
 const LABEL_CLASS = "text-[11px] font-bold uppercase tracking-wide text-neutral-700";
@@ -334,6 +335,159 @@ function PrintItemFull({ item }: { item: SavedItem }) {
   );
 }
 
+// ── V5.15 — Stock Health print/export ──────────────────────────────────────────────────────
+// Unlike the rest of this file, Full and Share render THE SAME content here: there's no
+// Mizuho/risk-lens layer on a Stock Health assessment to strip for an external audience, so the
+// Full-vs-Share distinction that matters for a Research analysis doesn't apply. Both modes get
+// the complete benchmarked table (this is print/export — nothing hides behind a tap-to-expand
+// the way it does in the live app card).
+
+const ASSESSMENT_PRINT_STYLE: Record<StockMetric["assessment"], string> = {
+  positive: "border-green-300 bg-green-50 text-green-700",
+  neutral: "border-blue-300 bg-blue-50 text-blue-700",
+  caution: "border-amber-300 bg-amber-50 text-amber-700",
+  negative: "border-red-300 bg-red-50 text-red-700",
+};
+const ASSESSMENT_PRINT_LABEL: Record<StockMetric["assessment"], string> = {
+  positive: "Positive",
+  neutral: "Neutral",
+  caution: "Caution",
+  negative: "Negative",
+};
+
+const RATING_PRINT_STYLE: Record<StockHealthAssessment["overall"]["rating"], { label: string; style: string }> = {
+  attractive: { label: "Attractive", style: "border-green-300 bg-green-50 text-green-700" },
+  reasonable: { label: "Reasonable", style: "border-blue-300 bg-blue-50 text-blue-700" },
+  caution: { label: "Caution", style: "border-amber-300 bg-amber-50 text-amber-700" },
+  highRisk: { label: "High Risk", style: "border-red-300 bg-red-50 text-red-700" },
+};
+
+const CATEGORY_LABEL: Record<Exclude<MetricCategory, "other">, string> = {
+  valuation: "Valuation",
+  profitability: "Profitability",
+  financialRisk: "Financial Risk",
+  shareholderReturns: "Shareholder Returns",
+};
+const CATEGORY_ORDER: Exclude<MetricCategory, "other">[] = [
+  "valuation",
+  "profitability",
+  "financialRisk",
+  "shareholderReturns",
+];
+
+function MetricsTable({ title, rows }: { title: string; rows: StockMetric[] }) {
+  if (!rows.length) return null;
+  return (
+    <div className="mt-4 break-inside-avoid">
+      <p className={`mb-1.5 ${LABEL_CLASS}`}>{title}</p>
+      <table className="w-full border-collapse text-[12px]">
+        <thead>
+          <tr className="border-b border-neutral-300 text-left text-[10px] uppercase tracking-wide text-neutral-500">
+            <th className="py-1 pr-2 font-semibold">Metric</th>
+            <th className="py-1 pr-2 font-semibold">Value</th>
+            <th className="py-1 pr-2 font-semibold">Benchmark</th>
+            <th className="py-1 font-semibold">Signal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((m) => (
+            <tr key={m.id} className="border-b border-neutral-100 align-top">
+              <td className="py-1.5 pr-2 font-medium text-neutral-800">{m.label}</td>
+              <td className="tnum py-1.5 pr-2 font-semibold text-neutral-900">{m.value}</td>
+              <td className="py-1.5 pr-2 text-neutral-500">{m.benchmarkRange || "—"}</td>
+              <td className="py-1.5">
+                <span className={`inline-block rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${ASSESSMENT_PRINT_STYLE[m.assessment]}`}>
+                  {ASSESSMENT_PRINT_LABEL[m.assessment]}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="mt-1.5 space-y-1">
+        {rows.map((m) => (
+          <p key={m.id} className="text-[11px] leading-relaxed text-neutral-500">
+            <span className="font-semibold text-neutral-700">{m.label} — </span>
+            {m.meaning} {m.whyItCares} <span className="italic">{m.caveat}</span>
+            {m.checkNext ? <span> Check next: {m.checkNext}</span> : null}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PrintStockHealth({ item }: { item: SavedItem }) {
+  const a = item.stockHealth!;
+  const rating = RATING_PRINT_STYLE[a.overall.rating];
+  const byCategory = (cat: MetricCategory) => a.metrics.filter((m) => m.category === cat);
+  const name = a.companyName || a.ticker;
+
+  return (
+    <article className="mx-auto max-w-2xl px-6 py-10 print:px-0 print:py-0" style={FORCE_PRINT_COLORS}>
+      <header className="mb-6 border-b border-neutral-200 pb-4">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">📊 Stock Health</p>
+        <h1 className="text-[22px] font-bold leading-snug text-neutral-900">{name || item.title}</h1>
+        <p className="mt-1.5 text-[11px] text-neutral-500">
+          {item.analysisDateISO ? `Analyzed ${fmt(item.analysisDateISO)}` : ""}
+          {item.sourceLabel ? ` · ${item.sourceLabel}` : " · from screenshot"}
+        </p>
+      </header>
+
+      <div className={`break-inside-avoid rounded-lg border px-4 py-3 ${rating.style}`}>
+        <p className="text-[10px] font-bold uppercase tracking-wide opacity-80">Overall Stock Health</p>
+        <p className="text-[16px] font-bold">{rating.label}</p>
+        <div className="mt-1.5 space-y-0.5 text-[12px] leading-relaxed">
+          <p><span className="font-semibold">Valuation — </span>{a.overall.valuation}</p>
+          <p><span className="font-semibold">Profitability — </span>{a.overall.profitability}</p>
+          <p><span className="font-semibold">Financial strength — </span>{a.overall.financialStrength}</p>
+          <p><span className="font-semibold">Income — </span>{a.overall.income}</p>
+          {a.overall.redFlags ? <p><span className="font-semibold">Red flags — </span>{a.overall.redFlags}</p> : null}
+        </div>
+      </div>
+
+      {CATEGORY_ORDER.map((cat) => (
+        <MetricsTable key={cat} title={CATEGORY_LABEL[cat]} rows={byCategory(cat)} />
+      ))}
+      <MetricsTable title="Other" rows={byCategory("other")} />
+
+      {a.keyPositives.length ? (
+        <Section label="Key positives">
+          <BulletList items={a.keyPositives} />
+        </Section>
+      ) : null}
+
+      {a.keyRisks.length ? (
+        <Section label="Key risks / concerns">
+          <BulletList items={a.keyRisks.map((r) => `${r.risk} — check: ${r.checkNext}`)} />
+        </Section>
+      ) : null}
+
+      {a.thingsToInvestigate.length ? (
+        <Section label="Things to investigate">
+          <BulletList items={a.thingsToInvestigate.map((r) => `${r.area} — check: ${r.checkNext}`)} />
+        </Section>
+      ) : null}
+
+      {a.dataLimitations.length ? (
+        <Section label="Can't be determined from this screenshot">
+          <BulletList items={a.dataLimitations} />
+        </Section>
+      ) : null}
+
+      <p className="mt-5 text-[10px] leading-relaxed text-neutral-500">
+        Screening/educational assessment based only on the values in the screenshot provided — not a
+        recommendation to buy or sell, and not investment advice.
+      </p>
+
+      <footer className="mt-8 border-t border-neutral-200 pt-3">
+        <PrintFooterText />
+      </footer>
+    </article>
+  );
+}
+
 export function PrintItem({ item, mode = "full" }: { item: SavedItem; mode?: "full" | "share" }) {
+  if (item.kind === "stockHealth" && item.stockHealth) return <PrintStockHealth item={item} />;
   return mode === "share" ? <PrintItemShare item={item} /> : <PrintItemFull item={item} />;
 }

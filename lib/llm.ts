@@ -164,6 +164,77 @@ export async function extractFromImage(
   }
 }
 
+/** One extracted {label, value} row from a stock key-statistics screenshot — verbatim, no interpretation yet. */
+export interface RawStockMetric {
+  label: string;
+  value: string;
+}
+
+/**
+ * V5.15 — Stock Health mode (Research, image-only). Sibling to extractFromImage, but asks
+ * Gemini for structured JSON directly (single vision call) rather than a verbatim transcript —
+ * more reliable for exact numbers than transcribe-then-re-parse. Gemini-only, same rationale as
+ * extractFromImage. Strictly grounded: only report what's actually visible, "Unclear" for
+ * anything illegible, never invent a metric that isn't shown.
+ */
+export async function extractStockMetrics(
+  images: ImageInput[]
+): Promise<{ data: RawStockMetric[] | null; provider: "gemini" | "none"; reason: LlmReason }> {
+  if (!process.env.GEMINI_API_KEY) return { data: null, provider: "none", reason: "no_key" };
+  if (!images.length) return { data: null, provider: "none", reason: "exception" };
+
+  const instruction =
+    "Extract every identifiable financial/valuation metric and its value from this stock " +
+    'summary screenshot. Return ONLY a JSON object: {"metrics":[{"label":"...","value":"..."}]}. ' +
+    "Rules: use the exact label and number shown (preserve units, %, $, commas, decimals) — do " +
+    'not invent, estimate, or round anything not visible. If a value is present but illegible, ' +
+    'set value to "Unclear". Do not include a metric that is not shown in the image. Preserve ' +
+    "the order the metrics appear in. Output JSON only, no commentary.";
+
+  const parts: unknown[] = [{ text: instruction }];
+  for (const img of images.slice(0, 4)) {
+    parts.push({ inline_data: { mime_type: img.mimeType, data: img.data } });
+  }
+
+  const key = process.env.GEMINI_API_KEY!;
+  const { res, timedOut } = await fetchTimeout(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0,
+          maxOutputTokens: 8192,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+      cache: "no-store",
+    },
+    GEMINI_TIMEOUT
+  );
+
+  if (!res) return { data: null, provider: "none", reason: timedOut ? "timeout" : "http_error" };
+  if (!res.ok) return { data: null, provider: "none", reason: "http_error" };
+  try {
+    const json: { candidates?: { content?: { parts?: { text?: string }[] } }[] } = await res.json();
+    const text = (json?.candidates?.[0]?.content?.parts ?? []).map((p) => p?.text ?? "").join("\n");
+    const { data } = parseLlmJson<{ metrics?: RawStockMetric[] }>(text);
+    const metrics = Array.isArray(data?.metrics) ? data!.metrics : null;
+    const clean = metrics?.filter(
+      (m): m is RawStockMetric => typeof m?.label === "string" && typeof m?.value === "string" && m.label.trim().length > 0
+    );
+    console.log(`[stockhealth] extracted ${clean?.length ?? 0} raw metrics from ${images.length} image(s)`);
+    return clean && clean.length
+      ? { data: clean, provider: "gemini", reason: "ok" }
+      : { data: null, provider: "none", reason: "invalid_json" };
+  } catch {
+    return { data: null, provider: "none", reason: "exception" };
+  }
+}
+
 /**
  * Gemini first (free); Anthropic only as fallback. Every decision point emits an
  * explicit diagnostic so an unattended run reveals exactly why a provider was
