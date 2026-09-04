@@ -75,14 +75,46 @@ function isValidResult(r: any): r is LlmStockHealthResult {
   return true;
 }
 
+// V5.15.1 — mirrors isValidResult()'s checks exactly (was a partial subset that fell through
+// to a generic "extraction was malformed" for anything not explicitly listed — useless for
+// diagnosing a real failure, the exact gap CLAUDE.md's own "always capture why" lesson from
+// bankEarningsRefresh.ts warns against repeating). Every branch below is one specific,
+// actionable reason.
 function explainInvalid(r: any): string {
   if (!r || typeof r !== "object") return "model returned no result";
+  if (r.sectorBasis !== "sector" && r.sectorBasis !== "broad-market")
+    return `sectorBasis was ${JSON.stringify(r.sectorBasis)}, not "sector"/"broad-market"`;
   if (!Array.isArray(r.metrics) || !r.metrics.length) return "extraction had no metrics";
-  if (!r.overall || !RATINGS.includes(r.overall?.rating)) return "extraction had no valid overall rating";
-  if (!Array.isArray(r.keyPositives)) return "extraction had no key-positives list";
-  if (!Array.isArray(r.keyRisks)) return "extraction had no key-risks list";
-  if (!Array.isArray(r.dataLimitations)) return "extraction had no data-limitations list";
-  return "extraction was malformed";
+  for (let i = 0; i < r.metrics.length; i++) {
+    const m = r.metrics[i];
+    if (typeof m?.label !== "string" || !m.label) return `metrics[${i}] missing label`;
+    if (typeof m?.value !== "string" || !m.value) return `metrics[${i}] (${m?.label}) missing value`;
+    if (!CATEGORIES.includes(m.category)) return `metrics[${i}] (${m?.label}) bad category ${JSON.stringify(m.category)}`;
+    if (typeof m?.meaning !== "string" || !m.meaning) return `metrics[${i}] (${m?.label}) missing meaning`;
+    if (typeof m?.whyItCares !== "string") return `metrics[${i}] (${m?.label}) missing whyItCares`;
+    if (!["High", "Medium", "Low"].includes(m.relevance)) return `metrics[${i}] (${m?.label}) bad relevance ${JSON.stringify(m.relevance)}`;
+    if (!ASSESSMENTS.includes(m.assessment)) return `metrics[${i}] (${m?.label}) bad assessment ${JSON.stringify(m.assessment)}`;
+    if (typeof m?.assessmentWhy !== "string") return `metrics[${i}] (${m?.label}) missing assessmentWhy`;
+    if (typeof m?.caveat !== "string") return `metrics[${i}] (${m?.label}) missing caveat`;
+  }
+  if (!Array.isArray(r.keyPositives) || !r.keyPositives.every((x: any) => typeof x === "string"))
+    return "keyPositives was not a string array";
+  if (!Array.isArray(r.keyRisks) || !r.keyRisks.every((x: any) => typeof x?.risk === "string" && typeof x?.checkNext === "string"))
+    return "keyRisks was not a {risk,checkNext}[] array";
+  if (
+    !Array.isArray(r.thingsToInvestigate) ||
+    !r.thingsToInvestigate.every((x: any) => typeof x?.area === "string" && typeof x?.checkNext === "string")
+  )
+    return "thingsToInvestigate was not a {area,checkNext}[] array";
+  if (!r.overall || !RATINGS.includes(r.overall?.rating))
+    return `overall.rating was ${JSON.stringify(r.overall?.rating)}, not one of ${RATINGS.join("/")}`;
+  if (typeof r.overall.valuation !== "string") return "overall.valuation missing";
+  if (typeof r.overall.profitability !== "string") return "overall.profitability missing";
+  if (typeof r.overall.financialStrength !== "string") return "overall.financialStrength missing";
+  if (typeof r.overall.income !== "string") return "overall.income missing";
+  if (!Array.isArray(r.dataLimitations) || !r.dataLimitations.every((x: any) => typeof x === "string"))
+    return "dataLimitations was not a string array";
+  return "extraction was malformed (unreached check — isValidResult/explainInvalid have drifted)";
 }
 
 function slug(label: string, i: number): string {
@@ -130,7 +162,7 @@ Return ONE JSON object (no prose outside it):
     {
       "id": "<short slug, e.g. pe_ratio>",
       "label": "<the metric's label, copied from the input>",
-      "value": "<the metric's value, copied from the input verbatim>",
+      "value": "<the metric's value, copied from the input verbatim — ALWAYS as a JSON string, e.g. \"15.59\", even though it looks like a number>",
       "category": "valuation" | "profitability" | "financialRisk" | "shareholderReturns" | "other",
       "meaning": "<what this metric means, explained very simply>",
       "whyItCares": "<why an investor cares about this metric>",
@@ -160,6 +192,18 @@ Return ONE JSON object (no prose outside it):
 - JSON only.`;
 
   const { data, provider, reason } = await interpretWithProvider<LlmStockHealthResult>(system, user);
+
+  // V5.15.1 — a purely-numeric-looking value ("15.59") is often emitted as a JSON number by
+  // the model despite being asked for a string, since this call re-writes the value fresh
+  // rather than passing the source string through untouched (same failure mode fixed in
+  // extractStockMetrics() one step earlier). Coerce before validating rather than rejecting a
+  // real, usable metric over its JSON type instead of its content — hit in production: a real
+  // P/E value of 15.59 was rejected outright by the stricter string-only check this replaces.
+  if (data && Array.isArray((data as any).metrics)) {
+    for (const m of (data as any).metrics) {
+      if (m && typeof m.value === "number") m.value = String(m.value);
+    }
+  }
 
   if (!data || !isValidResult(data)) {
     console.log(`[stockhealth] interpretation invalid: ${data ? explainInvalid(data) : `no data (reason=${reason})`}`);
