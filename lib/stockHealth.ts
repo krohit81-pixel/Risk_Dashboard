@@ -219,8 +219,12 @@ Return ONE JSON object (no prose outside it):
   // screenshot's own header clearly had one (that header text isn't part of the metrics list
   // this call actually sees) — fall back to what extraction found directly, so the name at the
   // top of the assessment doesn't go missing just because the second call didn't echo it.
+  // V5.16.1 — a third, last-resort fallback: some screenshots genuinely don't show a ticker or
+  // company name anywhere (a tightly cropped stats table, an unusual layout) — for those,
+  // ResearchWorkspace.tsx's "Stock name or ticker" field (relabeled for this mode) lets the
+  // user supply it manually rather than the saved item forever showing a bare "Stock" name.
   return {
-    ticker: data.ticker || extractedTitle || undefined,
+    ticker: data.ticker || extractedTitle || sourceLabel || undefined,
     companyName: data.companyName || undefined,
     sectorBasis: data.sectorBasis,
     metrics: data.metrics.map((m, i) => ({ ...m, id: m.id || slug(m.label, i) })) as StockMetric[],

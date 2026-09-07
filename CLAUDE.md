@@ -543,6 +543,26 @@ and then repeated here. Fixed in two parts:
   "8411:JP" and every metric carries a sensible `updateFrequency` (e.g. P/E "Daily", EPS
   "Quarterly (with earnings)") before shipping the change as final.
 
+**v5.16.1 — a saved item can still legitimately have no name (both extraction steps come up
+empty on a tricky/cropped screenshot), and Learn's Saved list showed those as an indistinguishable
+bare "Stock — Stock Health" — reported after two such saves both looked identical there.** Two
+fixes, not a retrofix of the already-saved rows (their `stockHealth.ticker`/`companyName` are
+genuinely empty — there's no name hiding in already-persisted data to recover):
+1. **A third, manual fallback.** ResearchWorkspace.tsx's existing "Source name" text field
+   (already there for regular Research analyses, to label a share export) is relabeled to "Stock
+   name or ticker" when Stock Statistics mode is active, and now also flows into
+   `analyzeStockHealth()`'s ticker fallback chain (`data.ticker || extractedTitle ||
+   sourceLabel`) as the last resort — so a user who notices a screenshot has no visible
+   header/ticker can just type it in before analyzing, rather than the save being permanently
+   nameless.
+2. **Honest fallback wording for when even that's skipped.** `savedFromStockHealth()`
+   (`lib/savedMappers.ts`) no longer titles a nameless save literally "Stock" (indistinguishable
+   from any other nameless save) — falls back to `"Stock Health — <analysis date>"` instead, so
+   multiple such saves are at least tellable apart in the Learn list.
+Already-saved items from before this fix keep their old "Stock — Stock Health" title permanently
+(nothing to derive it from) — re-save with the manual field filled in if a real name is wanted
+for those specific ones.
+
 ## Style conventions to match
 
 - Tailwind only, via CSS-variable-backed theme colors (`bg-ink-800`, `text-fg-muted`, `text-steel`,
