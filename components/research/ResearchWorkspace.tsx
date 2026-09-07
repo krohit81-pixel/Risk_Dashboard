@@ -245,12 +245,19 @@ export function ResearchWorkspace({
           </div>
 
           {/* V5.11 — optional; mainly fills the gap for pasted text/images, which (unlike a
-              URL fetch) have no automatic source to show on a "share externally" export. */}
+              URL fetch) have no automatic source to show on a "share externally" export.
+              V5.16.1 — relabeled for Stock Statistics mode: doubles as a last-resort ticker/
+              name fallback (lib/stockHealth.ts) for a screenshot where neither extraction step
+              can find one, so a saved item never has to fall back to a bare "Stock" title. */}
           <input
             type="text"
             value={sourceName}
             onChange={(e) => setSourceName(e.target.value)}
-            placeholder="Source name (optional) — e.g. Financial Times, Bloomberg"
+            placeholder={
+              mode === "image" && stockScreenshot
+                ? "Stock name or ticker (optional) — helps if not visible in the screenshot"
+                : "Source name (optional) — e.g. Financial Times, Bloomberg"
+            }
             className="w-full rounded-xl border border-line bg-ink-800 px-3.5 py-2.5 text-[13px] text-fg placeholder:text-fg-faint focus:border-steel/50 focus:outline-none"
           />
 

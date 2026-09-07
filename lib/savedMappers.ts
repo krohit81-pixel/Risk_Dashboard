@@ -69,11 +69,19 @@ const RATING_LABEL: Record<StockHealthAssessment["overall"]["rating"], string> =
  *  around, so this mapper only fills those with light, render-safe defaults; the live/saved
  *  card content actually comes from `stockHealth` (rendered by StockHealthCard). */
 export function savedFromStockHealth(s: StockHealthAssessment): SavedItem {
-  const name = s.companyName || s.ticker || "Stock";
+  const name = s.companyName || s.ticker;
+  // V5.16.1 — a bare "Stock" title (when neither extraction step nor the manual "Stock name or
+  // ticker" field found one) made multiple such saves indistinguishable in the Learn list, all
+  // reading identically "Stock — Stock Health". Falls back to the analysis date instead, so
+  // they're at least tellable apart — a real, if rare, case now that the manual-entry fallback
+  // (ResearchWorkspace.tsx) exists to avoid it going forward.
+  const dateLabel = new Date(s.analyzedISO).toLocaleDateString(undefined, { day: "numeric", month: "short" });
   return {
     id: `stockhealth-${s.analyzedISO}`,
     kind: "stockHealth",
-    title: `${name} — Stock Health${s.ticker && s.companyName ? ` (${s.ticker})` : ""}`,
+    title: name
+      ? `${name} — Stock Health${s.ticker && s.companyName ? ` (${s.ticker})` : ""}`
+      : `Stock Health — ${dateLabel}`,
     interpretation: `Overall: ${RATING_LABEL[s.overall.rating]}. ${s.overall.valuation}`,
     bankingImpact: "",
     whyMizuho: [],
