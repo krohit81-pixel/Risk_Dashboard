@@ -7,7 +7,6 @@ import { relativeTime } from "@/lib/format";
 import { APP_VERSION } from "@/lib/version";
 import { MorningBrief } from "@/components/MorningBrief";
 import { TopDevelopments } from "@/components/TopDevelopments";
-import { WhatChanged } from "@/components/WhatChanged";
 import { MarketsRiskThemes } from "@/components/MarketsRiskThemes";
 import { RiskHeatMap } from "@/components/RiskHeatMap";
 import { CroDashboard } from "@/components/CroDashboard";
@@ -312,21 +311,22 @@ export default function Page() {
 
                 <CollapsibleSection id="whatchanged" n="01" title="What Changed" hint="biggest movers · risk-ranked" lockOpen>
                   <WhatChangedOvernight items={data.overnight} indicators={data.indicators} />
-                  <div className="mt-3">
-                    <CollapsibleSection id="allindicators" n="" title="Show all indicators" defaultOpen={false}>
-                      <WhatChanged indicators={data.indicators} />
-                    </CollapsibleSection>
-                  </div>
-                </CollapsibleSection>
-
-                <CollapsibleSection id="developments" n="02" title="Top Developments" hint="last 24–72h" defaultOpen>
-                  <TopDevelopments items={data.developments} />
                 </CollapsibleSection>
 
                 <StaleBanner meta={data.snapshotMeta} />
                 <SnapshotHeader meta={data.snapshotMeta} />
 
-                <CollapsibleSection id="conversation" n="03" title="Today's CRO Conversation" hint="ranked themes · tap Go deeper" lockOpen>
+                {/* V5.17 — Today's CRO Conversation and Editorial Intelligence merged into one
+                    section. They were never a topical split (not macro-vs-company, not
+                    US-vs-international) — per lib/snapshotEngine.ts's generation prompt, each
+                    day's story clusters each become EITHER a full theme OR a leaner editorial
+                    card, never both; editorial cards are explicit overflow, only generated when
+                    there are more qualifying clusters than themes that day. Same "today's
+                    coverage," just full-depth vs. supplementary-breadth for the same kind of
+                    story — so one header, with any editorial cards appended below a light
+                    divider rather than a second collapsible section (renders nothing extra on
+                    the (typical) days with zero editorial cards). */}
+                <CollapsibleSection id="conversation" n="02" title="Today's CRO Conversation" hint="ranked themes · tap Go deeper" lockOpen>
                   <CroConversation
                     themes={intel!.themes}
                     rawThemes={data.intelligence.themes}
@@ -337,16 +337,21 @@ export default function Page() {
                     onToggleSave={toggleSave}
                     snapshotISO={data.intelligence.generatedISO}
                   />
+                  {intel!.editorial?.length ? (
+                    <div className="mt-5">
+                      <p className="mb-2 text-2xs font-semibold uppercase tracking-widest text-fg-faint">
+                        Also today
+                      </p>
+                      <EditorialIntelligence cards={intel!.editorial} rawCards={data.intelligence.editorial} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
+                    </div>
+                  ) : null}
                 </CollapsibleSection>
 
-                <CollapsibleSection id="editorial" n="04" title="Editorial Intelligence" hint="other developments" defaultOpen={false}>
-                  <EditorialIntelligence cards={intel!.editorial} rawCards={data.intelligence.editorial} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
-                </CollapsibleSection>
-                <CollapsibleSection id="japanasia" n="05" title="Japan & Asia Watch" hint="daily narrative" defaultOpen={false}>
+                <CollapsibleSection id="japanasia" n="03" title="Japan & Asia Watch" hint="daily narrative" defaultOpen={false}>
                   <JapanAsiaWatchSection data={intel!.japanAsia} raw={data.intelligence.japanAsia} learning={learning} savedIds={savedIds} onToggleSave={toggleSave} snapshotISO={data.intelligence.generatedISO} />
                 </CollapsibleSection>
                 {intel!.radar?.length ? (
-                  <CollapsibleSection id="radar" n="06" title="Also on the Radar" hint="high-relevance near-misses" defaultOpen={false}>
+                  <CollapsibleSection id="radar" n="04" title="Also on the Radar" hint="high-relevance near-misses" defaultOpen={false}>
                     <RadarSection items={intel!.radar} />
                   </CollapsibleSection>
                 ) : null}
@@ -359,10 +364,18 @@ export default function Page() {
                 <CollapsibleSection id="crodash" n="01" title="Key CRO Dashboard" hint="live indicators" defaultOpen>
                   <CroDashboard indicators={data.indicators} />
                 </CollapsibleSection>
-                <CollapsibleSection id="japanwatch" n="02" title="Japan Watch" hint="carry & rates" defaultOpen>
+                {/* V5.17 — moved from Home: data/quant-flavored (live indicator deltas + 2
+                    curated risk items), same spirit as Emerging Risks & Implications below.
+                    New id, not the old Home "developments" id — see the CollapsibleSection id
+                    gotcha noted on riskthemes below. buildDevelopments() itself (lib/riskEngine.ts)
+                    and the Daily Risk Brief PDF call site are untouched by this move. */}
+                <CollapsibleSection id="topdevelopments" n="02" title="Top Developments" hint="last 24–72h" defaultOpen>
+                  <TopDevelopments items={data.developments} />
+                </CollapsibleSection>
+                <CollapsibleSection id="japanwatch" n="03" title="Japan Watch" hint="carry & rates" defaultOpen>
                   <JapanWatch indicators={data.japanWatch} />
                 </CollapsibleSection>
-                <CollapsibleSection id="heatmap" n="03" title="Global Risk Heat Map" hint="tap a region" defaultOpen>
+                <CollapsibleSection id="heatmap" n="04" title="Global Risk Heat Map" hint="tap a region" defaultOpen>
                   {data.weeklyRefreshedISO ? (
                     <p className="mb-2 rounded-lg border border-steel/25 bg-steel/5 px-3 py-1.5 text-2xs leading-relaxed text-steel">
                       Weekly view · heat map, emerging risks & implications refreshed{" "}
@@ -376,10 +389,10 @@ export default function Page() {
                     that always covered the same 5 themes 1:1. New id (neither of the old
                     ones) per the CollapsibleSection id gotcha — reusing either would carry
                     over that section's old open/closed state onto this different section. */}
-                <CollapsibleSection id="riskthemes" n="04" title="Emerging Risks & Implications" hint="CRO playbook" defaultOpen={false}>
+                <CollapsibleSection id="riskthemes" n="05" title="Emerging Risks & Implications" hint="CRO playbook" defaultOpen={false}>
                   <MarketsRiskThemes risks={emergingRisks} implications={implications} />
                 </CollapsibleSection>
-                <CollapsibleSection id="indianmetals" n="05" title="Indian Market — Metals" hint="gold, silver, copper, aluminium, uranium" defaultOpen={false}>
+                <CollapsibleSection id="indianmetals" n="06" title="Indian Market — Metals" hint="gold, silver, copper, aluminium, uranium" defaultOpen={false}>
                   <IndianMetals items={data.indianMetals} />
                 </CollapsibleSection>
               </>

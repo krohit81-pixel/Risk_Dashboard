@@ -340,6 +340,50 @@ local Executive/Learning toggle, matching the established pattern (`ResearchWork
 the header toggle, which per the Navigation structure note above deliberately doesn't reach
 Markets at all.
 
+### Home tab simplification + Markets absorbs data-heavy sections (v5.17.0)
+Home had grown to 6 top-level sections (one nesting a 7th) and felt dense. Explicit request to
+simplify, plus a direct question worth answering precisely rather than assuming: **why separate
+sections for Today's CRO Conversation and Editorial Intelligence — what's the difference in
+article type?**
+
+**Answer, read from `lib/snapshotEngine.ts`'s generation prompt, not assumed:** there isn't a
+topical/category split (not macro-vs-company, not US-vs-international). Each day's up-to-5
+story clusters each become **either** a full theme **or** a leaner editorial card, never both —
+one story, one treatment. Editorial cards are explicit overflow, only generated when there are
+more qualifying clusters than themes that day. Typical day: 3-5 CRO Conversation cards (always
+present, full "Go deeper" — lenses/signals/questions/talking-points, Mizuho alignment), 0-2
+Editorial cards (only on busier news days, leaner — first-order/second-order/key-takeaway, no
+Go-deeper). Same generation pass, same "today's coverage," just full-depth vs. supplementary-
+breadth for the same kind of story — no principled reason for a second section header.
+
+**What changed, all in `app/page.tsx` (no data/generation-logic changes at all):**
+- **Merged** — the standalone "Editorial Intelligence" `CollapsibleSection` is gone; any
+  editorial cards now render directly inside "Today's CRO Conversation," below a light "Also
+  today" divider, after the ranked theme cards. Renders nothing extra on the (typical) days with
+  zero editorial cards. Neither `CroConversation.tsx` nor `EditorialIntelligence.tsx` changed —
+  same props, same components, just re-wired to share one section.
+- **Removed from Home, not replaced** — the nested "Show all indicators" sub-section (16-of-18
+  indicators, plain tone-tile grid, `components/WhatChanged.tsx`) was a plainer duplicate of
+  content Markets' "Key CRO Dashboard" (`CroDashboard.tsx`) already covers in full (all 18,
+  across Market Indicators/Economic Releases/Japan Watch) with sparklines and trend arrows.
+  `components/WhatChanged.tsx` deleted outright — no other consumer. Home's "What Changed" is
+  now just the top-5-movers grid (`WhatChangedOvernight`), unchanged itself.
+- **Moved to Markets** — "Top Developments" (`components/TopDevelopments.tsx`, fed by
+  `lib/riskEngine.ts`'s `buildDevelopments`) is data/quant-flavored (live indicator deltas + 2
+  curated risk items), same spirit as "Emerging Risks & Implications" already there — now
+  Markets section 02, right after Key CRO Dashboard. New `CollapsibleSection` id
+  (`"topdevelopments"`, not the old Home `"developments"` id) per the established
+  `CollapsibleSection` id-relocation gotcha. `buildDevelopments()` itself and its other call site
+  (the on-hold Daily Risk Brief PDF, `app/api/cron/editorial/route.ts`) are completely
+  untouched — this was purely a UI-placement move.
+
+**Resulting Home**: Morning Brief (always visible) → 01 What Changed (movers only) → 02 Today's
+CRO Conversation (themes + any editorial cards) → 03 Japan & Asia Watch (collapsed, unchanged)
+→ 04 Also on the Radar (collapsed, unchanged, still conditional on `radar.length`).
+
+**Resulting Markets**: 01 Key CRO Dashboard → 02 Top Developments (new) → 03 Japan Watch → 04
+Global Risk Heat Map → 05 Emerging Risks & Implications → 06 Indian Market — Metals.
+
 ### Markets tab — Indian Market: Metals (v5.14.0)
 New section 05, `components/IndianMetals.tsx`, rendering gold/silver/copper in the exact same
 card/grid format as section 01's "Market Indicators" (`components/CroDashboard.tsx`'s `Grid`,
