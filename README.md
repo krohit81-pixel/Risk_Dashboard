@@ -54,7 +54,7 @@ curated content when its keys are absent.
 
 ---
 
-## What's on the screen (current, v5.14.2)
+## What's on the screen (current, v5.17.1)
 
 Bottom nav has four tabs; a fifth area (**Settings**) is reached via the hamburger button in
 the header, not the nav bar. The app is responsive (v5.10.4+) — full-width on phones, a wider
@@ -62,9 +62,9 @@ shell on iPad/macOS Safari at standard breakpoints.
 
 | Tab | Sections |
 |---|---|
-| **Home** | Executive/Learning toggle (sticky, in the header) · Daily Risk Brief (risk meter) · What Changed (top movers + "show all indicators", both as colour-tile grids) · Top Developments · Today's CRO Conversation · Editorial Intelligence · Japan & Asia Watch · Also on the Radar |
-| **Markets** | Key CRO Dashboard (live indicators) · Japan Watch · Global Risk Heat Map (tappable regions) · Emerging Risks & Implications (merged, one card per theme, v5.12.0) · **Indian Market — Metals** (gold/silver/copper/aluminium/uranium, global spot converted to live INR, v5.14.0) |
-| **Research** | Research Workspace — paste text or a URL, analyzed through the same CRO framework as the daily editorial; every result includes a collapsible "Simple explanation" + "Original text" pair (v5.11.0); save results to Learn |
+| **Home** | Executive/Learning toggle (sticky, in the header) · Daily Risk Brief (risk meter) · 01 What Changed (top-5 movers) · 02 Today's CRO Conversation (ranked themes; any overflow editorial cards appear below an "Also today" divider) · 03 Japan & Asia Watch (collapsed) · 04 Also on the Radar (collapsed) — simplified in v5.17.0 |
+| **Markets** | 01 Key CRO Dashboard (all 18 live indicators) · 02 Top Developments (moved from Home) · 03 Japan Watch · 04 Global Risk Heat Map · 05 Emerging Risks & Implications · 06 Indian Market — Metals |
+| **Research** | Research Workspace — paste text or a URL, analyzed through the same CRO framework as the daily editorial; every result includes a collapsible "Simple explanation" + "Original text" pair (v5.11.0); save results to Learn · **Image mode → "📊 Stock Statistics"** turns a stock key-statistics screenshot into a benchmarked Stock Health assessment (v5.15) |
 | **Learn** | Saved Analyses · Saved for Later (both with the same Simple-explanation/Original-text pair as Research, plus Export Full/Export Share PDF options) · Concept Library (Your Concepts + All Concepts, both collapsible, pinned items grouped to the top) · Weekly Summary |
 | **Settings** (hamburger) | 01 Appearance (dark/light) · 02 Briefing Books (print/PDF) · 03 Add Concept (paste → analyze → save; editing a saved concept opens here pre-filled) · 04 Mizuho Reference · 05 Bank Earnings (15-bank baseline+live-overlay, plain-English summaries, "📊 Compare Banks" USD charts screen) · 06 Generation History (Refresh / Regenerate / Refresh Earnings / Reset Earnings) · 07 Mizuho Q1 Earnings (single-bank USD deep-dive, hand-drawn charts) |
 
@@ -97,6 +97,7 @@ app/
     cron/weekly/route.ts        Scheduled weekly summary generation
     regenerate/route.ts         Manual on-demand editorial re-run
     research/analyze/route.ts   Research Workspace: analyze pasted text/URL
+    research/analyze-stock/route.ts  Stock Health: screenshot → StockHealthAssessment (needs GEMINI_API_KEY)
     concepts/, concepts/analyze/  User-added concept CRUD + AI-assisted drafting
     bank-earnings/route.ts      GET — merged Bank Earnings baseline + KV overlay
     bank-earnings/refresh/route.ts  POST refresh · GET status · DELETE reset-to-baseline
@@ -115,14 +116,16 @@ components/
                                  entry point), BankEarningsCompare.tsx (USD comparison charts),
                                  MizuhoQ1Earnings.tsx (07 single-bank USD deep-dive)
   research/, saved/, print/, shared/, ui.tsx
-  MarketsRiskThemes.tsx         Markets 04 — Emerging Risks & Implications, merged one card
+  MarketsRiskThemes.tsx         Markets 05 — Emerging Risks & Implications, merged one card
                                  per theme (replaces the old EmergingRisks.tsx/BankImplications.tsx)
-  IndianMetals.tsx              Markets 05 — gold/silver/copper/aluminium/uranium price cards,
+  IndianMetals.tsx              Markets 06 — gold/silver/copper/aluminium/uranium price cards,
                                  reuses CroDashboard's exported Grid for the same visual format
 lib/
   riskEngine.ts                 Composite score/status/brief from live deltas; buildDevelopments()
                                  shared by the live dashboard AND the Daily Risk Brief PDF
   overnight.ts                  Top-mover ranking + risk-direction colour logic
+  stockHealth.ts                 Stock Health pipeline: extractStockMetrics (llm.ts, Gemini vision) → grounded
+                                 interpretation → validated StockHealthAssessment. UI: research/StockHealthCard.tsx
   indianMetals.ts                Markets 05 data: Yahoo Finance quote() (no key) for gold/silver/
                                  copper/aluminium/uranium futures + USD/INR, converted to the
                                  units India's metal market quotes in
@@ -1068,3 +1071,48 @@ v5.10.2). Brought current, plus one real bug fixed along the way: this README's 
 diff-marker artifacts left in from a botched patch apply — moved to its correct place between
 5.8.0 and 5.10.0, artifacts stripped.
 
+---
+
+## Version 5.15.0 — Research: Stock Health mode
+
+Attach a screenshot of a stock's Key Statistics panel in Research → Image, choose **📊 Stock Statistics**,
+and get a structured assessment instead of a captioned screenshot: an Overall Risk Signal, then
+Valuation / Profitability / Financial Risk / Shareholder Returns as compact tap-to-expand tables
+(plain-English meaning, why investors care, typical range, caveat, what to check next), plus key
+positives / risks / things to investigate / what the screenshot can't tell you. Two grounded LLM calls
+(Gemini vision extracts the numbers verbatim; a second call interprets only those numbers), validated
+before rendering. Saves to Learn and exports to PDF (Full and Share are identical here). Needs
+`GEMINI_API_KEY`; educational screening, not advice. Built from an approved plan (`EnterPlanMode`).
+
+## Version 5.15.1 — Stock Health: fix real bug
+
+First real screenshot failed: the model returned a value like 15.59 as a JSON number, the validator
+insisted on a string. Now coerces number→string (both steps), and `explainInvalid()` reports the exact
+failing field. Found by reading production logs (`vercel logs`), not guessing.
+
+## Version 5.16.0 — Stock Health: name, as-of date, update frequency
+
+Stock name/ticker and an "As of <analysis date>" line at the top of every view; each metric's expanded
+detail says how often it updates (Daily, Quarterly, …). Ticker is now also read from the screenshot
+header (it sits outside the stats table), fixing blank names.
+
+## Version 5.16.1 — Stock Health: manual name fallback
+
+For screenshots with no visible header, the optional field above the uploader becomes "Stock name or
+ticker" and is used as the last-resort name; a nameless save is titled "Stock Health — <date>" instead
+of an indistinguishable "Stock". Earlier nameless saves can't be repaired.
+
+## Version 5.17.0 — Home simplified, Markets absorbs data-heavy sections
+
+Home is now: Morning Brief → What Changed (top-5 movers) → Today's CRO Conversation → Japan & Asia Watch →
+Also on the Radar. Editorial Intelligence merged into CRO Conversation (same generation pass — full-depth
+themes vs. overflow editorial cards, not different article types; editorial cards appear under "Also
+today"). The nested "Show all indicators" table was deleted (Markets already shows all 18). Top Developments
+moved to Markets (section 02). Presentation-only change.
+
+## Version 5.17.1 — Documentation pass (no code changes)
+
+`CLAUDE.md` now opens with a start-here map, working agreement with the owner, the ship pipeline, and
+carries hosting/env-var/backlog reference (incl. that Vercel Pro is not required). New
+`documents/engineering-reference-v5_17_1.md` + `risk-dashboard-master-context-v5_17_1.md` supersede the
+v5.14.2 pair. Note: `lib/dailyBriefPdf.tsx` (email currently on hold) still mirrors the pre-5.17.0 Home layout.
