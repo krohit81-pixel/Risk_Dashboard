@@ -9,6 +9,39 @@ personalized to Mizuho. Next.js 14 App Router, TypeScript, Tailwind, single clie
 (`app/page.tsx`) driving four tabs (Home / Markets / Research / Learn) plus a Settings panel
 reached from a header hamburger button. No test suite — see Verification below.
 
+**Starting a fresh session? Read this file top to bottom, then skim the two reference docs in
+`documents/` (currently `engineering-reference-v5_17_1.md` = file-by-file/technical map, env
+vars, gotchas, backlog; `risk-dashboard-master-context-v5_17_1.md` = product, principles, working
+relationship). `README.md` has the per-version changelog. Older `documents/*_v5_5_2` / `_v5_10_2`
+/ `_v5_14_2` pairs are superseded history — kept, not deleted. `documents/knowledge cards/` is
+source material for the Mizuho Knowledge Repository, unrelated to app docs.** Hosting/repo:
+GitHub `krohit81-pixel/Risk_Dashboard` (public) → Vercel project `global-risk-dashboard`, live at
+https://global-risk-dashboard.vercel.app.
+
+## Working agreement with the owner (Rohit)
+- Rohit architects and directs; he does not write code. **Recommend → approve → build**: for
+  anything large/invasive/ambiguous (new feature, restructuring, placement decisions), explore the
+  code first, propose a plan (EnterPlanMode + AskUserQuestion for genuine forks), get sign-off,
+  then build. Small, unambiguous fixes just get done.
+- **Diagnose before fixing** — state the root cause, verified against actual code/logs, not memory.
+  `vercel logs <url> --since 2h --query <term> -x` reads production function logs; that is how
+  the Stock Health bug was found. Claims like "is X static/dynamic" get checked in code.
+- Say plainly what was NOT verified (e.g. no local `GEMINI_API_KEY`, so live LLM paths can only be
+  checked against production after deploy; the browser-preview pane can't drive a native file
+  picker; `computer` clicks in that pane sometimes time out — use `javascript_tool` to click).
+- Honest labelling over polish: derived/approximate data says so in its own copy (Indian metals
+  aren't MCX prints; uranium has no Indian market; "as of" = analysis date, not a live quote).
+- Parked ≠ deleted: prefer a reversible env-var gate (Daily Risk Brief) over ripping code out.
+
+## Ship pipeline (used for every change-set)
+`git checkout -b <type>/<name>` → edit → `rm -rf .next && npx tsc --noEmit` → bump
+`lib/version.ts` + `package.json` (must match) → CLAUDE.md note if architecture/gotchas changed →
+commit (multi-paragraph message, trailer `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`)
+→ `git checkout main && git merge --no-ff <branch>` → `tsc` again → `git push origin main` →
+`git branch -d <branch>` → `vercel --prod --yes`. Never `git add` the untracked scratch files.
+Temporary verification routes must NOT start with `_` (Next.js private folders silently 404) —
+name them e.g. `app/testfoo/page.tsx` and delete before committing.
+
 ## Commands
 
 ```bash
@@ -27,7 +60,7 @@ data-fetching steps in a sandboxed/offline environment — prefer `tsc --noEmit`
 ## Versioning convention (do this on every change)
 
 The repo bumps a version on essentially every change-set, in two places kept in sync:
-- `lib/version.ts` → `APP_VERSION` (renders in the header — current: see that file, currently "5.10.2")
+- `lib/version.ts` → `APP_VERSION` (renders in the header — current: see that file; last documented release is 5.17.1, a docs-only bump)
 - `package.json` → `"version"` (must match `APP_VERSION` exactly — these have drifted before; double-check both when bumping)
 
 Follow semver-ish judgment: bug fixes / visual tweaks bump the patch (5.6.3 → 5.6.4), a
@@ -142,8 +175,8 @@ Single `tab` state: `"today" | "markets" | "research" | "learn" | "settings"`. T
 bar only lists the first four (labelled Home/Markets/Research/Learn); `"settings"` is reached
 only via the header's hamburger button and isn't in the nav bar — that's intentional, not a bug.
 Executive/Learning view toggle lives in the sticky header itself (not page content) so it's
-"fixed at the top," and only applies to Home-tab sections 03+ (CRO Conversation, Editorial
-Intelligence, Japan & Asia Watch) — the header toggle itself doesn't render outside Home at all.
+"fixed at the top," and only applies to the Home tab's editorial sections (CRO Conversation incl. its "Also today"
+editorial cards, Japan & Asia Watch) — the header toggle itself doesn't render outside Home at all.
 Markets/Research/Learn each own a **local** Executive/Learning toggle instead where they need
 one (`MarketsRiskThemes`, `ResearchWorkspace`, `SavedList`), independent of the header state.
 
@@ -606,6 +639,44 @@ genuinely empty — there's no name hiding in already-persisted data to recover)
 Already-saved items from before this fix keep their old "Stock — Stock Health" title permanently
 (nothing to derive it from) — re-save with the manual field filled in if a real name is wanted
 for those specific ones.
+
+### Hosting, crons and Vercel plan (verified Sep 2026)
+`vercel.json` crons (UTC): `/api/cron/editorial?slot=morning` `30 22 * * *` (04:00 IST — the ONLY
+editorial run; `slotForNow()`/"two slots/day" wording in `lib/snapshotStore.ts` and the route header
+is stale, no evening trigger exists), `/api/cron/weekly` `30 0 * * 6`, `/api/cron-bloomberg`
+`0 0 * * *` and `30 13 * * *`. `api/cron-bloomberg.py` has `maxDuration: 300`; editorial/weekly/
+regenerate/bank-earnings refresh routes declare 180s; research/briefing/migrate 60s; concepts 30s.
+**Vercel Pro is NOT required** for this app as of Sep 2026 (checked against Vercel's docs): with
+Fluid Compute Hobby's function limit is 300s default AND max (covers every route above); Hobby
+allows 100 crons/project but each expression may fire only once/day (all ours do) — the cost of
+Hobby is cron timing precision (±59 min window, not exact minute). Confirm Fluid Compute is
+enabled in Vercel → Settings → Functions if ever downgrading; personal/non-commercial use fits
+Hobby terms. Owner originally upgraded because old Hobby capped duration at 60s.
+
+### Environment variables (all optional; app degrades to sample/curated content without them)
+LLM: `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_TIMEOUT_MS`, `GEMINI_RETRY_MS`, `DISABLE_GEMINI`,
+`ANTHROPIC_API_KEY`, `ANTHROPIC_TIMEOUT_MS`, `LLM_MODEL`. Data: `FRED_API_KEY`, `FINNHUB_API_KEY`,
+`MARKETAUX_API_KEY`, `NEWSDATA_API_KEY`, `ALPHAVANTAGE_API_KEY` (Yahoo Finance needs none — also
+powers Indian Metals). Storage: `KV_REST_API_URL`/`KV_REST_API_TOKEN`, `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`. Security: `CRON_SECRET`, `MIGRATION_SECRET`. Behaviour:
+`RESEARCH_DAILY_CAP` (default 20; Stock Health shares this counter), `ONBOARDING_PHASE`. Mailbox
+(newsletter ingest + Daily Risk Brief sender): `IMAP_HOST`, `IMAP_EMAIL`/`AOL_EMAIL`,
+`IMAP_PASSWORD`/`AOL_APP_PASSWORD`, `INGEST_SENDERS`, `EXTRA_NEWSLETTERS`, `LOOKBACK_HOURS`.
+Daily Risk Brief: `DAILY_BRIEF_ENABLED` (must be exactly `true`), `DAILY_BRIEF_RECIPIENT_EMAIL`,
+`SMTP_HOST`, `SMTP_PORT`. **Stock Health requires `GEMINI_API_KEY`** (vision); no fallback.
+
+### Open items / backlog (as of v5.17.1)
+- Daily Risk Brief email: parked behind `DAILY_BRIEF_ENABLED`; owner to decide resume vs delete.
+  Its PDF (`lib/dailyBriefPdf.tsx`) still mirrors the OLD Home layout (Top Developments and
+  Editorial Intelligence as separate sections) — intentionally untouched by v5.17.0; align it if
+  the feature is resumed.
+- Stale "two slots/day" comments (see hosting note) — cosmetic cleanup offered, not done.
+- Tin has no free data path (Indian Metals); Mizuho Knowledge Repository lens still not in the
+  daily CRO Conversation; 2 curated Top Developments filler items still hardcoded; Concept
+  auto-link (`detectConcepts`) still curated-only; Compare Banks metrics not wired to the
+  Refresh Earnings overlay; the two Mizuho top-risk systems not reconciled.
+- Stock Health: two Learn saves from before v5.16.1 are titled "Stock — Stock Health" (no name
+  data exists to recover); live extraction quality only verifiable in production (no local key).
 
 ## Style conventions to match
 
