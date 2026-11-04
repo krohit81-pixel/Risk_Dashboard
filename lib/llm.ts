@@ -1,6 +1,6 @@
 // lib/llm.ts
-// Provider-agnostic, grounded LLM interpretation. Prefers Google Gemini (free
-// tier) when GEMINI_API_KEY is set; falls back to Anthropic if ANTHROPIC_API_KEY
+// Provider-agnostic, grounded LLM interpretation. Prefers Google Gemini
+// when GEMINI_API_KEY is set; falls back to Anthropic if ANTHROPIC_API_KEY
 // is set; otherwise returns null and the snapshot engine uses curated content.
 //
 // The model may ONLY interpret the stories it is given — it must not introduce
@@ -19,7 +19,8 @@ export function llmProvider(): "gemini" | "anthropic" | "none" {
 }
 
 const ANTHROPIC_MODEL = process.env.LLM_MODEL || "claude-haiku-4-5-20251001";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+// Shared env name/default with api/cron-bloomberg.py. Use a compatible Gemini 3 model.
+const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
 
 /** fetch with an abort timeout. Returns the Response, or null on timeout/error. */
 async function fetchTimeout(
@@ -111,7 +112,7 @@ export interface ImageInput {
 /**
  * V4.4 — transcribe visible text from screenshots via Gemini multimodal (step one of
  * the two-step Research image pipeline). Returns VERBATIM text only; the transcript is
- * then fed to the unchanged analyzeContent() pipeline. Deterministic (temp 0), Gemini-
+ * then fed to the unchanged analyzeContent() pipeline. Verbatim extraction, Gemini-
  * only (no Anthropic image fallback in v1 — Tier 1 reliability makes that unnecessary).
  */
 export async function extractFromImage(
@@ -140,7 +141,7 @@ export async function extractFromImage(
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
         contents: [{ role: "user", parts }],
-        generationConfig: { temperature: 0, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { maxOutputTokens: 8192, thinkingConfig: { thinkingLevel: "minimal" } },
       }),
       cache: "no-store",
     },
@@ -155,7 +156,7 @@ export async function extractFromImage(
       .map((p) => p?.text ?? "")
       .join("\n")
       .trim();
-    console.log(`[research] image transcription length=${text.length} images=${images.length}`);
+    console.log(`[research] image transcription model=${GEMINI_MODEL} length=${text.length} images=${images.length}`);
     return text
       ? { text, provider: "gemini", reason: "ok" }
       : { text: "", provider: "none", reason: "invalid_json" };
@@ -216,9 +217,8 @@ export async function extractStockMetrics(
         contents: [{ role: "user", parts }],
         generationConfig: {
           responseMimeType: "application/json",
-          temperature: 0,
           maxOutputTokens: 8192,
-          thinkingConfig: { thinkingBudget: 0 },
+          thinkingConfig: { thinkingLevel: "minimal" },
         },
       }),
       cache: "no-store",
@@ -243,7 +243,7 @@ export async function extractStockMetrics(
       ?.filter((m) => typeof m?.label === "string" && (m.label as string).trim().length > 0 && (typeof m?.value === "string" || typeof m?.value === "number"))
       .map((m): RawStockMetric => ({ label: m.label as string, value: String(m.value) }));
     const title = typeof data?.title === "string" ? data.title.trim() : "";
-    console.log(`[stockhealth] extracted ${clean?.length ?? 0} raw metrics (title=${title ? JSON.stringify(title) : "none"}) from ${images.length} image(s)`);
+    console.log(`[stockhealth] model=${GEMINI_MODEL} extracted ${clean?.length ?? 0} raw metrics (title=${title ? JSON.stringify(title) : "none"}) from ${images.length} image(s)`);
     return clean && clean.length
       ? { data: { title: title || undefined, metrics: clean }, provider: "gemini", reason: "ok" }
       : { data: null, provider: "none", reason: "invalid_json" };
@@ -253,7 +253,7 @@ export async function extractStockMetrics(
 }
 
 /**
- * Gemini first (free); Anthropic only as fallback. Every decision point emits an
+ * Gemini first; Anthropic only as fallback. Every decision point emits an
  * explicit diagnostic so an unattended run reveals exactly why a provider was
  * used: unavailable, skipped, attempted+failed, rate-limited, unauthorized,
  * crashed, or succeeded. Never logs key values — only boolean presence.
@@ -279,7 +279,7 @@ export async function interpretWithProvider<T>(
   } else if (!hasGemini) {
     console.log(`[gen] provider=gemini skipped reason=missing_api_key`);
   } else {
-    console.log(`[gen] attempting provider=gemini`);
+    console.log(`[gen] attempting provider=gemini model=${GEMINI_MODEL}`);
     let g: ProviderResult<T>;
     try {
       g = await geminiInterpret<T>(system, user);
@@ -360,7 +360,7 @@ export async function interpretWithProvider<T>(
   return { data: null, provider: "none", reason: "no_key" };
 }
 
-// ── Google Gemini (free tier) ──
+// ── Google Gemini ──
 async function geminiInterpret<T>(system: string, user: string): Promise<ProviderResult<T>> {
   const key = process.env.GEMINI_API_KEY!;
   const { res, timedOut, error } = await fetchTimeout(
@@ -373,13 +373,10 @@ async function geminiInterpret<T>(system: string, user: string): Promise<Provide
         contents: [{ role: "user", parts: [{ text: user }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          temperature: 0.4,
           maxOutputTokens: 8192,
-          // gemini-2.5-flash is a reasoning model; hidden thinking tokens count against
-          // maxOutputTokens and were truncating the JSON (finishReason=MAX_TOKENS) at ~4.7k
-          // chars, forcing slow Anthropic fallbacks that blew the 180s cron ceiling.
-          // Disabling thinking frees the whole budget for the actual JSON output.
-          thinkingConfig: { thinkingBudget: 0 },
+          // Gemini 3 uses thinking levels; keep latency low for the scheduled pipeline.
+          // Sampling parameters are deprecated on 3.5 Flash-Lite, so omit temperature.
+          thinkingConfig: { thinkingLevel: "minimal" },
         },
       }),
       cache: "no-store",

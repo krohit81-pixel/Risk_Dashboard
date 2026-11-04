@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A mobile-first (iPhone Safari, add-to-homescreen) morning risk briefing for a global-bank CRO,
 personalized to Mizuho. Next.js 14 App Router, TypeScript, Tailwind, single client page
 (`app/page.tsx`) driving four tabs (Home / Markets / Research / Learn) plus a Settings panel
-reached from a header hamburger button. No test suite — see Verification below.
+reached from a header hamburger button. Focused provider tests — see Verification below.
 
 **Starting a fresh session? Read this file top to bottom, then skim the two reference docs in
 `documents/` (currently `engineering-reference-v5_17_1.md` = file-by-file/technical map, env
@@ -17,6 +17,10 @@ relationship). `README.md` has the per-version changelog. Older `documents/*_v5_
 source material for the Mizuho Knowledge Repository, unrelated to app docs.** Hosting/repo:
 GitHub `krohit81-pixel/Risk_Dashboard` (public) → Vercel project `global-risk-dashboard`, live at
 https://global-risk-dashboard.vercel.app.
+
+**v5.17.2 addendum:** `documents/gemini-migration-v5_17_2.md` updates the v5.17.1
+reference pair for Gemini 3.5 Flash-Lite and deployment requirements. Older model names
+in historical release notes describe their release, not the current default.
 
 ## Working agreement with the owner (Rohit)
 - Rohit architects and directs; he does not write code. **Recommend → approve → build**: for
@@ -48,11 +52,14 @@ name them e.g. `app/testfoo/page.tsx` and delete before committing.
 npm install
 npm run dev      # http://localhost:3000 — runs with zero API keys (sample/curated fallbacks)
 npm run build    # production build
+npm test         # mocked Gemini text/vision requests and Anthropic fallback (no keys/network)
+python3 -m unittest discover -s tests -p 'test_*.py'  # newsletter model/request tests
 npm run lint     # next lint (not auto-run; ESLint isn't configured with a preset yet — first
                   # run prompts an interactive setup, so it's not CI-safe as-is)
 ```
 
-There is no automated test suite. **Verification in this repo means `npx tsc --noEmit`** —
+Focused provider regression tests now cover the v5.17.2 migration. Run them alongside
+TypeScript validation. **Verification in this repo includes `npx tsc --noEmit`** —
 run it after any change and treat a clean pass as the bar before calling work done. A full
 `npm run build` also works but requires live env vars (Supabase, FRED, etc.) or it can hang on
 data-fetching steps in a sandboxed/offline environment — prefer `tsc --noEmit` for iteration.
@@ -60,7 +67,7 @@ data-fetching steps in a sandboxed/offline environment — prefer `tsc --noEmit`
 ## Versioning convention (do this on every change)
 
 The repo bumps a version on essentially every change-set, in two places kept in sync:
-- `lib/version.ts` → `APP_VERSION` (renders in the header — current: see that file; last documented release is 5.17.1, a docs-only bump)
+- `lib/version.ts` → `APP_VERSION` (renders in the header — current: see that file; last documented release is 5.17.2, Gemini migration)
 - `package.json` → `"version"` (must match `APP_VERSION` exactly — these have drifted before; double-check both when bumping)
 
 Follow semver-ish judgment: bug fixes / visual tweaks bump the patch (5.6.3 → 5.6.4), a
@@ -151,7 +158,7 @@ that does NOT send this email — only the actual scheduled cron does — so tes
 editorial generation from the UI can't accidentally spam the recipient.
 
 ### LLM provider chain
-`lib/llm.ts` tries **Gemini first** (free tier, `GEMINI_API_KEY`), and only falls back to
+`lib/llm.ts` tries **Gemini first** (`GEMINI_API_KEY`), and only falls back to
 Anthropic (`ANTHROPIC_API_KEY`) if Gemini errors or returns nothing. Neither key present →
 curated fallback content, not a broken UI. Any new LLM-generated field should follow the same
 pattern: grounded (model may only use supplied source material, never invent), schema-validated
