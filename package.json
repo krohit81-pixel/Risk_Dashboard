@@ -1,13 +1,14 @@
 {
   "name": "global-risk-dashboard",
-  "version": "5.17.1",
+  "version": "5.17.2",
   "private": true,
   "description": "Global Risk Intelligence Dashboard — a morning risk briefing for a global-bank CRO.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --test tests/llm.test.cjs"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.6.1",

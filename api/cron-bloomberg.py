@@ -29,7 +29,8 @@ from google.genai import types
 from upstash_redis import Redis
 
 # --- Configuration ---
-MODEL_NAME = "gemini-2.5-flash"
+# Same env name/default as lib/llm.ts; Vercel shares it across both runtimes.
+MODEL_NAME = os.environ.get("GEMINI_MODEL", "").strip() or "gemini-3.5-flash-lite"
 # Fallback provider for when Gemini is down for the whole retry window (recurring 503 spikes).
 ANTHROPIC_MODEL = os.environ.get("LLM_MODEL", "claude-haiku-4-5-20251001")
 MAX_RETRIES = 3
@@ -178,7 +179,7 @@ def _extract_with_retry(ai_client, system_prompt: str, user_prompt: str, anth_cl
                 config=types.GenerateContentConfig(
                     system_instruction=system_prompt,
                     response_mime_type="application/json",
-                    temperature=0.1,
+                    thinking_config=types.ThinkingConfig(thinking_level="minimal"),
                 ),
             )
             return json.loads(response.text)
@@ -460,7 +461,7 @@ def process_bloomberg_inbox(force: bool = False):
 
             # Deterministic briefing classification (footer subscription line → subject/alt → body).
             nl_key, nl_label = detect_newsletter(subject, html_content, text_content)
-            print(f"[bloomberg] extracting \"{raw_subject}\" → {nl_label}")
+            print(f"[bloomberg] extracting \"{raw_subject}\" → {nl_label} via {MODEL_NAME}")
 
             # Per-article links so the model can attach a URL to each story (V4.8).
             article_links = extract_article_links(html_content)

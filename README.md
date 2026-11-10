@@ -54,7 +54,7 @@ curated content when its keys are absent.
 
 ---
 
-## What's on the screen (current, v5.17.1)
+## What's on the screen (current, v5.17.2)
 
 Bottom nav has four tabs; a fifth area (**Settings**) is reached via the hamburger button in
 the header, not the nav bar. The app is responsive (v5.10.4+) — full-width on phones, a wider
@@ -333,7 +333,10 @@ Cost: one LLM run per snapshot, twice daily, over a handful of themes — a few 
 ### LLM provider (Gemini-first)
 
 The interpretation step is provider-agnostic (`lib/llm.ts`):
-- **Gemini is tried first** (free tier — `GEMINI_API_KEY`, model `gemini-2.5-flash`).
+- **Gemini is tried first** (`GEMINI_API_KEY`, default model `gemini-3.5-flash-lite`).
+  `GEMINI_MODEL` overrides the default for both the Next.js app and Python newsletter extractor.
+  Requests use minimal thinking and omit deprecated sampling parameters. See the
+  [v5.17.2 migration/deployment notes](documents/gemini-migration-v5_17_2.md).
 - If Gemini errors or returns nothing **and** `ANTHROPIC_API_KEY` is set, it
   **automatically falls back to Anthropic** (default model Haiku) for that run.
 - Neither key → curated content.
@@ -1116,3 +1119,12 @@ moved to Markets (section 02). Presentation-only change.
 carries hosting/env-var/backlog reference (incl. that Vercel Pro is not required). New
 `documents/engineering-reference-v5_17_1.md` + `risk-dashboard-master-context-v5_17_1.md` supersede the
 v5.14.2 pair. Note: `lib/dailyBriefPdf.tsx` (email currently on hold) still mirrors the pre-5.17.0 Home layout.
+
+
+## Version 5.17.2 — Gemini 3.5 Flash-Lite migration
+
+Both the Next.js provider and Python newsletter extractor default to
+`gemini-3.5-flash-lite` and honor the shared `GEMINI_MODEL` override. All Gemini
+requests use minimal thinking and omit deprecated temperature settings. Anthropic
+fallback and the weekly Anthropic-only jobs are unchanged. Includes focused mocked
+provider regression tests; see [migration and deployment notes](documents/gemini-migration-v5_17_2.md).
